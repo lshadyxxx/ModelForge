@@ -13,6 +13,7 @@ from modelforge.settings import get_settings
 from modelforge.errors import AppError, configure_errors
 from modelforge.infrastructure.http import read_bounded_body
 from modelforge.modules.models import FileRegistry
+from modelforge.modules.models import router as models_router
 from modelforge.modules.datasets import router as datasets_router
 
 
@@ -32,6 +33,7 @@ async def lifespan(app):
 app = FastAPI(title="ModelForge API", version="0.1.0", lifespan=lifespan)
 configure_errors(app)
 app.include_router(datasets_router)
+app.include_router(models_router)
 
 
 @app.get("/api/v1/health/live")

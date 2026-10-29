@@ -26,6 +26,12 @@ class Settings(BaseSettings):
     dataset_preview_samples: int = 20
     dataset_limits_version: str = "initial-2026-10-29"
     dataset_limits_locked: bool = False
+    model_file_limit_bytes: int = 20 * 1024**3
+    model_total_limit_bytes: int = 100 * 1024**3
+    model_file_count_limit: int = 10_000
+    model_limits_version: str = 'initial-2026-10-30'
+    model_limits_locked: bool = False
+    model_temporary_directory: str = '/tmp/modelforge-models'
 
     def conninfo(self) -> str:
         return make_conninfo(host=self.pg_host, port=self.pg_port,

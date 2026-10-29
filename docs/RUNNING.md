@@ -1,6 +1,6 @@
 # 本地运行与第一阶段验收
 
-本批只覆盖已完成的 ticket 01 基础骨架。完整 Compose、真实存储与故障恢复结果见[完整验收记录](implementation/full-compose-2026-10-29.md)；历史分阶段结果保留在[初轮实施记录](implementation/phase-1-2026-10-29.md)及[缓存镜像复验](implementation/cached-storage-2026-10-29.md)。`designs/` 保留完整演示，`frontend/` 只开放实际实现的工作台。
+当前运行包括 ticket 01 基础骨架、数据集后端及模型目录上传后端。完整 Compose、真实存储与故障恢复结果见[基础骨架验收](implementation/full-compose-2026-10-29.md)，模型能力边界见[模型实施记录](implementation/models-2026-10-30.md)。`designs/` 保留完整演示，`frontend/` 目前只开放实际实现的工作台；数据集/模型管理 UI 尚未接通。
 
 ## 启停
 
@@ -129,3 +129,17 @@ backend\.venv\Scripts\python.exe scripts/acceptance-datasets.py
 | `DELETE` | `/api/v1/dataset-versions/{version_id}` | 删除未引用版本及其对象 |
 
 数据集容量初始值由后端环境配置提供：100 MiB 单文件、100000 个有效样本、1 MiB 单物理行、最多 100 个校验错误和 20 个预览样本。这些限制用于首版实现，尚未替代后续真实传输性能验证。
+
+## 模型目录上传验收
+
+已有 Compose 服务启动后运行：
+
+```powershell
+backend/.venv/Scripts/python.exe scripts/acceptance-models.py
+```
+
+脚本使用 fixture 字节验证传输与登记，执行真实 HTTP 中断、文件级恢复、MinIO 回读、PostgreSQL 核对、API 重启、行锁冲突和引用删除保护；最后清理本次数据，输出证据的 OS 临时目录。可以用 `--output-dir <目录>` 指定证据位置。脚本默认工作台端口 8092；自定义端口时需先调整脚本。不会租卡或加载真实模型。
+
+模型目录 API：先 `POST /api/v1/models/directory-imports` 提交 `{name,model_id?,files:[{path,size_bytes,sha256}]}`；随后对 `/api/v1/model-versions/{id}/files?path=...` 按文件 PUT 原始字节，再 POST `/complete`。POST `/resume` 提交原 files 清单，返回 reusable_paths/upload_paths；POST `/cancel` 可取消待上传版本。GET 版本或 `/api/v1/models` 查询，DELETE 未引用版本。文件改变时新建版本。
+
+`GET /api/v1/models/limits` 返回初始限制及未锁定状态。初始为 20 GiB/文件、100 GiB/目录、10000 文件；临时文件位于容器可重建目录。存储检查全部通过的 available 仍为兼容性未验证。忙碌写操作返回 `409 model_busy`，表示未接受；稍后重试。取消不强行打断已经执行中的文件存储操作。公开仓库下载、优云外部引用及模型加载验收另行实现。

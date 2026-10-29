@@ -67,6 +67,18 @@ def test_dataset_limits_contract_reports_configuration(monkeypatch):
     }
 
 
+def test_model_limits_contract_reports_configuration(monkeypatch):
+    from modelforge.settings import Settings
+    settings = Settings(model_file_limit_bytes=17, model_total_limit_bytes=31,
+                        model_file_count_limit=5, model_limits_version='test-models', model_limits_locked=False)
+    monkeypatch.setattr(app.state, 'resources', SimpleNamespace(settings=settings), raising=False)
+    response = TestClient(app).get('/api/v1/models/limits')
+    assert response.status_code == 200
+    assert response.json() == {'file_limit_bytes': 17, 'total_limit_bytes': 31,
+        'file_count_limit': 5, 'configuration_version': 'test-models', 'locked': False,
+        'resume_granularity': 'file'}
+
+
 def test_unexpected_errors_are_sanitized():
     from fastapi import FastAPI
     from modelforge.errors import configure_errors
