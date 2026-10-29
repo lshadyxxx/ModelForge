@@ -1,4 +1,5 @@
 import os
+from types import SimpleNamespace
 os.environ.setdefault("MF_PG_PASSWORD", "test-only")
 os.environ.setdefault("MF_MINIO_ACCESS_KEY", "test-only")
 os.environ.setdefault("MF_MINIO_SECRET_KEY", "test-only-secret")
@@ -40,6 +41,30 @@ def test_not_found_uses_same_envelope():
 def test_invalid_request_id_is_replaced():
     response = TestClient(app).get("/api/v1/health/live", headers={"X-Request-ID": "x" * 65})
     assert response.headers["X-Request-ID"] != "x" * 65
+
+
+def test_dataset_limits_contract_reports_configuration(monkeypatch):
+    settings = SimpleNamespace(
+        dataset_file_limit_bytes=100,
+        dataset_sample_limit=200,
+        dataset_line_limit_bytes=300,
+        dataset_validation_error_limit=40,
+        dataset_preview_samples=20,
+        dataset_limits_version="test",
+        dataset_limits_locked=False,
+    )
+    monkeypatch.setattr(app.state, "resources", SimpleNamespace(settings=settings), raising=False)
+    response = TestClient(app).get("/api/v1/datasets/limits")
+    assert response.status_code == 200
+    assert response.json() == {
+        "file_limit_bytes": 100,
+        "sample_limit": 200,
+        "line_limit_bytes": 300,
+        "validation_error_limit": 40,
+        "preview_samples": 20,
+        "configuration_version": "test",
+        "locked": False,
+    }
 
 
 def test_unexpected_errors_are_sanitized():

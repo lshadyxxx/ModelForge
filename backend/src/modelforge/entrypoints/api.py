@@ -11,7 +11,9 @@ from starlette.concurrency import run_in_threadpool
 from modelforge.bootstrap import Resources
 from modelforge.settings import get_settings
 from modelforge.errors import AppError, configure_errors
+from modelforge.infrastructure.http import read_bounded_body
 from modelforge.modules.models import FileRegistry
+from modelforge.modules.datasets import router as datasets_router
 
 
 def now():
@@ -29,6 +31,7 @@ async def lifespan(app):
 
 app = FastAPI(title="ModelForge API", version="0.1.0", lifespan=lifespan)
 configure_errors(app)
+app.include_router(datasets_router)
 
 
 @app.get("/api/v1/health/live")
@@ -86,13 +89,12 @@ async def ready(request: Request):
 @app.post("/api/v1/files", status_code=201)
 async def upload(request: Request):
     resources = request.app.state.resources
-    data = bytearray()
-    async for chunk in request.stream():
-        if len(data) + len(chunk) > resources.settings.file_limit_bytes:
-            raise AppError(413, "file_too_large", "Foundation verification files must not exceed 1 MiB")
-        data.extend(chunk)
-    if not data:
-        raise AppError(422, "validation_error", "File must not be empty", [{"path": "body", "message": "Empty file"}])
+    data = await read_bounded_body(
+        request,
+        resources.settings.file_limit_bytes,
+        too_large_message="Foundation verification files must not exceed 1 MiB",
+        empty_message="File must not be empty",
+    )
     row = await run_in_threadpool(FileRegistry(resources).upload, bytes(data), "application/octet-stream")
     return jsonable_encoder(row)
 

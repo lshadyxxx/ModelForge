@@ -102,3 +102,30 @@ try { ./scripts/start.ps1 } finally { Remove-Item Env:MF_GOPROXY }
 `MF_GOPROXY` 只传给 MinIO 构建；未设置时仍使用 `https://proxy.golang.org,direct`。Go checksum database 保持启用。镜像标签会变化，本次实际 digest、工具版本和构建输出保存在 `.runtime/full-compose-20261029/`。重新构建时应重新记录，旧记录不能证明新镜像身份。
 
 MinIO 由已选官方 release 的 Go module 构建；`go install` 产物的版本字符串为 `DEVELOPMENT.GOGET`，不能用它确认 release。应读取二进制的 Go module build information 并对照本次构建记录。
+
+## 数据集生命周期验收
+
+ticket 02 的真实验收脚本需要 API、Worker、PostgreSQL 和 MinIO 已经由 Compose 启动：
+
+```powershell
+backend\.venv\Scripts\python.exe -m pytest -q backend/tests
+backend\.venv\Scripts\python.exe scripts/acceptance-datasets.py
+```
+
+脚本会上传有效和无效 messages JSONL，直接核对 PostgreSQL DatasetVersion 元数据，使用 API 容器内客户端回读 MinIO 原始对象和 split manifest，验证 10%/seed 42 拆分、发布、下载 checksum、无效版本清理、引用保护及最终删除。它通过真实读写和内容摘要判断结果，端口开放、健康状态或模拟数据不能替代这些步骤。详细结果见[数据集实施记录](implementation/datasets-2026-10-29.md)。
+
+数据集 API 入口：
+
+| 方法 | 路径 | 作用 |
+|---|---|---|
+| `POST` | `/api/v1/datasets?name=...` | 创建数据集及首个版本，上传 messages JSONL |
+| `GET` | `/api/v1/datasets/limits` | 查看服务端容量限制、配置版本和是否已锁定 |
+| `POST` | `/api/v1/datasets/{dataset_id}/versions` | 为已有数据集创建新版本 |
+| `GET` | `/api/v1/datasets` | 列出数据集版本 |
+| `GET` | `/api/v1/dataset-versions/{version_id}` | 查看校验、预览、拆分和引用状态 |
+| `GET` | `/api/v1/dataset-versions/{version_id}/content` | 下载并核对原始文件 |
+| `POST` | `/api/v1/dataset-versions/{version_id}/split` | 创建或复用确定性验证集拆分 |
+| `POST` | `/api/v1/dataset-versions/{version_id}/publish` | 发布有效不可变版本 |
+| `DELETE` | `/api/v1/dataset-versions/{version_id}` | 删除未引用版本及其对象 |
+
+数据集容量初始值由后端环境配置提供：100 MiB 单文件、100000 个有效样本、1 MiB 单物理行、最多 100 个校验错误和 20 个预览样本。这些限制用于首版实现，尚未替代后续真实传输性能验证。

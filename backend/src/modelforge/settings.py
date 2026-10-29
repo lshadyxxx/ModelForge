@@ -19,6 +19,13 @@ class Settings(BaseSettings):
     worker_url: str = "http://worker:8103"
     probe_timeout: float = 2.0
     file_limit_bytes: int = 1048576
+    dataset_file_limit_bytes: int = 100 * 1024 * 1024
+    dataset_sample_limit: int = 100_000
+    dataset_line_limit_bytes: int = 1 * 1024 * 1024
+    dataset_validation_error_limit: int = 100
+    dataset_preview_samples: int = 20
+    dataset_limits_version: str = "initial-2026-10-29"
+    dataset_limits_locked: bool = False
 
     def conninfo(self) -> str:
         return make_conninfo(host=self.pg_host, port=self.pg_port,
