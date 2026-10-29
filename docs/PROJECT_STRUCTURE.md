@@ -1,6 +1,6 @@
 # 项目结构设计
 
-状态：目录与模块设计，尚未实现。本文是代码布局、职责归属和依赖方向的统一入口；运行拓扑及数据归属见 [ARCHITECTURE.md](ARCHITECTURE.md)，技术选型见 [TECH_STACK.md](TECH_STACK.md)。
+状态：目标目录与模块设计；基础骨架已按需落地，尚未创建的业务模块仍属于规划。本文是代码布局、职责归属和依赖方向的统一入口；运行拓扑及数据归属见 [ARCHITECTURE.md](ARCHITECTURE.md)，技术选型见 [TECH_STACK.md](TECH_STACK.md)。
 
 ## 设计选择
 
@@ -227,4 +227,4 @@ features/training/
 | 未明确的 GPU 规则位置 | `modules/resources/` | 训练与推理只维护一份租约规则 |
 | 前端并列 `components/`、`lib/` | 业务内容归 feature，通用内容归 `shared/` | 一项业务变更的相关代码集中在同一处 |
 
-本轮只更新设计文档及读取入口，不预建空模块或 Compose 配置，不安装依赖、生成应用代码或启动服务。
+最初目录设计轮次仅更新文档及读取入口。后续 ticket 01 已按需实现基础骨架与 Compose；未创建的业务模块继续遵循按阶段创建规则，当前范围与证据见[完整验收记录](implementation/full-compose-2026-10-29.md)。

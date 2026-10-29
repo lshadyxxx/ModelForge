@@ -1,6 +1,6 @@
 # 技术栈决策
 
-本页记录 ModelForge 的架构决策；当前仓库仍处于初始化阶段，组件尚未全部实现。
+本页记录 ModelForge 的架构决策；本地基础骨架已实现，业务组件逐票实施；具体版本和验收状态见[运行文档](RUNNING.md)。
 
 首版追加优云智算 API 驱动的远程训练、权重回传与推理试用，见 [ADR-0001](adr/0001-ucompshare-remote-execution.md)。下方本地运行图保留为参考，云端执行拓扑以 [ARCHITECTURE.md](ARCHITECTURE.md) 的远程执行边界为准。
 

@@ -26,3 +26,7 @@ MinIO 服务端使用官方 RELEASE.2025-10-15T17-29-55Z 源码。GitHub latest 
 ## 本机缓存复验
 
 已核对postgres:17.9与minio/minio:RELEASE.2024-12-18T13-15-44Z的RepoDigest、平台和版本输出，使用pull_policy: never运行独立容器完成真实存储验收。旧版本仅用于本次本地兼容性复验，不作为新推荐或默认版本降级。完整结果见[缓存镜像复验](cached-storage-2026-10-29.md)。镜像下载超时主要阻塞应用构建及默认目标镜像，不能概括为本机没有可运行的PostgreSQL/MinIO。
+
+## 后续完整复验（2026-10-29）
+
+完整根 Compose 已完成源码构建、Linux Python 3.13 运行、nginx 同源访问、单次迁移成功/重复/受控失败门槛与长时依赖故障恢复。实际镜像 digest 和依赖解析均已记录；ticket 01 的当前状态及证据以[完整验收记录](full-compose-2026-10-29.md)为准，上文保留为历史结果。

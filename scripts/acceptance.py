@@ -72,16 +72,33 @@ def main():
         command(["up", "-d", "--wait", "--wait-timeout", "180"])
         wait_status()
         verify("verify")
+        api_id = command(["ps", "-q", "api"]).stdout.strip()
+        api_started = command(["--format", "{{.State.StartedAt}}", api_id], prefix=["docker", "inspect"]).stdout.strip()
         for service in ["postgres", "minio", "worker"]:
             try:
                 command(["stop", service])
                 wait_status(service)
+                if service == "postgres":
+                    # Exceed the pool's retry window and the former eight-waiter
+                    # limit, as a continuously polling workbench does.
+                    end = time.monotonic() + 40
+                    while time.monotonic() < end:
+                        ensure(http("/api/v1/status", args.web)[1]["components"][service]["state"] == "down",
+                               "Stopped PostgreSQL must remain down during extended outage")
+                        time.sleep(1)
                 ensure(http("/api/v1/health/live")[0] == 200, "API liveness must remain available")
                 ensure(http("/api/v1/health/ready")[0] == (200 if service == "worker" else 503), "Readiness misreports dependency failure: " + service)
                 ensure(http("/api/v1/status", args.web)[1]["components"][service]["state"] == "down", "Proxy status must reflect stopped dependency")
             finally:
                 command(["start", service])
             wait_status()
+            ensure(command(["ps", "-q", "api"]).stdout.strip() == api_id,
+                   "Dependency recovery must not require API container recreation")
+            ensure(command(["--format", "{{.State.StartedAt}}", api_id], prefix=["docker", "inspect"]).stdout.strip() == api_started,
+                   "Dependency recovery must not require API restart")
+        # The recovered API's own pool must support writes and reads too, not
+        # merely fresh connections from an independent verification process.
+        verify("lifecycle")
         command(["stop", "api"])
         command(["exec", "-T", "worker", "python", "-c", "import urllib.request; raise SystemExit(0 if urllib.request.urlopen('http://localhost:8103/health/live',timeout=2).status == 200 else 1)"])
         command(["start", "api"])

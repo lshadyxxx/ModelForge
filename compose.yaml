@@ -33,6 +33,8 @@ services:
     build:
       context: .
       dockerfile: deploy/docker/minio.Dockerfile
+      args:
+        GOPROXY: ${MF_GOPROXY:-https://proxy.golang.org,direct}
     command: [server, /data, --console-address, ':9001']
     environment:
       MINIO_ROOT_USER: ${MF_MINIO_ACCESS_KEY}

@@ -1,10 +1,10 @@
 # 本地运行与第一阶段验收
 
-本批只覆盖 ticket 01 基础骨架。本机缓存镜像的真实存储复验已通过；默认全应用Compose仍有未验门槛，见[实施记录](implementation/phase-1-2026-10-29.md)及[缓存镜像复验](implementation/cached-storage-2026-10-29.md)。`designs/` 保留完整演示，`frontend/` 只开放实际实现的工作台。
+本批只覆盖已完成的 ticket 01 基础骨架。完整 Compose、真实存储与故障恢复结果见[完整验收记录](implementation/full-compose-2026-10-29.md)；历史分阶段结果保留在[初轮实施记录](implementation/phase-1-2026-10-29.md)及[缓存镜像复验](implementation/cached-storage-2026-10-29.md)。`designs/` 保留完整演示，`frontend/` 只开放实际实现的工作台。
 
 ## 启停
 
-需要 Docker Desktop（Linux containers）、Compose v2+ 和 PowerShell 5.1+ / 7。首次构建需要连接 Docker Hub、PyPI、npm 和 Go module proxy。从项目根目录运行：
+需要 Docker Desktop（Linux containers）、Compose v2+ 和 PowerShell 5.1+ / 7。首次构建需要获取 Docker 基础镜像、PyPI、npm 和 Go modules。网络受限时见下方构建说明。从项目根目录运行：
 
 ```powershell
 ./scripts/start.ps1
@@ -79,6 +79,26 @@ python -m venv .venv
 ./.venv/Scripts/python.exe -m pip check
 ```
 
-开发前端 `npm run dev` 仅监听回环 5176，`/api` 代理至 8102。容器目标 Python 3.13，本次宿主检查环境为 3.14；宿主测试通过不代表容器兼容性已验证。
+开发前端 `npm run dev` 仅监听回环 5176，`/api` 代理至 8102。容器目标 Python 3.13，本次宿主检查环境为 3.14。完整 Compose 复验已实际运行 Linux Python 3.13.18；宿主和容器检查分别保留记录。
 
-完整CLI验收（仅本项目、执行过程中会启停依赖、最终停止服务）：`python scripts/acceptance.py`。自定义端口时传 `--api` 和 `--web`；原始输出写到 `.runtime/acceptance.jsonl`，UI故障截图仍需单独核对。
+完整CLI验收包含 PostgreSQL 持续断开至少 40 秒并持续轮询，恢复后在原 API 容器核对状态与实际文件读写；不能通过重启 API 绕过恢复缺陷。仅本项目、执行过程中会启停依赖、最终停止服务：`python scripts/acceptance.py`。自定义端口时传 `--api` 和 `--web`；原始输出写到 `.runtime/acceptance.jsonl`，UI故障截图仍需单独核对。
+
+## 构建网络受限时
+
+本次 Docker Hub 不可达时，从 AWS ECR Public 的 Docker Official Images 命名空间取得同名基础镜像并本地重标记，没有改 Docker 全局配置。可在项目根目录按需执行；每步失败应停止：
+
+```powershell
+$baseImages = @('python:3.13-slim', 'node:22-slim', 'golang:1', 'debian:bookworm-slim', 'nginx:stable-alpine', 'postgres:17')
+foreach ($image in $baseImages) {
+    docker pull "public.ecr.aws/docker/library/$image"
+    if ($LASTEXITCODE -ne 0) { throw "Base image pull failed: $image" }
+    docker tag "public.ecr.aws/docker/library/$image" $image
+    if ($LASTEXITCODE -ne 0) { throw "Base image tag failed: $image" }
+}
+$env:MF_GOPROXY = 'https://goproxy.cn,direct'
+try { ./scripts/start.ps1 } finally { Remove-Item Env:MF_GOPROXY }
+```
+
+`MF_GOPROXY` 只传给 MinIO 构建；未设置时仍使用 `https://proxy.golang.org,direct`。Go checksum database 保持启用。镜像标签会变化，本次实际 digest、工具版本和构建输出保存在 `.runtime/full-compose-20261029/`。重新构建时应重新记录，旧记录不能证明新镜像身份。
+
+MinIO 由已选官方 release 的 Go module 构建；`go install` 产物的版本字符串为 `DEVELOPMENT.GOGET`，不能用它确认 release。应读取二进制的 Go module build information 并对照本次构建记录。

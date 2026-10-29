@@ -6,7 +6,7 @@
 
 首版真实执行接入优云 API 工作流，见 [ADR-0001](adr/0001-ucompshare-remote-execution.md)。优云资源查询、远程任务与数据/产物传输纳入已确认的首版闭环；本地实现顺序拆分在[产品 MVP 任务目录](../<internal-evidence>)。
 
-当前已存在静态原型、实施票据和基础骨架代码；缓存存储复验已通过，完整Compose验收仍未完成，见[实施记录](implementation/phase-1-2026-10-29.md)。进行 UI 重设计或选取实施任务前，读取[功能清单与交互调研入口](FEATURE_INVENTORY.md)，区分首版动作、实际实现证据与交互建议。当前[连续流程原型](../designs/modelforge-mvp/README.md)已做静态交互检查，状态为待用户审阅；旧版三方向保留作对照。应用实施票仍未关闭。
+当前 ticket 01 基础骨架已完成完整 Compose 验收，见[完整验收记录](implementation/full-compose-2026-10-29.md)。进行 UI 重设计或选取实施任务前，读取[功能清单](FEATURE_INVENTORY.md)，区分真实能力与演示。连续流程原型已获用户基本认可，旧版三方向保留作对照；其他业务实施票仍开放。下一批为 ticket 02 数据集生命周期，开始前由用户确认。
 
 各阶段创建的目录、模块职责和依赖规则见 [项目结构设计](PROJECT_STRUCTURE.md)。目标目录按需创建，不作为一次性生成空壳的清单。
 
