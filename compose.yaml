@@ -1,0 +1,93 @@
+name: modelforge
+
+x-backend: &backend
+  image: modelforge-backend:local
+  build:
+    context: ./backend
+    dockerfile: ../deploy/docker/backend.Dockerfile
+  env_file: .env
+  environment:
+    MF_PG_HOST: postgres
+    MF_MINIO_ENDPOINT: minio:9000
+    MF_WORKER_URL: http://worker:8103
+  init: true
+
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: ${MF_PG_DATABASE}
+      POSTGRES_USER: ${MF_PG_USER}
+      POSTGRES_PASSWORD: ${MF_PG_PASSWORD}
+    volumes:
+      - ./docker-db/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
+      interval: 3s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+
+  minio:
+    image: modelforge-minio:RELEASE.2025-10-15T17-29-55Z
+    build:
+      context: .
+      dockerfile: deploy/docker/minio.Dockerfile
+    command: [server, /data, --console-address, ':9001']
+    environment:
+      MINIO_ROOT_USER: ${MF_MINIO_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${MF_MINIO_SECRET_KEY}
+    volumes:
+      - ./docker-db/minio:/data
+    healthcheck:
+      test: [CMD, curl, -f, --max-time, '2', http://localhost:9000/minio/health/live]
+      interval: 3s
+      timeout: 3s
+      retries: 40
+      start_period: 10s
+    restart: unless-stopped
+
+  migrate:
+    <<: *backend
+    command: [python, -m, modelforge.entrypoints.initialize]
+    depends_on:
+      postgres: {condition: service_healthy}
+      minio: {condition: service_healthy}
+    restart: 'no'
+
+  api:
+    <<: *backend
+    command: [uvicorn, modelforge.entrypoints.api:app, --host, 0.0.0.0, --port, '8102', --no-access-log]
+    ports:
+      - '127.0.0.1:${MF_API_PORT:-8102}:8102'
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://localhost:8102/api/v1/health/live', timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
+  worker:
+    <<: *backend
+    command: [uvicorn, modelforge.entrypoints.worker:app, --host, 0.0.0.0, --port, '8103', --no-access-log]
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://localhost:8103/health/live', timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
+  web:
+    image: modelforge-web:local
+    build:
+      context: .
+      dockerfile: deploy/docker/web.Dockerfile
+    ports:
+      - '127.0.0.1:${MF_WEB_PORT:-8092}:8080'
+    depends_on:
+      api: {condition: service_healthy}
+    restart: unless-stopped

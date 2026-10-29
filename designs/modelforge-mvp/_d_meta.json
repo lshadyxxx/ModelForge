@@ -1,0 +1,35 @@
+{
+  "type": "design",
+  "designSystems": [],
+  "primaryDesignSystem": null,
+  "assets": {
+    "ModelForge continuous MVP flow": {
+      "versions": [
+        {
+          "path": "index.html",
+          "createdAt": "2026-10-28T16:02:16.595Z",
+          "status": "needs-review",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          }
+        }
+      ]
+    },
+    "ModelForge legacy ABC variants": {
+      "versions": [
+        {
+          "path": "legacy-variants.html",
+          "createdAt": "2026-10-28T16:02:16.666Z",
+          "status": "changes-requested",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          }
+        }
+      ]
+    }
+  },
+  "createdAt": "2026-10-28T16:02:16.596Z",
+  "updatedAt": "2026-10-28T17:48:07.817874+00:00"
+}

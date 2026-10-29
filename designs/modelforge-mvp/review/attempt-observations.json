@@ -1,0 +1,16 @@
+{
+  "failed": {
+    "unpublished": "执行训练阶段失败：显存不足（演示）\n已模拟确认进程退出和实例删除。输入快照和旧 Attempt 保留；重试创建新的 Attempt。\n按原输入重试",
+    "blocked": true
+  },
+  "retried": "提交时的固定快照\n基础模型\n示例文本模型 · 0.6B\n模型内容指纹\ndemo-base-06b\n数据版本\n产品助手对话 v3\n拆分身份\ndemo-split-2-seed-42\n预设\ndemo-text-lora-v1 · 待真实验证\n{\n  \"name\": \"产品助手 · LoRA 微调\",\n  \"epochs\": 3,\n  \"lr\": 0.0002,\n  \"sequence\": 2048,\n  \"batch\": 1,\n  \"accumulation\": 8,\n  \"rank\": 8,\n  \"alpha\": 16,\n  \"dropout\": 0,\n  \"scheduler\": \"cosine\",\n  \"warmup\": 0.1,\n  \"validation\": 10,\n  \"seed\": 42\n}\n\n失败重试保留此快照。修改输入须创建新任务；新 Attempt 不覆盖旧记录。\n\nAttempt 历史\nA1\nfailed\nA2\n执行中\n输入与来源\n模型\n示例文本模型 · 0.6B\n数据\n产品助手对话 v3\n验证拆分\n10% · 已固定\n方式\n文本 SFT + LoRA\n\n输入、产物和实例分别追踪。此页所有指标与状态均为本地演示。\n\n下一步\n\n执行期间可以离开此页，演示继续。真实任务由 Worker 执行。",
+  "cancelled": {
+    "text": "训练已取消，实例已回收\n已模拟核对远程进程退出并删除实例。保留已取得日志，不发布部分 Adapter。\n重试为新的 Attempt",
+    "gpu": "GPU 名额可申请"
+  },
+  "cleanup": {
+    "blocked": true,
+    "gpu": "GPU 名额占用中",
+    "cancelHidden": true
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "checkedAt": "2026-10-28T16:02:09.758Z",
+  "checks": {
+    "missingInput": true,
+    "unknownImage": true,
+    "noStock": true,
+    "paramError": "参数超出范围，请检查标红字段和数值边界。",
+    "assetLibrary": 1,
+    "artifacts": [
+      "BEST ADAPTER\nMinIO 已校验\nBest · v1\n\n最低有效验证 Loss 对应的保存点\n\n验证 Loss\n1.490\n训练位置\nepoch 2\n任务 / Attempt\nTF-001 / A1\n版本身份\ndemo-tf-001-a1-best\n选择 Best 试用\n文件清单",
+      "FINAL ADAPTER\nMinIO 已校验\nFinal · v1\n\n本次训练结束时的最后输出\n\n验证 Loss\n1.560\n训练位置\nepoch 3\n任务 / Attempt\nTF-001 / A1\n版本身份\ndemo-tf-001-a1-final\n选择 Final 试用\n文件清单"
+    ],
+    "multiTurn": 4,
+    "clearKeepsInstance": true,
+    "idleRecycled": true
+  }
+}

@@ -1,0 +1,50 @@
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# JavaScript
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+
+# Local data and model outputs
+/data/
+/datasets/
+/artifacts/
+/models/
+/model-cache/
+/runtime/
+*.db
+*.sqlite
+*.sqlite3
+
+# Editor and operating system files
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
+
+# Rebuildable runtime workspace
+.runtime/
+
+# Local bind-mounted PostgreSQL and MinIO data
+/docker-db/**
+!/docker-db/.gitkeep
+
+# Build outputs
+dist/
+*.egg-info/
+
+# Local-only internal integration research
+<internal-evidence>*.md

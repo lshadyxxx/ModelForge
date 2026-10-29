@@ -1,0 +1,10 @@
+{
+  "invalid": {
+    "error": "样本数\n40 条\n版本状态\n草稿\n存储\nMinIO（演示）\n第 3 行：messages[1].content 为空\n此版本不能发布；请在外部修正文件后重新上传。在线逐行编辑不在首版范围。",
+    "publishEnabled": false
+  },
+  "interrupted": "MODELS\n模型\n\n基础模型、导入记录和训练产物拥有各自的版本与来源。\n\n导入或登记模型\n基础模型\n导入记录\n训练产物\n目录上传模型 · 演示\n导入中断\n\n完整目录上传 · 演示导入 · 文件校验后才能选作基础模型\n\nconfig.json\n已校验，可复用\ntokenizer.json\n已校验，可复用\nmodel.safetensors\n待重新上传\n恢复失败文件\n取消导入",
+  "resumed": "MODELS\n模型\n\n基础模型、导入记录和训练产物拥有各自的版本与来源。\n\n导入或登记模型\n基础模型\n导入记录\n训练产物\n目录上传模型 · 演示\n校验完成\n\n完整目录上传 · 演示导入 · 文件校验后才能选作基础模型\n\nconfig.json\n已校验，可复用\ntokenizer.json\n已校验，可复用\nmodel.safetensors\n已校验，可复用\n查看基础模型",
+  "compute": "COMPUTE / YOUYUN\n计算环境\n\n资源目录用于选择，实例记录用于追踪训练和试用的生命周期。\n\n刷新目录\n以下配置、库存、价格、镜像均为原型样例。GPU A/B/C 不代表供应商真实型号，不预选实际验收硬件。\n资源目录\n单 GPU\n资源\t显存 / CPU / 内存\t库存\t示例单价\t操作\nGPU A\n区域 A · 演示\n\t24 GB / 8 vCPU / 32 GB\t有库存\t¥2.40 / 小时\t用于新训练\nGPU B\n区域 A · 演示\n\t48 GB / 12 vCPU / 64 GB\t有库存\t¥4.80 / 小时\t用于新训练\nGPU C\n区域 A · 演示\n\t16 GB / 8 vCPU / 32 GB\t无库存\t¥1.80 / 小时\t用于新训练\n运行镜像\n兼容状态需与模型、运行时和目录挂载一起核对\n文本训练环境 · 演示 v1\n演示兼容\n通用 Python 环境 · 演示\n未知\nvLLM 推理环境 · 演示 v1\n演示兼容\n平台创建的实例\n首版不提供独立租卡或已有实例接管\n实例 / 用途\t关联记录\t状态\tGPU 占用\t操作\ndemo-train-TF-002-a3\n训练\n\tTF-002 / A3\t已确认删除\t已释放\t关联训练\ndemo-infer-1\n推理试用\n\tFinal / TF-001\t已确认删除\t已释放\t关联试用",
+  "tasks": 2
+}

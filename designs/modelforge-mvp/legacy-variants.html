@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="ModelForge 首版产品可点击原型，包含三种后台布局方向和关键失败状态演示。">
+  <title>ModelForge MVP 原型</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div id="app" class="app-shell">
+    <aside id="side-rail" class="side-rail" aria-label="侧边导航"></aside>
+    <div class="workspace">
+      <header class="topbar">
+        <a class="brand" href="?variant=A" aria-label="ModelForge 工作台">
+          <span class="brand-mark" aria-hidden="true">M</span>
+          <span><strong>ModelForge</strong><small>模型工程台</small></span>
+        </a>
+        <nav id="top-navigation" class="top-navigation" aria-label="主导航"></nav>
+        <div class="top-actions">
+          <label class="scenario-control" for="scenario-select">
+            <span>演示状态</span>
+            <select id="scenario-select" aria-label="切换原型演示状态">
+              <option value="normal">正常流程</option>
+              <option value="dependency-failure">依赖故障</option>
+              <option value="dataset-invalid">数据校验失败</option>
+              <option value="import-interrupted">模型导入中断</option>
+              <option value="resource-empty">GPU 缺货</option>
+              <option value="resource-incompatible">组合不兼容</option>
+              <option value="training-cancelled">训练取消中</option>
+              <option value="artifact-sync-failure">产物回传失败</option>
+              <option value="cleanup-failure">实例清理失败</option>
+            </select>
+          </label>
+          <span class="demo-stamp">仅原型演示</span>
+        </div>
+      </header>
+      <div id="workflow-strip" class="workflow-strip"></div>
+      <div class="workspace-grid">
+        <main id="screen" class="screen" data-screen-label="工作台" tabindex="-1"></main>
+        <aside id="inspector" class="inspector" aria-label="上下文状态"></aside>
+      </div>
+    </div>
+    <div class="variant-switcher" role="group" aria-label="切换原型布局方向">
+      <button type="button" class="switch-arrow" data-action="variant-prev" aria-label="上一个布局方向" title="上一个方向">←</button>
+      <span class="switch-label"><strong id="variant-key">A</strong><span id="variant-name">紧凑运营台</span></span>
+      <button type="button" class="switch-arrow" data-action="variant-next" aria-label="下一个布局方向" title="下一个方向">→</button>
+      <span class="switch-divider" aria-hidden="true"></span>
+      <button type="button" class="switch-key" data-action="variant-select" data-variant="A">A</button>
+      <button type="button" class="switch-key" data-action="variant-select" data-variant="B">B</button>
+      <button type="button" class="switch-key" data-action="variant-select" data-variant="C">C</button>
+    </div>
+  </div>
+  <script src="./prototype.js"></script>
+</body>
+</html>

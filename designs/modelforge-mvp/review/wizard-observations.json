@@ -1,0 +1,7 @@
+{
+  "error": "参数超出范围，请检查标红字段和数值边界。",
+  "dimensions": {
+    "width": 390,
+    "scrollWidth": 390
+  }
+}
