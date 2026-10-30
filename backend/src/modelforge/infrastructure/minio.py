@@ -3,10 +3,11 @@ from minio import Minio
 from modelforge.settings import Settings
 
 
-def create_store(settings: Settings) -> Minio:
+def create_store(settings: Settings, *, read_timeout: float | None = None) -> Minio:
     return Minio(settings.minio_endpoint, access_key=settings.minio_access_key.get_secret_value(),
                  secret_key=settings.minio_secret_key.get_secret_value(), secure=settings.minio_secure,
-                 http_client=urllib3.PoolManager(timeout=urllib3.Timeout(connect=2, read=2),
+                 http_client=urllib3.PoolManager(timeout=urllib3.Timeout(
+                     connect=2, read=settings.minio_read_timeout if read_timeout is None else read_timeout),
                                                 retries=False, maxsize=4))
 
 

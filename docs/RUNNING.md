@@ -176,3 +176,19 @@ $testExit = $LASTEXITCODE
 测试在收集阶段拒绝缺少隔离确认或命名不符合 `modelforge_test_*` / `modelforge-test-*` 的目标。该门禁不创建隔离资源，也不证明任意同名前缀资源可安全删除；只清理由本次成功创建的唯一 ID 对应的资源。测试后通过 MinIO 客户端列举并确认该测试 bucket 无待保留数据，再删除其对象和 bucket；使用 PostgreSQL `dropdb` 删除本次 `$db`。失败/中断时保留这两个身份和原始输出，不对应用默认库/桶或未知来源目标自动清理。
 
 集成测试用受控仓库 HTTP fixture；真实 ModelScope 小文件、整模型下载和 GPU 验证分别报告，见[实施记录](implementation/modelscope-2026-10-30.md)。
+
+### 既有真实导入的只读验收
+
+先通过公开 API 创建或重试所需的真实 ModelScope 导入，再对其固定来源运行观察器（将占位值替换为实际身份）：
+
+```powershell
+backend/.venv/Scripts/python.exe scripts/acceptance-modelscope.py --version-id <version-uuid> --repository <owner/model> --revision <40-character-lowercase-commit>
+```
+
+观察器不创建、重试、取消或删除模型，也不加载仓库代码。它仅接受新取得的完整 `available/succeeded` 版本，随后通过 API 容器独立查询 PostgreSQL，并逐对象流式回读全部 MinIO 文件大小/SHA-256，再次读取 API 确认来源未变。需本地 Docker Compose 及默认同源端口 8092；自定义端口尚无命令行选项，不可把脚本误指其他服务。默认等待 7200 秒，`--timeout-seconds` / `--poll-seconds` 调整状态轮询；完成后的独立存储探针另有 1800 秒上限，轮询期限不是全脚本总时长上限。
+
+证据默认写入新的 OS 临时目录；`--output-dir <目录>` 必须为空，避免沿用旧成功报告。HTTP 502/503/504 可在轮询期内重试；存储探针中断或校验失败会失败退出，不发布成功报告，重新运行时使用新目录。
+
+`MF_MINIO_READ_TIMEOUT` 默认 120 秒，取值须有限且大于 0、不超过 600，控制传输与分片完成响应的读取无活动预算；不是整个文件传输的截止时间。连接超时仍为 2 秒，健康检查使用独立客户端和短 `probe_timeout`，不继承长传输预算。
+
+2026-10-30 Qwen3-0.6B 已完成 11 文件、1,519,209,873 字节的真实整模型存储、原有文件复用和 API/Worker 重启后核验。该状态只表示正式文件可用，`compatibility_state=unverified`；不能据此宣称模型可加载、训练/GPU 或业务 UI 已完成。

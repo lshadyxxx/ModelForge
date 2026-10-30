@@ -297,7 +297,9 @@ def test_disconnected_worker_cannot_overwrite_replacement_attempt(environment):
         old.start()
         assert entered[0].wait(5)
         with resources.pool.connection() as connection:
-            holders = connection.execute("SELECT pid FROM pg_locks WHERE locktype='advisory' AND objid=742193601 AND granted").fetchall()
+            holders = connection.execute("""SELECT pid FROM pg_locks WHERE locktype='advisory'
+                AND objid=742193601 AND granted
+                AND database=(SELECT oid FROM pg_database WHERE datname=current_database())""").fetchall()
             assert len(holders) == 1
             assert holders[0]['pid'] != connection.info.backend_pid
             assert connection.execute('SELECT pg_terminate_backend(%s) AS killed', (holders[0]['pid'],)).fetchone()['killed']

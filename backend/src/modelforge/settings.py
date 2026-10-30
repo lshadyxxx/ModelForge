@@ -1,5 +1,5 @@
 from functools import lru_cache
-from pydantic import SecretStr
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from psycopg.conninfo import make_conninfo
 
@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     minio_secret_key: SecretStr
     minio_secure: bool = False
     minio_bucket: str = "modelforge"
+    minio_read_timeout: float = Field(default=120.0, gt=0, le=600, allow_inf_nan=False)
     worker_url: str = "http://worker:8103"
     probe_timeout: float = 2.0
     file_limit_bytes: int = 1048576

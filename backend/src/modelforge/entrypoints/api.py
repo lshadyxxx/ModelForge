@@ -12,6 +12,7 @@ from modelforge.bootstrap import Resources
 from modelforge.settings import get_settings
 from modelforge.errors import AppError, configure_errors
 from modelforge.infrastructure.http import read_bounded_body
+from modelforge.infrastructure.minio import create_store
 from modelforge.modules.models import FileRegistry
 from modelforge.modules.models import router as models_router
 from modelforge.modules.datasets import router as datasets_router
@@ -47,7 +48,11 @@ async def dependency_status(request: Request, include_worker=True):
         with resources.pool.connection() as connection:
             return connection.execute("SELECT 1 AS connected").fetchone()["connected"] == 1
     def check_minio():
-        return resources.store.bucket_exists(resources.settings.minio_bucket)
+        store = create_store(resources.settings, read_timeout=resources.settings.probe_timeout)
+        try:
+            return store.bucket_exists(resources.settings.minio_bucket)
+        finally:
+            store._http.clear()
     async def check_worker():
         async with httpx.AsyncClient(timeout=resources.settings.probe_timeout, trust_env=False) as client:
             response = await client.get(resources.settings.worker_url + "/health/live")

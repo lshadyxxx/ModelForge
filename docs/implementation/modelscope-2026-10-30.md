@@ -20,7 +20,7 @@
 - 初轮真实 PostgreSQL/MinIO、受控外部 HTTP 的 10 项集成测试通过，包含失败重试、已验证文件复用、取消、代次接管、迟到写入、缺失对象重传、HTTP 契约及删除；最终收尾已扩展为下方 13 项。权重是 fixture 字节。
 - 独立 QA 已复现并推动修复旧代次结算污染、上游数值 Path 导致 500、迟到 put 删除竞态。`0007` 迟到写入及邻接代次场景已独立复验通过；最终增量三轴审查见下方收尾状态，不将旧记录冒充最终代码验收。
 
-## 2026-10-30 收尾复验
+## 2026-10-30 初轮收尾复验（历史）
 
 固定基准 `e80fef01bcf4085bb3b548616fcf0590a6b23b80`，范围包含已有未提交 ModelScope 增量。先复现取消测试失败，再取消 HTTPX 的 1 MiB 聚合，让已收到的数据块及时触发取消检查；尚未收到数据时仍受 HTTP read timeout 约束，不承诺瞬时停止阻塞中的读请求。
 
@@ -42,8 +42,35 @@
 
 隔离验收数据库及两只本轮创建的 bucket 在零活动连接、对象为空后已删除；正式库/桶未清空，无一次性容器遗留。证据在上述临时目录的 `image-final-all.txt`、`resident-*-acceptance*`、`qa-followup/report.md`、三轴 followup report、source SHA-256 和 teardown 输出。ticket 03 保持开放，不将本增量通过升级为整票或 MVP 完成。
 
+## 2026-10-30 真实整模型存储收尾
+
+本增量基准 `8142f5e`，包含其后已有未提交的传输超时修复、观察器及测试；本次继续执行时没有再改运行时代码或依赖。当前常驻 API/Worker 镜像均为 `sha256:f75ff83bd50630ee084dfff94b5c6d11b7c1cb99fcd14f218231d5493602ed90`，独立 QA 核对每个服务的 26 个已安装 Python 源码文件与当前工作树一致。镜像来自先前大文件修复轮次，本次没有重新构建或把旧镜像声称为新构建。
+
+### 修复与失败记录
+
+- 原 MinIO 客户端 2 秒读取超时不足以等待真实大对象的分片完成响应。已用实际 1,503,300,328 字节临时对象复现旧配置失败，长预算下完整上传、回读、删除核验通过；临时零字节流只作为存储机制证据，不作为真实模型。
+- 传输预算由 `MF_MINIO_READ_TIMEOUT` 配置，默认 120 秒，仅接受有限且大于 0、不超过 600 的值；连接超时仍为 2 秒且不自动重试。这是读取无活动超时，不承诺整个传输在该时长内结束。健康检查使用独立客户端及原 `probe_timeout`（默认 2 秒），检查后清理自己的连接池。
+- 新增 `scripts/acceptance-modelscope.py` 只读观察既有导入，不创建、重试、取消或删除模型；核对固定来源、完整 manifest、最新成功状态，再独立查询 PostgreSQL、逐对象流式计算 MinIO 大小/SHA-256。非空证据目录拒绝运行，HTTP 502/503/504 在期限内重新读取，身份或摘要不一致失败退出。
+- 先前 attempts 1–4 的失败保留：旧传输超时及上游下载故障不改写为通过。attempt 4 已写入真实权重，随后文件下载失败，原有 9 个文件已验证、两个 tokenizer 文件仍 pending。
+
+### 实际成功与重启核验
+
+2026-10-30 23:12（Asia/Shanghai）通过公开 API 重试同一版本 `51f7b869-9894-424b-bc5d-dba013723ddb`，仓库 `Qwen/Qwen3-0.6B`、commit `09b42cad3d112e832108974449ccb5e8e0f5b5d1` 不变。attempt 5 补齐 `tokenizer.json` 与 `vocab.json`，11 个文件共 **1,519,209,873 字节**达到 `available` / `import.state=succeeded`。原有 9 个已验证文件的 object key 和 SHA-256 均保留，其中真实 `model.safetensors` 为 1,503,300,328 字节、SHA-256 `f47f71177f32bcd101b7573ec9171e6a57f4f4d31148d38e382306f42996874b`。
+
+主任务首次全量独立存储观察器通过，随后确认无活动导入，仅重启 API/Worker；重新查询 PostgreSQL 并逐对象回读全部 11 个 MinIO 文件通过，manifest、来源、对象身份、字节数和摘要不变。本批没有重启 PostgreSQL/MinIO 容器，不将此前骨架容器重建证据冒充本次整模型持久化验收。
+
+新独立宿主 QA 再次运行完整观察器，核对全部 11 个实际对象与数据库，确认来源、9 个文件复用及重启后全部对象身份不变。其首次探针恰遇邻接目录回归的 API 重启，失败退出且未生成成功报告；新建证据目录后重新执行全量核验通过，保留中断证据，不声称首次即通过。独立观察器测试 24 项通过，另完成 21 项只读 API/CLI 检查；其前后可信源码快照一致。整体票据 QA 保持 **Passes with gaps**，当前授权的整模型存储/复用/重启收尾场景通过。
+
+### 回归、服务与证据
+
+- 当前宿主 `backend/tests tests`：**135 passed, 13 skipped, 1 warning**；跳过项为 opt-in 真实存储测试，不计作通过。
+- 同版常驻镜像后端全量在新建隔离 PostgreSQL 数据库和 MinIO bucket 中：**117 passed, 1 warning**，包含全部 13 项真实存储集成；它与宿主根目录脚本测试不是同一测试集合，不能相加或混报。隔离初始化因管理会话沿用应用 2 秒 statement_timeout 首次失败；核对数据库未创建后，仅临时管理连接设为 60 秒并重新创建成功，没有改应用配置。测试后核对 bucket 为空、数据库无活动连接，删除本次隔离资源；应用库/桶未清空。
+- 常驻数据集验收 run_id=`20261030T151553Z`、目录上传验收 run_id=`20261030T151602Z` 通过；后者使用 fixture 字节，包含实际中断/恢复、行锁冲突、API 重启和引用删除，不将其当作真实模型加载证据。
+- ego-browser 已打开同源工作台，API/PostgreSQL/MinIO/Worker 显示正常；业务入口仍为后续接入。页面健康不算模型 UI 或训练/推理验收。
+- 原始证据留在 OS 临时目录 `modelforge-ms-complete-20261030-2312/`：`attempt5/`、`after-restart/`、`restart-and-reuse.json`、`current-tests.txt`、`isolated-image-tests.txt`、`isolated-cleanup.txt`、`independent-qa/report.md` 及 `independent-qa/full-observer-retry/store-readback.json`。先前修复的 red/green、三轴审查及真实权重回读记录仍保留在 `modelforge-modelscope-live-391d51a5/`。原始 QA 材料不提交仓库。
+
 ## 未完成与下一步
 
-真实 CDN 大权重完整下载、整模型导入和加载、容量测量与限额锁定、默认分支解析、优云公共基座外部引用、MinIO 到优云实例传输、业务模型 UI 和真实训练/推理均未验收。Hugging Face 暂缓。ticket 03 保持开放。
+本次只证明固定 commit 的真实整模型文件已完整存储、复用及应用重启后可核验。`compatibility_state=unverified`：尚未加载模型或 tokenizer；默认分支解析、容量测量与限额锁定、优云公共基座外部引用、MinIO 到优云实例传输、业务模型 UI 和真实训练/推理仍未完成。运行中实际 OS Worker 崩溃恢复也未覆盖。Hugging Face 暂缓，ticket 03 保持开放，产品 MVP 未完成。
 
-后续先补模型导入真实大文件证据及用户操作入口，再按票据接入优云目录和远程传输；优云支持通过 SSH/SFTP 上传自有模型不等于 ModelForge 已实现这一训练闭环。
+后续按票据补默认 revision/外部基座契约和用户操作入口，再接优云目录、兼容性及远程传输。优云支持 SSH/SFTP 上传自有模型不等于 ModelForge 已实现该训练闭环；当前整模型存储成功也不等于容量初始上限全部实测通过。
