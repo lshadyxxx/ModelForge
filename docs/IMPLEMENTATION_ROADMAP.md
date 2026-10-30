@@ -4,9 +4,11 @@
 
 产品首版以[已确认的产品 MVP 规格](../<internal-evidence>)为准：验收终点包含真实训练产物在平台内的推理试用，模型输入包括完整目录上传、ModelScope/Hugging Face 公开模型导入和优云公共基座引用。以下阶段属于逐步交付里程碑；基础骨架或模拟训练完成时，产品首版仍未完成。
 
+2026-10-30 调整：当前先实现 ModelScope，Hugging Face 暂缓。固定 commit 导入、持久 Worker 状态与存储验证见[专项记录](implementation/modelscope-2026-10-30.md)；下文此前“公开仓库待实现”的进度描述由此记录补充，真实大文件及 GPU 闭环仍待验收。
+
 首版真实执行接入优云 API 工作流，见 [ADR-0001](adr/0001-ucompshare-remote-execution.md)。优云资源查询、远程任务与数据/产物传输纳入已确认的首版闭环；本地实现顺序拆分在[产品 MVP 任务目录](../<internal-evidence>)。
 
-当前 ticket 01 基础骨架已完成完整 Compose 验收，见[完整验收记录](implementation/full-compose-2026-10-29.md)。ticket 02 数据集后端已提交，代码审查及真实 PostgreSQL/MinIO 验收已完成，容量测量与限额锁定仍待完成，见[数据集实施记录](implementation/datasets-2026-10-29.md)。ticket 03 的目录上传后端已通过真实存储验收，公开仓库与外部引用仍待实现，见[模型实施记录](implementation/models-2026-10-30.md)。进行 UI 重设计或选取实施任务前，读取[功能清单](FEATURE_INVENTORY.md)，区分真实能力与演示。连续流程原型已获用户基本认可，旧版三方向保留作对照；其他业务实施票仍开放。
+当前 ticket 01 基础骨架已完成完整 Compose 验收，见[完整验收记录](implementation/full-compose-2026-10-29.md)。ticket 02 数据集后端已提交，代码审查及真实 PostgreSQL/MinIO 验收已完成，容量测量与限额锁定仍待完成，见[数据集实施记录](implementation/datasets-2026-10-29.md)。ticket 03 的目录上传后端已通过真实存储验收，ModelScope 固定 commit 后台导入已实现并完成受控来源/真实存储专项复验；真实整模型和外部引用仍待验收，Hugging Face 暂缓，见[模型实施记录](implementation/models-2026-10-30.md)及[专项记录](implementation/modelscope-2026-10-30.md)。进行 UI 重设计或选取实施任务前，读取[功能清单](FEATURE_INVENTORY.md)，区分真实能力与演示。连续流程原型已获用户基本认可，旧版三方向保留作对照；其他业务实施票仍开放。
 
 各阶段创建的目录、模块职责和依赖规则见 [项目结构设计](PROJECT_STRUCTURE.md)。目标目录按需创建，不作为一次性生成空壳的清单。
 
@@ -34,7 +36,7 @@
 
 验收：messages JSONL 单轮和多轮样本可上传、预览、发布；无效 JSON/消息记录按物理行号报错并拒绝发布。每个训练输入可以确定地指向已发布的数据集版本；清理可重建本地缓存后，仍能从 MinIO 下载并校验同一原始版本。
 
-实施状态（2026-10-30）：数据集后端已提交并经新镜像回归；覆盖有效/无效 JSONL、MinIO 回读、PostgreSQL 元数据、确定性 10% split、发布、下载 checksum、引用保护和清理。容量限制仍是首版初始配置，训练/优云执行未开始。模型目录上传后端增量已通过真实存储验收；公开仓库导入、外部引用和 UI 待实现。详见[数据集实施记录](implementation/datasets-2026-10-29.md)和[模型实施记录](implementation/models-2026-10-30.md)。
+实施状态（2026-10-30）：数据集后端已提交并经新镜像回归；覆盖有效/无效 JSONL、MinIO 回读、PostgreSQL 元数据、确定性 10% split、发布、下载 checksum、引用保护和清理。容量限制仍是首版初始配置，训练/优云执行未开始。模型目录上传后端增量已通过真实存储验收；ModelScope 当前仅固定 commit 后台导入，Hugging Face 暂缓，外部引用和业务 UI 待实现。详见[数据集实施记录](implementation/datasets-2026-10-29.md)和[模型实施记录](implementation/models-2026-10-30.md)。
 
 ## 3. 训练任务与模拟执行器
 

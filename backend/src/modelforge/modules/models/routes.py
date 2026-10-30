@@ -8,13 +8,14 @@ import uuid
 
 from fastapi import APIRouter, Query, Request
 from fastapi.encoders import jsonable_encoder
-from fastapi.responses import Response
+from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, ConfigDict, Field
 from starlette.concurrency import run_in_threadpool
 
 from modelforge.errors import AppError
 from .manifest import ModelFile
 from .registry import ModelRegistry
+from .imports import ModelImports
 
 router = APIRouter(prefix='/api/v1')
 
@@ -29,6 +30,25 @@ class CreateDirectory(BaseModel):
 class ResumeDirectory(BaseModel):
     model_config = ConfigDict(extra='forbid')
     files: list[ModelFile] = Field(min_length=1, max_length=10_000)
+
+
+class CreateModelScope(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    name: str = Field(min_length=1, max_length=120)
+    repository: str = Field(min_length=3, max_length=257)
+    revision: str = Field(pattern=r'^[0-9a-f]{40}$')
+    model_id: uuid.UUID | None = None
+
+
+@router.post('/models/modelscope-imports', status_code=201)
+def create_modelscope(body: CreateModelScope, request: Request):
+    return jsonable_encoder(ModelImports(request.app.state.resources).create(
+        body.name, body.repository, body.revision, body.model_id))
+
+
+@router.post('/model-versions/{version_id}/retry-import')
+def retry_import(version_id: uuid.UUID, request: Request):
+    return jsonable_encoder(ModelImports(request.app.state.resources).retry(version_id))
 
 
 @router.get('/models/limits')
@@ -98,10 +118,21 @@ def complete(version_id: uuid.UUID, request: Request):
 
 @router.post('/model-versions/{version_id}/cancel')
 def cancel(version_id: uuid.UUID, request: Request):
-    return jsonable_encoder(ModelRegistry(request.app.state.resources).cancel(version_id))
+    resources = request.app.state.resources
+    registry = ModelRegistry(resources)
+    if registry.get(version_id).get('source_kind') == 'modelscope':
+        return jsonable_encoder(ModelImports(resources).cancel(version_id))
+    return jsonable_encoder(registry.cancel(version_id))
 
 
 @router.delete('/model-versions/{version_id}', status_code=204)
 def delete(version_id: uuid.UUID, request: Request):
-    ModelRegistry(request.app.state.resources).delete(version_id)
+    result = ModelRegistry(request.app.state.resources).delete(version_id)
+    if result and result['storage_cleanup'] == 'pending':
+        return JSONResponse(result, status_code=202)
     return Response(status_code=204)
+
+
+@router.get('/model-versions/{version_id}/storage-cleanup')
+def storage_cleanup(version_id: uuid.UUID, request: Request):
+    return ModelImports(request.app.state.resources).cleanup_status(version_id)

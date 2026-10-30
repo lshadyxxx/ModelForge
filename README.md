@@ -2,7 +2,7 @@
 
 ModelForge（模锻）是一个独立规划中的模型训练与推理平台，目标是把数据集、微调任务、模型产物和推理服务放进一条可追踪的生命周期中。
 
-当前状态：基础骨架已完成完整 Compose 验收；数据集生命周期后端已提交。模型完整目录上传后端已实现按文件恢复、MinIO 回读校验、取消及引用保护，并通过真实 PostgreSQL/MinIO 验收。公开仓库导入、优云公共基座引用、模型管理 UI 和真实 GPU 闭环尚未完成；产品 MVP 尚未完成。见[本地运行](docs/RUNNING.md)、[模型实施记录](docs/implementation/models-2026-10-30.md)和[基础骨架验收](docs/implementation/full-compose-2026-10-29.md)。首版动作与完成边界见[功能清单](docs/FEATURE_INVENTORY.md)。
+当前状态：基础骨架、数据集生命周期后端和模型目录上传已通过真实 PostgreSQL/MinIO 验收。ModelScope 固定 commit 后台导入已实现持久进度、取消/重试、Worker 恢复及 MinIO 回读校验，验证范围见[专项记录](docs/implementation/modelscope-2026-10-30.md)；Hugging Face 按用户要求暂缓。整模型大文件传输、优云公共基座引用、业务管理 UI 和真实 GPU 闭环尚未完成；产品 MVP 尚未完成。见[本地运行](docs/RUNNING.md)、[模型实施记录](docs/implementation/models-2026-10-30.md)和[基础骨架验收](docs/implementation/full-compose-2026-10-29.md)。首版动作与完成边界见[功能清单](docs/FEATURE_INVENTORY.md)。
 
 ## 产品目标
 

@@ -50,7 +50,7 @@ class ModelRegistry:
         return validate_manifest(files, max_files=self.settings.model_file_count_limit,
             max_file_bytes=self.settings.model_file_limit_bytes, max_total_bytes=self.settings.model_total_limit_bytes)
 
-    def create(self, name: str, files: list[ModelFile], model_id=None):
+    def create(self, name: str, files: list[ModelFile], model_id=None, *, source_snapshot=None):
         if not name.strip():
             raise AppError(422, 'validation_error', 'Model name must not be blank')
         manifest = self._manifest(files)
@@ -64,18 +64,23 @@ class ModelRegistry:
             number = connection.execute('SELECT COALESCE(MAX(version_number),0)+1 AS n FROM model_versions WHERE model_id=%s', (model_id,)).fetchone()['n']
             connection.execute('''INSERT INTO model_versions
                 (id,model_id,version_number,source_kind,state,bucket,manifest_sha256)
-                VALUES (%s,%s,%s,'directory','uploading',%s,%s)''',
-                (version_id, model_id, number, self.bucket, content_fingerprint(manifest)))
+                VALUES (%s,%s,%s,%s,'uploading',%s,%s)''',
+                (version_id, model_id, number, 'modelscope' if source_snapshot else 'directory', self.bucket, content_fingerprint(manifest)))
             for file in manifest:
                 key = f'models/{model_id}/versions/{version_id}/files/{file["path"]}'
                 connection.execute('''INSERT INTO model_version_files (model_version_id,path,size_bytes,sha256,object_key)
                     VALUES (%s,%s,%s,%s,%s)''', (version_id, file['path'], file['size_bytes'], file['sha256'], key))
+            if source_snapshot:
+                connection.execute('INSERT INTO model_imports (model_version_id,source_snapshot) VALUES (%s,%s)',
+                                   (version_id, Jsonb(source_snapshot)))
         return self.get(version_id)
 
     def get(self, version_id):
         with self._connection() as connection:
             row = self._version(connection, version_id, for_update=False)
             row['files'] = self._files(connection, version_id)
+            if row.get('source_kind') == 'modelscope':
+                row['import'] = connection.execute('SELECT * FROM model_imports WHERE model_version_id=%s', (version_id,)).fetchone()
             row['references'] = list(connection.execute('SELECT reference_type,reference_id FROM model_version_references WHERE model_version_id=%s', (version_id,)).fetchall())
         row['verified_bytes'] = sum(f['size_bytes'] for f in row['files'] if f['state'] == 'verified')
         row['total_bytes'] = sum(f['size_bytes'] for f in row['files'])
@@ -87,9 +92,18 @@ class ModelRegistry:
                 ORDER BY v.created_at DESC''').fetchall())
 
     @staticmethod
-    def _editable(row):
+    def _editable(row, *, import_worker=False):
         if row['state'] != 'uploading':
             raise AppError(409, 'conflict', 'ModelVersion does not accept uploads', {'state': row['state']})
+        if row.get('source_kind') == 'modelscope' and not import_worker:
+            raise AppError(409, 'conflict', 'Public imports are transferred and finalized by the Worker')
+
+    @staticmethod
+    def _active_import(connection, row):
+        if row.get('source_kind') == 'modelscope':
+            job = connection.execute('SELECT * FROM model_imports WHERE model_version_id=%s', (row['id'],)).fetchone()
+            if job['state'] in {'queued', 'running'}:
+                raise AppError(409, 'model_busy', 'Cancel the import and wait for the Worker to stop before deleting it')
 
     def _verify_object(self, row, file, *, collect=False):
         response = self.store.get_object(row['bucket'], file['object_key'])
@@ -113,10 +127,15 @@ class ModelRegistry:
             raise AppError(409, 'model_checksum_mismatch', 'Stored model file checksum changed')
         return bytes(data)
 
-    def upload(self, version_id, path, stream, size, sha256):
+    def upload(self, version_id, path, stream, size, sha256, *, import_attempt=None):
+        if import_attempt is not None:
+            from .transfers import ModelTransfers
+            return ModelTransfers(self).upload(version_id, path, stream, size, sha256, import_attempt)
         with self._connection() as connection:
             row = self._version(connection, version_id)
-            self._editable(row)
+            self._editable(row, import_worker=import_attempt is not None)
+            if import_attempt is not None:
+                self._import_running(connection, version_id, import_attempt)
             file = next((f for f in self._files(connection, version_id) if f['path'] == path), None)
             if file is None:
                 raise AppError(404, 'not_found', 'File is absent from the immutable manifest')
@@ -143,6 +162,8 @@ class ModelRegistry:
         reusable, upload = [], []
         with self._connection() as connection:
             row = self._version(connection, version_id)
+            if row.get('source_kind') == 'modelscope':
+                raise AppError(409, 'conflict', 'Use the public import retry endpoint; the source snapshot is immutable')
             if row['state'] not in {'uploading', 'cancelled'}:
                 raise AppError(409, 'conflict', 'ModelVersion cannot be resumed', {'state': row['state']})
             if content_fingerprint(manifest) != row['manifest_sha256']:
@@ -166,10 +187,19 @@ class ModelRegistry:
             connection.execute("UPDATE model_versions SET state='uploading',updated_at=now() WHERE id=%s", (version_id,))
         return {'version_id': str(version_id), 'reusable_paths': reusable, 'upload_paths': upload}
 
-    def complete(self, version_id):
+    @staticmethod
+    def _import_running(connection, version_id, attempt):
+        job = connection.execute('SELECT * FROM model_imports WHERE model_version_id=%s', (version_id,)).fetchone()
+        if (not job or job['state'] != 'running' or job['cancel_requested']
+                or job['attempt_count'] != attempt):
+            raise AppError(409, 'model_import_interrupted', 'Import is no longer running')
+
+    def complete(self, version_id, *, import_attempt=None):
         with self._connection() as connection:
             row = self._version(connection, version_id)
-            self._editable(row)
+            self._editable(row, import_worker=import_attempt is not None)
+            if import_attempt is not None:
+                self._import_running(connection, version_id, import_attempt)
             files = self._files(connection, version_id)
             if any(f['state'] != 'verified' for f in files):
                 raise AppError(409, 'model_incomplete', 'All manifest files must be verified before completion')
@@ -214,11 +244,15 @@ class ModelRegistry:
                        'runtime_verified': False}
             connection.execute("UPDATE model_versions SET state='available',format_summary=%s,updated_at=now() WHERE id=%s",
                                (Jsonb(summary), version_id))
+            if import_attempt is not None:
+                connection.execute("UPDATE model_imports SET state='succeeded',current_path=NULL,current_bytes=0,error_code=NULL,error_message=NULL,updated_at=now() WHERE model_version_id=%s", (version_id,))
         return self.get(version_id)
 
     def cancel(self, version_id):
         with self._connection() as connection:
             row = self._version(connection, version_id)
+            if row.get('source_kind') == 'modelscope':
+                raise AppError(409, 'conflict', 'Use the public import cancellation operation')
             if row['state'] != 'cancelled':
                 self._editable(row)
                 connection.execute("UPDATE model_versions SET state='cancelled',updated_at=now() WHERE id=%s", (version_id,))
@@ -227,6 +261,7 @@ class ModelRegistry:
     def delete(self, version_id):
         with self._connection() as connection:
             row = self._version(connection, version_id)
+            self._active_import(connection, row)
             if connection.execute('SELECT 1 FROM model_version_references WHERE model_version_id=%s', (version_id,)).fetchone():
                 raise AppError(409, 'model_in_use', 'ModelVersion is referenced')
             connection.execute("UPDATE model_versions SET state='deleting',updated_at=now() WHERE id=%s", (version_id,))
@@ -247,7 +282,14 @@ class ModelRegistry:
             raise AppError(503, 'dependency_unavailable', 'Model deletion failed; retry required', {'version_id': str(version_id)}) from error
         with self._connection() as connection:
             self._version(connection, version_id)
+            if row.get('source_kind') == 'modelscope':
+                connection.execute("UPDATE model_object_transfers SET state='cleanup',updated_at=now() WHERE model_version_id=%s AND state='published'", (version_id,))
             connection.execute('DELETE FROM model_versions WHERE id=%s', (version_id,))
+        if row.get('source_kind') == 'modelscope':
+            from .transfers import ModelTransfers
+            transfers = ModelTransfers(self)
+            transfers.sweep()
+            return {'version_id': str(version_id), 'storage_cleanup': transfers.status(version_id)['state']}
 
     def add_reference(self, version_id, reference_type, reference_id, *, connection):
         row = self._version(connection, version_id)

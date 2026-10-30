@@ -142,4 +142,37 @@ backend/.venv/Scripts/python.exe scripts/acceptance-models.py
 
 模型目录 API：先 `POST /api/v1/models/directory-imports` 提交 `{name,model_id?,files:[{path,size_bytes,sha256}]}`；随后对 `/api/v1/model-versions/{id}/files?path=...` 按文件 PUT 原始字节，再 POST `/complete`。POST `/resume` 提交原 files 清单，返回 reusable_paths/upload_paths；POST `/cancel` 可取消待上传版本。GET 版本或 `/api/v1/models` 查询，DELETE 未引用版本。文件改变时新建版本。
 
-`GET /api/v1/models/limits` 返回初始限制及未锁定状态。初始为 20 GiB/文件、100 GiB/目录、10000 文件；临时文件位于容器可重建目录。存储检查全部通过的 available 仍为兼容性未验证。忙碌写操作返回 `409 model_busy`，表示未接受；稍后重试。取消不强行打断已经执行中的文件存储操作。公开仓库下载、优云外部引用及模型加载验收另行实现。
+`GET /api/v1/models/limits` 返回初始限制及未锁定状态。初始为 20 GiB/文件、100 GiB/目录、10000 文件；临时文件位于容器可重建目录。存储检查全部通过的 available 仍为兼容性未验证。忙碌写操作返回 `409 model_busy`，表示未接受；稍后重试。取消不强行打断已经执行中的文件存储操作。优云外部引用及模型加载验收另行实现。
+
+## ModelScope 后台导入
+
+API 与 Worker 必须运行同版源码，先执行迁移任务；Hugging Face 暂缓。请求示例中的 commit 仅用于已核实的公开清单，不是建议自动下载该模型或费用承诺：
+
+```json
+{"name":"Qwen3-0.6B","repository":"Qwen/Qwen3-0.6B","revision":"09b42cad3d112e832108974449ccb5e8e0f5b5d1"}
+```
+
+将 JSON POST 到 `/api/v1/models/modelscope-imports` 后，API 固化清单，Worker 逐文件执行。revision 当前必须是完整 commit，空值或 `master` 被拒绝；达到上游 3000 项清单边界明确拒绝，不静默导入部分文件。
+
+GET `/api/v1/model-versions/{id}` 查看 `import.state`、当前文件字节和已校验文件总量。POST `/cancel` 请求取消，POST `/retry-import` 恢复失败/取消的同一快照。Worker 重启可重新领取未完成导入；下载文件重新从头传输，已验证文件经 MinIO 回读后复用。
+
+DELETE 仍受活动导入及引用保护；取消后 Worker 确认停止才可删除。若有失效执行器的写入尚未结束，DELETE 返回 `202` 和 `storage_cleanup=pending`；GET `/api/v1/model-versions/{id}/storage-cleanup` 独立跟踪清理。版本 GET 404 不代表文件清理完成。已结束写入的清理由 Worker 重试；进程永久消失且未确认的 writing 账本保持 pending，不能仅以 PostgreSQL 会话断开判定写入结束。
+
+真实 PostgreSQL/MinIO 集成测试必须使用独立的一次性数据库和 bucket；仅停止其他 Worker 不能保护数据库里已有的任务。测试会全局领取导入，禁止对应用默认库/桶运行。以下示例先创建唯一测试数据库，初始化隔离存储后运行；不要把任何正式 Worker 指向这些测试目标：
+
+```powershell
+$id = [guid]::NewGuid().ToString('N')
+$db = "modelforge_test_$id"
+$bucket = "modelforge-test-$id"
+docker compose exec -T postgres sh -c 'exec createdb -U "$POSTGRES_USER" "$1"' sh $db
+if ($LASTEXITCODE -ne 0) { throw 'Test database creation failed; do not reuse an existing database' }
+docker compose run --rm --no-deps -e "MF_PG_DATABASE=$db" -e "MF_MINIO_BUCKET=$bucket" migrate
+if ($LASTEXITCODE -ne 0) { throw 'Test migration failed; retain test identities for cleanup' }
+docker compose run --rm --no-deps -e "MF_PG_DATABASE=$db" -e "MF_MINIO_BUCKET=$bucket" -e MF_TEST_INTEGRATION=1 -e MF_TEST_ISOLATED_STORES=1 api python -m pytest tests/test_model_imports.py -q -p no:cacheprovider
+# Record the test exit code before cleanup; cleanup success must not hide a failed test.
+$testExit = $LASTEXITCODE
+```
+
+测试在收集阶段拒绝缺少隔离确认或命名不符合 `modelforge_test_*` / `modelforge-test-*` 的目标。该门禁不创建隔离资源，也不证明任意同名前缀资源可安全删除；只清理由本次成功创建的唯一 ID 对应的资源。测试后通过 MinIO 客户端列举并确认该测试 bucket 无待保留数据，再删除其对象和 bucket；使用 PostgreSQL `dropdb` 删除本次 `$db`。失败/中断时保留这两个身份和原始输出，不对应用默认库/桶或未知来源目标自动清理。
+
+集成测试用受控仓库 HTTP fixture；真实 ModelScope 小文件、整模型下载和 GPU 验证分别报告，见[实施记录](implementation/modelscope-2026-10-30.md)。
