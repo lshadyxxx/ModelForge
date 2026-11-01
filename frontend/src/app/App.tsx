@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { fetchStatus, type PlatformStatus, type ComponentName } from '../shared/http';
+import { Datasets } from '../features/datasets/Datasets';
+import { Models } from '../features/models/Models';
+import { Resources } from '../features/resources/Resources';
+import { Training } from '../features/training/Training';
+import { Serving } from '../features/serving/Serving';
+import { Overview } from '../features/overview/Overview';
 
 const components: {id: ComponentName; label: string; description: string; mark: string}[] = [
   {id: 'api', label: 'API 服务', description: '控制面进程响应', mark: 'A'},
@@ -14,6 +20,9 @@ function Icon({name}: {name: string}) {
 function time(value?: string) {return value ? new Date(value).toLocaleTimeString('zh-CN', {hour12: false}) : '尚未检查';}
 
 export function App() {
+  const readPage = () => ['datasets','models','compute','training','serving'].includes(location.hash.slice(1)) ? location.hash.slice(1) : 'overview';
+  const [page, setPage] = useState(readPage);
+  useEffect(() => {const update = () => setPage(readPage()); window.addEventListener('hashchange', update); return () => window.removeEventListener('hashchange', update);}, []);
   const [status, setStatus] = useState<PlatformStatus | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -45,20 +54,23 @@ export function App() {
     return () => {mounted.current = false; clearInterval(timer); window.removeEventListener('focus', focus); controller.current?.abort(); controller.current = null;};
   }, [refresh]);
   const allUp = status && !error && Object.values(status.components).every(item => item.state === 'up');
+  const writable = !!status?.ready && !error;
+  const workerUp = status?.components.worker.state === 'up' && !error;
+  const pageLabel = ({overview: '工作台', datasets: '数据集', models: '模型', compute: '计算环境', training: '训练', serving: '推理试用'} as Record<string,string>)[page];
   return <div className="app-shell">
-    <a className="skip" href="#main">跳到工作台</a>
+    <a className="skip" href="#main" onClick={event=>{event.preventDefault();document.getElementById("main")?.focus();}}>跳到主要内容</a>
     <aside className="sidebar">
       <div className="brand"><span className="brand-mark">M</span><span>ModelForge<small>模型微调工作台</small></span></div>
       <nav aria-label="主导航">
-        <a href="#main" className="nav-item active" aria-current="page"><Icon name="overview" />工作台</a>
-        {['数据集', '模型', '计算环境', '训练', '推理试用'].map((label, index) => <div key={label} className="nav-item future" aria-disabled="true"><Icon name={['data','model','compute','training','chat'][index]} />{label}<small>后续接入</small></div>)}
+        {[['overview','工作台','overview'],['datasets','数据集','data'],['models','模型','model'],['compute','计算环境','compute'],['training','训练','training'],['serving','推理试用','chat']].map(([id,label,icon]) => <a key={id} href={'#'+id} className={'nav-item'+(page===id?' active':'')} aria-current={page===id?'page':undefined}><Icon name={icon}/>{label}</a>)}
       </nav>
-      <div className="sidebar-foot"><i />本地控制面<small>基础骨架 · 第一阶段</small></div>
+      <div className="sidebar-foot"><i />本地控制面<small>数据、训练与独立推理</small></div>
     </aside>
     <div className="workspace">
-      <header className="topbar"><span>个人工作空间 <b>/</b> 工作台</span><span className="environment">本机访问</span></header>
+      <header className="topbar"><span>个人工作空间 <b>/</b> {pageLabel}</span><span className="environment">本机访问</span></header>
       <main id="main" tabIndex={-1}>
-        <div className="page-heading"><div><h1>工作台</h1><p>先确认控制面与存储连接，再开始后续模型工作。</p></div><button onClick={() => void refresh()} disabled={busy}>{busy ? '检查中…' : '刷新状态'}</button></div>
+        {page==='datasets' ? <Datasets writable={writable}/> : page==='models' ? <Models writable={writable} workerUp={workerUp}/> : page==='compute' ? <Resources/> : page==='training' ? <Training/> : page==='serving' ? <Serving/> : page!=='overview' ? <><div className="page-heading"><div><h1>{pageLabel}</h1><p>此业务流程尚未接入，当前不能提交训练或申请 GPU。</p></div></div><section className="panel asset-form"><h2>等待真实执行能力接入</h2><p>后续按优云目录、资源租约、远程传输、训练产物与独立推理顺序实现。当前可以先准备数据集与模型资产。</p><div className="actions"><a className="button-link" href="#datasets">准备数据集</a><a className="button-link secondary" href="#models">管理模型</a></div></section></> : <>
+        <div className="page-heading"><div><h1>工作台</h1><p>确认控制面与存储连接，管理真实数据集和模型资产。</p></div><button onClick={() => void refresh()} disabled={busy}>{busy ? '检查中…' : '刷新状态'}</button></div>
         {error && <div className="notice error" role="alert"><strong>实时检查暂时中断</strong><p>{error}</p>{status && <small>下方保留上次结果，已过期；不表示服务当前可用。</small>}</div>}
         <section className="panel" aria-labelledby="status-title">
           <div className="section-heading"><div><h2 id="status-title">平台运行状态</h2><p>每 5 秒检查一次，结果来自实际服务。</p></div><span className={'badge ' + (error ? 'warn' : allUp ? 'ok' : status ? 'warn' : 'neutral')}>{error ? '状态未知' : allUp ? '连接正常' : status ? '需要关注' : '正在检查'}</span></div>
@@ -74,11 +86,13 @@ export function App() {
           })}</div>
           <div className="readiness"><span className={'dot ' + (status?.ready && !error ? 'green' : 'amber')} /><strong>{error ? '依赖就绪状态未知' : status ? status.ready ? 'API 依赖已就绪' : 'API 依赖尚未就绪' : '正在检查依赖'}</strong><span>就绪检查包括 PostgreSQL 和 MinIO；Worker 存活单独呈现。</span></div>
         </section>
+        <Overview/>
         <div className="lower-grid">
-          <section className="panel scope"><div className="section-heading"><div><h2>当前交付范围</h2><p>基础设施先行，业务流程分批接入。</p></div><span className="badge neutral">阶段 01</span></div><ul className="scope-list"><li><div><strong>本地控制面</strong><p>Web、API 与独立 Worker，通过 Compose 启停。</p></div></li><li><div><strong>正式文件存储</strong><p>PostgreSQL 记录元数据，MinIO 保存文件内容。</p></div></li><li><div><strong>真实读写验证</strong><p>使用独立验证脚本完成上传、回读校验、删除与重启后核对。</p></div></li></ul></section>
-          <section className="panel next"><div className="section-heading"><h2>接下来</h2></div><div className="next-symbol"><Icon name="next" /></div><h3>连接数据，再组织训练</h3><p>后续逐步接入数据集、模型资产、优云资源与训练任务。训练和推理入口将在对应功能验收后开放。</p><div className="note">当前状态检查不代表文件读写验收，也不代表 GPU 或训练环境已可用。</div></section>
+          <section className="panel scope"><div className="section-heading"><div><h2>当前交付范围</h2><p>数据准备、训练和独立推理。</p></div><span className="badge neutral">本地工作流</span></div><ul className="scope-list"><li><div><strong>本地控制面</strong><p>Web、API 与独立 Worker，通过 Compose 启停。</p></div></li><li><div><strong>正式文件存储</strong><p>PostgreSQL 记录元数据，MinIO 保存文件内容。</p></div></li><li><div><strong>真实读写验证</strong><p>使用独立验证脚本完成上传、回读校验、删除与重启后核对。</p></div></li></ul></section>
+          <section className="panel next"><div className="section-heading"><h2>准备训练资产</h2></div><div className="next-symbol"><Icon name="next" /></div><h3>上传数据，固定模型版本</h3><p>数据集校验、发布与模型导入通过真实 API 执行。选择运行环境后可创建训练任务；收费实例由你手动创建并关联。完成产物同步与回收后可开始独立推理。</p><div className="actions"><a className="button-link" href="#datasets">管理数据集</a><a className="button-link secondary" href="#models">管理模型</a></div><div className="note">当前状态检查不代表文件读写验收，也不代表 GPU 或训练环境已可用。</div></section>
         </div>
-        <footer>ModelForge · 本地基础骨架<span>正式数据持久化至 docker-db/</span></footer>
+        </>}
+        <footer>ModelForge · 个人本机工作台<span>正式数据持久化至 PostgreSQL / MinIO</span></footer>
       </main>
     </div>
   </div>;

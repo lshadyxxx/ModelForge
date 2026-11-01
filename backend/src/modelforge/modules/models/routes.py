@@ -36,8 +36,21 @@ class CreateModelScope(BaseModel):
     model_config = ConfigDict(extra='forbid')
     name: str = Field(min_length=1, max_length=120)
     repository: str = Field(min_length=3, max_length=257)
-    revision: str = Field(pattern=r'^[0-9a-f]{40}$')
+    revision: str | None = Field(default=None, max_length=255)
     model_id: uuid.UUID | None = None
+
+
+class CreateExternalBase(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    name: str = Field(min_length=1, max_length=120)
+    region: str = Field(min_length=1, max_length=64)
+    path: str = Field(min_length=1, max_length=1024)
+
+
+@router.post('/models/external-bases', status_code=201)
+def create_external_base(body: CreateExternalBase, request: Request):
+    from .external import ExternalModels
+    return jsonable_encoder(ExternalModels(request.app.state.resources).create(body.name, body.region, body.path))
 
 
 @router.post('/models/modelscope-imports', status_code=201)

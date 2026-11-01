@@ -16,6 +16,10 @@ from modelforge.infrastructure.minio import create_store
 from modelforge.modules.models import FileRegistry
 from modelforge.modules.models import router as models_router
 from modelforge.modules.datasets import router as datasets_router
+from modelforge.modules.resources import router as resources_router
+from modelforge.modules.training import router as training_router
+from modelforge.modules.serving import router as serving_router
+from modelforge.modules.overview import router as overview_router
 
 
 def now():
@@ -35,6 +39,10 @@ app = FastAPI(title="ModelForge API", version="0.1.0", lifespan=lifespan)
 configure_errors(app)
 app.include_router(datasets_router)
 app.include_router(models_router)
+app.include_router(resources_router)
+app.include_router(training_router)
+app.include_router(serving_router)
+app.include_router(overview_router)
 
 
 @app.get("/api/v1/health/live")

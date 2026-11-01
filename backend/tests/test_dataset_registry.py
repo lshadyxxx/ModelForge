@@ -88,8 +88,8 @@ class _Store:
         self.objects.pop(key.rsplit("/", 1)[-1], None)
 
 
-def _registry(*, corrupt_split=False, fail_update=False, fail_remove=False, fail_put_after_write=False):
-    source = _source()
+def _registry(*, corrupt_split=False, fail_update=False, fail_remove=False, fail_put_after_write=False, source=None):
+    source = _source() if source is None else source
     version_id = uuid.uuid4()
     row = {
         "id": version_id,
@@ -157,3 +157,39 @@ def test_split_retry_returns_same_enriched_response_shape():
     second = registry.split(version_id)
     assert first.keys() == second.keys()
     assert "references" in second
+
+
+def test_get_exposes_saved_split_counts_and_target_separately():
+    registry, version_id, store = _registry()
+    registry.split(version_id, ratio=0.3)
+    detail = registry.get(version_id)
+    assert detail.get("split") == {
+        "sample_count": 10, "train_count": 7, "validation_count": 3,
+        "requested_ratio": 0.3, "actual_ratio": 0.3, "seed": 42,
+    }
+
+
+def test_small_split_detail_keeps_actual_counts_separate_from_requested_ratio():
+    source = bytes([10]).join(_source().splitlines()[:3]) + bytes([10])
+    registry, version_id, _ = _registry(source=source)
+    registry.split(version_id)
+    detail = registry.get(version_id)
+    assert detail["split"]["train_count"] == 2
+    assert detail["split"]["validation_count"] == 1
+    assert detail["split"]["requested_ratio"] == 0.1
+    assert detail["split"]["actual_ratio"] == 1 / 3
+
+
+def test_get_rejects_corrupted_saved_split_instead_of_inventing_counts():
+    registry, version_id, store = _registry()
+    registry.split(version_id)
+    store.corrupt_split = True
+    with pytest.raises(AppError) as caught:
+        registry.get(version_id)
+    assert caught.value.status == 503
+    assert caught.value.code == "dependency_unavailable"
+
+
+def test_get_unsplit_version_has_no_split_summary():
+    registry, version_id, _ = _registry()
+    assert registry.get(version_id)["split"] is None

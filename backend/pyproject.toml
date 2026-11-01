@@ -15,5 +15,7 @@ dependencies = [
 test = ["pytest==9.2.0"]
 [tool.setuptools.packages.find]
 where = ["src"]
+[tool.setuptools.package-data]
+"modelforge.runtimes" = ["*.json"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -30,8 +30,18 @@ CONTENT = {'config.json': b'{"model_type":"fixture-only"}', 'tokenizer.json': b'
 def environment(tmp_path):
     from modelforge.modules.models import ModelImports, ModelRegistry
     resources = Resources.open(Settings(model_temporary_directory=str(tmp_path)))
-    state = {'fail': None, 'downloads': [], 'callback': None}
+    state = {'fail': None, 'downloads': [], 'callback': None, 'head': COMMIT, 'discoveries': 0}
     def serve(request):
+        if request.url.path.endswith('/info/refs'):
+            state['discoveries'] += 1
+            def pkt(data):
+                return f'{len(data) + 4:04x}'.encode() + data
+            head = state['head']
+            body = (pkt(b'# service=git-upload-pack\n') + b'0000'
+                    + pkt(f'{head} HEAD\0symref=HEAD:refs/heads/master object-format=sha1\n'.encode())
+                    + pkt(f'{head} refs/heads/master\n'.encode()) + b'0000')
+            return httpx.Response(200, content=body, headers={
+                'Content-Type': 'application/x-git-upload-pack-advertisement'})
         assert request.url.params['Revision'] == COMMIT
         if request.url.path.endswith('/files'):
             return httpx.Response(200, json={'Code': 200, 'Success': True, 'Data': {'Files': [
@@ -62,6 +72,42 @@ def environment(tmp_path):
             if error.status != 404:
                 raise
     resources.close()
+
+
+@pytest.mark.parametrize('revision', [None, '', 'HEAD', 'master', 'refs/heads/master'])
+def test_http_default_and_branch_pin_persisted_snapshot_across_retry(environment, monkeypatch, revision):
+    from fastapi.testclient import TestClient
+    from modelforge.entrypoints.api import app
+    resources, imports, registry, state, _ = environment
+    monkeypatch.setattr(app.state, 'resources', resources, raising=False)
+    client = TestClient(app)
+    body = {'name': 'Resolved branch fixture', 'repository': 'Qwen/Qwen3-0.6B'}
+    if revision is not None:
+        body['revision'] = revision
+    response = client.post('/api/v1/models/modelscope-imports', json=body)
+    assert response.status_code == 201, response.text
+    identifier = response.json()['id']
+    url = '/api/v1/model-versions/' + identifier
+    try:
+        snapshot = client.get(url).json()['import']['source_snapshot']
+        assert snapshot['revision'] == COMMIT
+        assert snapshot['requested_revision'] == revision
+        assert snapshot['resolved_ref'] == 'refs/heads/master'
+        state['fail'] = 'model.safetensors'
+        imports.run_once()
+        assert client.get(url).json()['import']['state'] == 'failed'
+        state['head'] = 'c' * 40
+        assert client.post(url + '/retry-import').status_code == 200
+        state['fail'] = None
+        imports.run_once()
+        row = client.get(url).json()
+        assert row['state'] == 'available'
+        assert row['import']['source_snapshot'] == snapshot
+        assert state['discoveries'] == 1
+        assert state['downloads'].count('config.json') == 1
+    finally:
+        imports.cancel(identifier) if registry.get(identifier)['state'] != 'available' else None
+        registry.delete(identifier)
 
 
 def test_failed_import_retries_fixed_snapshot_and_reuses_verified_file(environment):

@@ -6,7 +6,11 @@
 
 采用一个仓库、两个工程：`frontend/` 和 `backend/`。后端是按业务组织的模块化单体，API 与 Worker 使用同一个 Python 包、不同进程入口。保持 React + TypeScript + Vite、FastAPI、PostgreSQL、MinIO 和 Docker Compose 的既定选型。产品首版的个人本机访问、无登录及本机回环绑定见[产品规格](../<internal-evidence>)。
 
-产品首版已追加优云远程执行和公共只读基座范围，见 [ADR-0001](adr/0001-ucompshare-remote-execution.md) 与 [ADR-0002](adr/0002-external-readonly-base-models.md)。下方目录仍是按需创建的设计；优云控制客户端、SSH/SFTP、远程任务与双向传输的具体文件及接口归属在实现规格中补足。现有模块的业务职责继续保留，不因使用云 API 将业务状态搬进供应商客户端。
+产品首版已追加优云远程执行和公共只读基座范围，见 [ADR-0001](adr/0001-ucompshare-remote-execution.md) 与 [ADR-0002](adr/0002-external-readonly-base-models.md)。下方目录仍是按需创建的设计；优云只读签名传输现归 `infrastructure/ucloud.py`，类型化目录投影与 HTTP 接口归 `modules/resources/catalog.py`、`routes.py`，计算环境 UI 归 `features/resources/`。外部基座用例归 `modules/models/external.py`，无模型依赖的只读文件探针归 `infrastructure/model_probe.py`，登记表单归 `features/models/ExternalBaseForm.tsx`。SSH/SFTP、远程任务与双向传输仍待实现规格补足。现有模块的业务职责继续保留，不因使用云 API 将业务状态搬进供应商客户端。
+
+2026-11-01 增量：`modules/resources/leases.py` 通过包入口公开 `GpuLeases`、`LeaseToken`；业务SQL与迁移0009保存单GPU占用、创建意图和清理事实。仅后端内核，尚未接供应商写操作、Worker、真实Attempt/trial和远程进程。实现及验收边界见[租约内核记录](implementation/gpu-leases-2026-11-01.md)。
+
+2026-11-01 后续增量：`modules/resources/instances.py` 公开 `InstanceLifecycle`、`InstanceSpec`，在资源模块内协调持久参数和租约事实；迁移0010保存创建快照和清理请求/确认。`infrastructure/ucloud.py` 新增显式写客户端 `UCloudInstances`，原 `UCloud.query` 保留只读allowlist。模块共用资源内核事务helper，不跨业务模块移动SQL。尚未接HTTP写入口/Worker/真实Attempt或远程进程。见[实例生命周期记录](implementation/ucloud-instances-2026-11-01.md)。
 
 目录优先回答“这项规则由谁负责”和“修改一项业务要去哪里”。每个 module（模块）通过小而明确的 interface（对外契约）隐藏内部实现。seam（可替换接点）只放在真实需要替换的位置；adapter（适配实现）通过该接点接入。
 

@@ -11,7 +11,7 @@ from psycopg.types.json import Jsonb
 from psycopg.errors import LockNotAvailable
 
 from modelforge.errors import AppError
-from .manifest import ModelFile, content_fingerprint, safe_path, validate_manifest
+from .manifest import ModelFile, content_fingerprint, safe_path, validate_manifest, model_structure
 
 
 class ModelRegistry:
@@ -81,6 +81,9 @@ class ModelRegistry:
             row['files'] = self._files(connection, version_id)
             if row.get('source_kind') == 'modelscope':
                 row['import'] = connection.execute('SELECT * FROM model_imports WHERE model_version_id=%s', (version_id,)).fetchone()
+            if row.get('source_kind') == 'ucloud_public':
+                row['external'] = connection.execute('SELECT * FROM external_base_models WHERE model_version_id=%s', (version_id,)).fetchone()
+                row['files'] = [{**file, 'state': 'external_observed'} for file in row['external']['pinned_manifest'] or []]
             row['references'] = list(connection.execute('SELECT reference_type,reference_id FROM model_version_references WHERE model_version_id=%s', (version_id,)).fetchall())
         row['verified_bytes'] = sum(f['size_bytes'] for f in row['files'] if f['state'] == 'verified')
         row['total_bytes'] = sum(f['size_bytes'] for f in row['files'])
@@ -222,26 +225,7 @@ class ModelRegistry:
                 raise
             except Exception as error:
                 raise AppError(503, 'dependency_unavailable', 'Cannot verify all model files in MinIO') from error
-            config = metadata['config.json']
-            if not isinstance(config, dict) or not isinstance(config.get('model_type'), str) or not config['model_type'].strip():
-                raise AppError(422, 'model_format_invalid', 'config.json requires model_type')
-            if not ({'tokenizer.json', 'tokenizer.model'} & by_path.keys()) and not {'vocab.json', 'merges.txt'} <= by_path.keys():
-                raise AppError(422, 'model_format_invalid', 'Tokenizer files are missing')
-            if not ({'model.safetensors', 'pytorch_model.bin'} & by_path.keys()) and not indexes:
-                raise AppError(422, 'model_format_invalid', 'Model weights or shard index are missing')
-            for index in indexes:
-                mapping = metadata[index].get('weight_map') if isinstance(metadata[index], dict) else None
-                if not isinstance(mapping, dict) or not mapping:
-                    raise AppError(422, 'model_format_invalid', 'Weight index requires a nonempty weight_map')
-                for shard in mapping.values():
-                    try:
-                        safe_path(shard)
-                    except (ValueError, TypeError, AttributeError) as error:
-                        raise AppError(422, 'model_format_invalid', 'Weight index contains an unsafe shard path') from error
-                    if shard not in by_path:
-                        raise AppError(422, 'model_format_invalid', 'Weight index references a missing shard', {'path': shard})
-            summary = {'model_type': config['model_type'], 'validation': 'directory_structure_only',
-                       'runtime_verified': False}
+            summary = model_structure(by_path, metadata)
             connection.execute("UPDATE model_versions SET state='available',format_summary=%s,updated_at=now() WHERE id=%s",
                                (Jsonb(summary), version_id))
             if import_attempt is not None:
@@ -264,6 +248,10 @@ class ModelRegistry:
             self._active_import(connection, row)
             if connection.execute('SELECT 1 FROM model_version_references WHERE model_version_id=%s', (version_id,)).fetchone():
                 raise AppError(409, 'model_in_use', 'ModelVersion is referenced')
+            if row.get('source_kind') == 'ucloud_public':
+                # External files are never platform-owned. Delete metadata under the same lock.
+                connection.execute('DELETE FROM model_versions WHERE id=%s', (version_id,))
+                return
             connection.execute("UPDATE model_versions SET state='deleting',updated_at=now() WHERE id=%s", (version_id,))
             files = self._files(connection, version_id)
         try:
@@ -297,3 +285,16 @@ class ModelRegistry:
             raise AppError(409, 'conflict', 'Only an available ModelVersion can be referenced')
         connection.execute('''INSERT INTO model_version_references (model_version_id,reference_type,reference_id)
             VALUES (%s,%s,%s) ON CONFLICT DO NOTHING''', (version_id,reference_type,reference_id))
+
+    def pin(self, version_id, reference_type, reference_id, *, connection):
+        self.add_reference(version_id, reference_type, reference_id, connection=connection)
+        row = self._version(connection, version_id)
+        snapshot = {'id': str(version_id), 'source_kind': row['source_kind'],
+                    'fingerprint': row['manifest_sha256'], 'bucket': row['bucket']}
+        if row['source_kind'] == 'ucloud_public':
+            source = connection.execute('SELECT * FROM external_base_models WHERE model_version_id=%s', (version_id,)).fetchone()
+            snapshot.update(external=source['source_snapshot'], files=source['pinned_manifest'])
+        else:
+            snapshot['files'] = [{k: f[k] for k in ('path','size_bytes','sha256','object_key')}
+                                 for f in self._files(connection, version_id)]
+        return snapshot

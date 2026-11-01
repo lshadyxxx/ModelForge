@@ -1,5 +1,7 @@
 # 实施路线
 
+2026-11-01增量：训练/产物/独立试用工作流和页面已实现；后端 `mvp-release-20261101-r5`、Web `mvp-release-20261101-r6` 已部署，业务库为 `0011_execution_workflows`。真实 Qwen3-0.6B SFT/LoRA 已完成 22 step，平均 train loss 1.7859、eval loss 0.2148；Best/Final Adapter 已发布到 MinIO，训练实例已停止、删除并确认释放。另一台人工推理实例已加载同一基座和 Best Adapter，真实 SSE 的两轮上下文、生成取消、后续请求、Worker 重启、断流恢复和十五分钟空闲回收已通过。r5 为训练和独立推理增加不可漂移的运行时锁，最终隔离回归 445 通过、1 跳过。r6 修复实例表单传入空镜像名导致 `Request validation failed` 的前端缺陷；前端 18 项测试及生产构建通过，`ego-browser` 已完成六页桌面/390px移动端和两处收费确认交互验收。当前主门禁是另用一台人工实例独立验证手动结束；容量上限最终锁定和完整模型/GPU兼容矩阵也仍开放。状态以[本轮实施记录](implementation/mvp-workflows-2026-11-01.md)为准。
+
 以下是建议的交付顺序。每阶段应先明确验收标准，再开始实现。
 
 产品首版以[已确认的产品 MVP 规格](../<internal-evidence>)为准：验收终点包含真实训练产物在平台内的推理试用，模型输入包括完整目录上传、ModelScope/Hugging Face 公开模型导入和优云公共基座引用。以下阶段属于逐步交付里程碑；基础骨架或模拟训练完成时，产品首版仍未完成。
@@ -8,7 +10,11 @@
 
 首版真实执行接入优云 API 工作流，见 [ADR-0001](adr/0001-ucompshare-remote-execution.md)。优云资源查询、远程任务与数据/产物传输纳入已确认的首版闭环；本地实现顺序拆分在[产品 MVP 任务目录](../<internal-evidence>)。
 
-当前 ticket 01 基础骨架已完成完整 Compose 验收，见[完整验收记录](implementation/full-compose-2026-10-29.md)。ticket 02 数据集后端已提交，代码审查及真实 PostgreSQL/MinIO 验收已完成，容量测量与限额锁定仍待完成，见[数据集实施记录](implementation/datasets-2026-10-29.md)。ticket 03 的目录上传后端和 ModelScope 固定 commit 后台导入均已实现；真实 Qwen3-0.6B 的 11 个文件已完成独立存储回读、原有 9 个文件复用及 API/Worker 重启后核验。默认分支解析、模型加载/兼容性、外部引用、容量锁定和业务 UI 仍待完成，Hugging Face 暂缓，见[模型实施记录](implementation/models-2026-10-30.md)及[专项记录](implementation/modelscope-2026-10-30.md)。进行 UI 重设计或选取实施任务前，读取[功能清单](FEATURE_INVENTORY.md)，区分真实能力与演示。连续流程原型已获用户基本认可，旧版三方向保留作对照；其他业务实施票仍开放。
+当前 ticket 01 基础骨架已完成完整 Compose 验收，见[完整验收记录](implementation/full-compose-2026-10-29.md)。ticket 02 数据集后端已提交，代码审查及真实 PostgreSQL/MinIO 验收已完成，容量测量与限额锁定仍待完成，见[数据集实施记录](implementation/datasets-2026-10-29.md)。ticket 03 的目录上传后端和 ModelScope 固定 commit 后台导入均已实现；真实 Qwen3-0.6B 的 11 个文件已完成独立存储回读、原有 9 个文件复用及 API/Worker 重启后核验。2026-10-31 默认/命名分支解析与数据集/模型 UI 已接入，见[连续实施记录](implementation/progress-2026-10-31.md)；模型加载/兼容性、外部引用实际实例核对、容量锁定和其余业务页面仍待完成，Hugging Face 暂缓，见[模型实施记录](implementation/models-2026-10-30.md)及[专项记录](implementation/modelscope-2026-10-30.md)。进行 UI 重设计或选取实施任务前，读取[功能清单](FEATURE_INVENTORY.md)，区分真实能力与演示。连续流程原型已获用户基本认可，旧版三方向保留作对照；其他业务实施票仍开放。
+
+2026-11-01：已实现后端PostgreSQL单GPU租约内核，包含owner/generation隔离、创建不确定保留、进程/实例/清理分离和核实后释放；尚未部署或接入真实云写操作及Worker。此为独立准备性增量，ticket04仍开放，产品ticket05保持阻塞。见[租约内核记录](implementation/gpu-leases-2026-11-01.md)。
+
+2026-11-01 后续：优云实例生命周期准备性适配器已通过真实隔离存储、签名fixture HTTP和独立QA，覆盖参数固定/库存、创建未知恢复及停止/终止/释放分离。最终全后端393通过、1跳过，审查修复独立复验9组必需检查及1组诊断通过，三轴host-only补审原3项P2已修复、无新增发现；独立准备票已关闭，常驻业务版本和0008迁移保持不变。下一步明确远程执行与文件传输通道的退出/恢复契约，再接Attempt/Worker；真实实例、费用与ticket04页面验收尚未闭合，产品05/07继续阻塞。见[实例生命周期记录](implementation/ucloud-instances-2026-11-01.md)。
 
 各阶段创建的目录、模块职责和依赖规则见 [项目结构设计](PROJECT_STRUCTURE.md)。目标目录按需创建，不作为一次性生成空壳的清单。
 
@@ -36,7 +42,7 @@
 
 验收：messages JSONL 单轮和多轮样本可上传、预览、发布；无效 JSON/消息记录按物理行号报错并拒绝发布。每个训练输入可以确定地指向已发布的数据集版本；清理可重建本地缓存后，仍能从 MinIO 下载并校验同一原始版本。
 
-实施状态（2026-10-30）：数据集后端已提交并经新镜像回归；覆盖有效/无效 JSONL、MinIO 回读、PostgreSQL 元数据、确定性 10% split、发布、下载 checksum、引用保护和清理。容量限制仍是首版初始配置，训练/优云执行未开始。模型目录上传后端增量已通过真实存储验收；ModelScope 当前仅固定 commit 后台导入，Hugging Face 暂缓，外部引用和业务 UI 待实现。详见[数据集实施记录](implementation/datasets-2026-10-29.md)和[模型实施记录](implementation/models-2026-10-30.md)。
+实施状态（更新至 2026-10-31）：数据集后端已提交并经新镜像回归；覆盖有效/无效 JSONL、MinIO 回读、PostgreSQL 元数据、确定性 10% split、发布、下载 checksum、引用保护和清理。容量限制仍是首版初始配置，训练/优云执行未开始。模型目录上传后端增量已通过真实存储验收；ModelScope 已支持默认/命名分支解析为固定 commit 后台导入，数据集/模型 UI 已接入；2026-10-31 新增优云只读目录接口和计算环境入口，真实账号目录筛选、分页和库存 API 已经同源 HTTP 验收，页面视觉/交互仍待安全隔离浏览器验收。Hugging Face 暂缓；外部引用登记与指纹内核已实现并经本地 fixture 验证，实际实例通道、训练和推理尚未实现，见[外部基座记录](implementation/external-bases-2026-10-31.md)。详见[数据集实施记录](implementation/datasets-2026-10-29.md)和[模型实施记录](implementation/models-2026-10-30.md)。
 
 ## 3. 训练任务与模拟执行器
 

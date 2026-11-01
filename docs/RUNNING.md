@@ -1,6 +1,6 @@
 # 本地运行与第一阶段验收
 
-当前运行包括 ticket 01 基础骨架、数据集后端及模型目录上传后端。完整 Compose、真实存储与故障恢复结果见[基础骨架验收](implementation/full-compose-2026-10-29.md)，模型能力边界见[模型实施记录](implementation/models-2026-10-30.md)。`designs/` 保留完整演示，`frontend/` 目前只开放实际实现的工作台；数据集/模型管理 UI 尚未接通。
+当前开放工作台、数据集、模型管理、计算环境、训练和独立试用入口。数据集/模型页面调用实际 API；优云凭据由后端环境注入，未配置时显示明确提示，不提供演示目录。优云真实目录/库存 API 和计算环境页面已通过同源 HTTP 与 `ego-browser` 隔离验收。训练/产物/独立试用流程已部署为后端 `mvp-release-20261101-r5`、Web `mvp-release-20261101-r6`。真实 Qwen3-0.6B SFT/LoRA 已完成并发布 Best/Final；另一台人工创建的 RTX 4090 已加载同一基座和 Best Adapter，真实 Adapter 生成、两轮上下文、取消、Worker 重启、断流恢复和十五分钟空闲回收通过。r6 修复了空镜像名参数导致 `Request validation failed` 的问题。独立手动结束仍需另一台人工实例，容量上限最终锁定和完整模型/GPU兼容矩阵也仍开放，见[工作流实施记录](implementation/mvp-workflows-2026-11-01.md)。真实存储与基础设施结果见[基础骨架验收](implementation/full-compose-2026-10-29.md)，最近增量与未验收项见[连续记录](implementation/progress-2026-10-31.md)和[优云目录](implementation/ucloud-catalog-2026-10-31.md)。
 
 ## 启停
 
@@ -70,6 +70,7 @@ MinIO 与 PostgreSQL 没有跨存储事务；失败保留不完整状态和清�
 ```powershell
 cd frontend
 npm ci
+npm test
 npm run build
 npm audit signatures
 cd ../backend
@@ -142,7 +143,7 @@ backend/.venv/Scripts/python.exe scripts/acceptance-models.py
 
 模型目录 API：先 `POST /api/v1/models/directory-imports` 提交 `{name,model_id?,files:[{path,size_bytes,sha256}]}`；随后对 `/api/v1/model-versions/{id}/files?path=...` 按文件 PUT 原始字节，再 POST `/complete`。POST `/resume` 提交原 files 清单，返回 reusable_paths/upload_paths；POST `/cancel` 可取消待上传版本。GET 版本或 `/api/v1/models` 查询，DELETE 未引用版本。文件改变时新建版本。
 
-`GET /api/v1/models/limits` 返回初始限制及未锁定状态。初始为 20 GiB/文件、100 GiB/目录、10000 文件；临时文件位于容器可重建目录。存储检查全部通过的 available 仍为兼容性未验证。忙碌写操作返回 `409 model_busy`，表示未接受；稍后重试。取消不强行打断已经执行中的文件存储操作。优云外部引用及模型加载验收另行实现。
+`GET /api/v1/models/limits` 返回初始限制及未锁定状态。初始为 20 GiB/文件、100 GiB/目录、10000 文件；临时文件位于容器可重建目录。存储检查全部通过的 available 仍为兼容性未验证。忙碌写操作返回 `409 model_busy`，表示未接受；稍后重试。取消不强行打断已经执行中的文件存储操作。优云外部登记与指纹内核见下节专项说明，实际实例核对和模型加载验收仍未完成。
 
 ## ModelScope 后台导入
 
@@ -192,3 +193,45 @@ backend/.venv/Scripts/python.exe scripts/acceptance-modelscope.py --version-id <
 `MF_MINIO_READ_TIMEOUT` 默认 120 秒，取值须有限且大于 0、不超过 600，控制传输与分片完成响应的读取无活动预算；不是整个文件传输的截止时间。连接超时仍为 2 秒，健康检查使用独立客户端和短 `probe_timeout`，不继承长传输预算。
 
 2026-10-30 Qwen3-0.6B 已完成 11 文件、1,519,209,873 字节的真实整模型存储、原有文件复用和 API/Worker 重启后核验。该状态只表示正式文件可用，`compatibility_state=unverified`；不能据此宣称模型可加载、训练/GPU 或业务 UI 已完成。
+
+## 优云只读目录
+
+在被 Git 忽略的 `.env` 配置 `MF_UCLOUD_PUBLIC_KEY`、`MF_UCLOUD_PRIVATE_KEY`；可选 `MF_UCLOUD_REGION`、`MF_UCLOUD_PROJECT_ID`、`MF_UCLOUD_TIMEOUT`（默认 20 秒，最大 60 秒）。网关配置 `MF_UCLOUD_API_URL` 仅接受官方 HTTPS `https://api.compshare.cn`。不要在前端代码或浏览器输入凭据。保存配置后按现有启动脚本重建应用容器；单纯 restart 不重新加载 env_file。
+
+进入“计算环境”，先刷新地域/可用区，再查 GPU 规格、平台镜像及公共模型；库存查询必须选定可用区、单卡型号、镜像、CPU 自动平台、计费模式和规格目录支持的系统盘。库存只反映查询时刻，不保留资源。目录可见不代表训练/推理已兼容。
+
+接口前缀 `/api/v1/resources/ucloud`：`GET /configuration` 仅返回配置布尔值/默认地域/只读模式；`GET /zones`、`/specs`、`/images`、`/models`、`/instances`、`/monitor` 以及 `POST /capacity` 均为只读查询。镜像按单一类型分页：API 和页面默认 `System`，可选 `App`，不提供跨类型混合分页；供应商会对每类分别应用 offset/limit。实例支持 offset/limit，公共模型按名称/标签筛选；实例响应移除密码、登录命令等敏感字段。本轮不提供创建、启动、停止或删除云实例接口。
+
+`cloud_not_configured`、`cloud_credentials_rejected`、`cloud_credentials_expired`、`cloud_permission_denied`、`cloud_unavailable`、`cloud_timeout`、`cloud_rate_limited`、`cloud_invalid_response`、`cloud_out_of_stock`、`cloud_incompatible` 分别说明配置、鉴权、权限、连接、协议或库存问题。供应商未说明原因时返回 `cloud_api_error`，不推测凭据过期；供应商原始错误正文不返回浏览器。成功响应包含 fetched_at、filters、total、state 和 compatibility=unverified。无后台静默重试，用户可显式刷新。
+
+浏览器验收不得置前窗口、调整窗口、使用桌面坐标或全局输入。后台驱动无法完成的文件选择/页面验收保留缺口，继续 HTTP 与测试。
+
+
+## 优云外部只读基座
+
+进入模型页，读取地域并选择公共目录条目后登记。API 会再次查询目录；登记为待实例核对，不复制权重到 MinIO。`POST /api/v1/models/external-bases` 接受 name/region/path；详情可查看来源、空或已固定的指纹和最近核对状态。删除只移除未引用的平台登记。
+
+完整文件探针可在明确的本地 fixture 上用 `python -m modelforge.infrastructure.model_probe <directory>` 执行；不要把此命令运行在未知大目录，也不要把其输出手动提交给浏览器作为核对证明。实际公共挂载和服务器远程核对通道尚未接通，页面没有伪造成功的“验证”按钮。扫描上限、固化/漂移/重试契约和证据见[实施记录](implementation/external-bases-2026-10-31.md)。
+
+## 手动 GPU 实例与 SSH
+
+平台不会自动创建收费实例。训练或独立推理提交前会弹出确认窗口，展示固定的单GPU规格并说明平台只保存要求、不购买或预留资源；确认后任务才进入“等待手动创建实例”。请按页面规格在优云控制台手动创建，确认 Running 后关联实例ID并明确授权停止/删除。训练和独立试用使用不同实例身份。
+
+后端只读挂载 `.runtime/ssh` 到 `/run/modelforge/ssh`。在被Git忽略的 `.runtime/ssh/endpoints.json` 按实例ID配置：
+
+```json
+{
+  "human-instance-id": {
+    "host": "verified-host.example", "port": 22, "user": "root",
+    "private_key": "/run/modelforge/ssh/instance_key",
+    "known_hosts": "/run/modelforge/ssh/known_hosts",
+    "root": "/var/tmp/modelforge", "python": "/opt/modelforge-venv/bin/python"
+  }
+}
+```
+
+`known_hosts` 必须经可信渠道核实主机指纹。私钥及指纹只放本地后端配置；不要放前端、聊天、SQL快照或Git。容器用户10001必须能读取私钥，私钥权限须满足OpenSSH要求。未配置或指纹不符时任务保留实例，不将断线当作退出。
+
+在人工实例上运行 `bash prepare-gpu-runtime.sh train` 或 `serve`（脚本见仓库scripts目录）。脚本要求Python >=3.11，并会依次检查`MODELFORGE_PYTHON`、`python3.13`、`python3.12`、`python3.11`、`python3`和镜像常见的Miniconda路径；镜像中的旧`python3`不能满足LLaMA-Factory 0.9.5时应显式设置`MODELFORGE_PYTHON`。安装与平台协议对应的固定候选运行时，再实际核对CUDA、依赖与单GPU。训练与推理分属独立实例。安装成功和`pip check`不替代真实模型兼容验收。远程实例不注入云AccessKey或平台数据库/MinIO凭据。
+
+失败/取消已确认退出后，诊断回传失败会显示日志缺口并继续回收；成功输出未校验入库时继续保留实例。未知远程进程或云状态必须核对，不强行释放。

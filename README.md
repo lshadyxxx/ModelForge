@@ -2,7 +2,7 @@
 
 ModelForge（模锻）是一个独立规划中的模型训练与推理平台，目标是把数据集、微调任务、模型产物和推理服务放进一条可追踪的生命周期中。
 
-当前状态：基础骨架、数据集生命周期后端和模型目录上传已通过真实 PostgreSQL/MinIO 验收。ModelScope 固定 commit 后台导入已实现持久进度、取消/重试及恢复；Qwen3-0.6B 的 11 个真实文件、1,519,209,873 字节已通过独立 MinIO 全量回读、SHA-256、已验证文件复用及 API/Worker 重启后核验，见[专项记录](docs/implementation/modelscope-2026-10-30.md)。这只证明模型存储可用，加载与训练/推理兼容性仍未验证。Hugging Face 按用户要求暂缓；默认分支解析、优云公共基座引用、容量锁定、业务管理 UI 和真实 GPU 闭环尚未完成，ticket 03 与产品 MVP 均未完成。见[本地运行](docs/RUNNING.md)、[模型实施记录](docs/implementation/models-2026-10-30.md)和[基础骨架验收](docs/implementation/full-compose-2026-10-29.md)。首版动作与完成边界见[功能清单](docs/FEATURE_INVENTORY.md)。
+当前状态（2026-11-01）：本地控制面、数据集/模型托管、优云只读目录、训练 Task/Attempt、单GPU租约、远程执行、Best/Final、独立推理及对应页面已实现并部署为后端 `mvp-release-20261101-r5`、Web `mvp-release-20261101-r6`。真实 Qwen3-0.6B SFT/LoRA 已完成，Best/Final 经 MinIO SHA-256 回读后发布，训练实例已停止、删除并确认租约释放。另一台人工实例已从正式资产加载同一基座和 Best Adapter；真实 Adapter 生成、两轮上下文、生成中取消、取消后新请求、Worker 重启、断流恢复和十五分钟空闲回收均已通过。`ego-browser` 隔离验收覆盖六页桌面与 390px 移动布局、训练/推理收费确认弹窗，并发现及修复了空白镜像名参数导致的验证失败。收费实例由用户手动创建，Worker 不自动采购。产品 MVP 当前还差另一台人工实例上的“手动结束试用”证据，以及容量上限最终锁定和完整模型/GPU兼容矩阵。详见[最新工作流记录](docs/implementation/mvp-workflows-2026-11-01.md)及[运行说明](docs/RUNNING.md)。
 
 ## 产品目标
 

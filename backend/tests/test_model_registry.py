@@ -259,3 +259,17 @@ def test_http_upload_enforces_streamed_size_and_content_identity(monkeypatch, tm
     assert response.json() == {'path': 'model.safetensors', 'state': 'verified', 'reused': False}
     assert store.objects[c.files[0]['object_key']] == data
     assert list(tmp_path.iterdir()) == []
+
+
+@pytest.mark.parametrize('target', ['config.json', 'tokenizer.json', 'model.safetensors.index.json'])
+def test_complete_rejects_nonweight_shard_targets(target):
+    registry, c, store = complete_subject()
+    c.files[:] = [file for file in c.files if file['path'] != 'model.safetensors']
+    content = __import__('json').dumps({'weight_map': {'layer': target}}).encode()
+    c.files.append({'path': 'model.safetensors.index.json', 'size_bytes': len(content),
+                    'sha256': hashlib.sha256(content).hexdigest(), 'object_key': 'index', 'state': 'verified'})
+    store.objects['index'] = content
+    with pytest.raises(AppError) as caught:
+        registry.complete(c.version['id'])
+    assert caught.value.code == 'model_format_invalid'
+    assert c.version['state'] == 'uploading'

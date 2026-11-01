@@ -25,3 +25,28 @@ class Resources:
             self.source_http.close()
         self.pool.close(timeout=3)
         self.store._http.clear()
+
+
+@dataclass(frozen=True)
+class RemoteServices:
+    channel: object
+    lifecycle: object
+
+
+def remote_services(resources):
+    """Shared HTTP/Worker transport assembly; no model runtime is created."""
+    from modelforge.infrastructure.remote import RemoteChannel
+    from modelforge.infrastructure.ucloud import UCloudInstances
+    from modelforge.modules.resources import GpuLeases, InstanceLifecycle
+    return RemoteServices(RemoteChannel(resources.settings),
+        InstanceLifecycle(GpuLeases(resources.pool),UCloudInstances(resources.settings,resources.source_http)))
+
+
+def execution_workers(resources):
+    """Worker-only preset assembly behind the module-owned executor contracts."""
+    from modelforge.modules.training import TrainingWorker
+    from modelforge.modules.serving import ServingWorker
+    from modelforge.runtimes.executors import LlamaFactoryExecutor, VllmExecutor
+    remote=remote_services(resources)
+    return (TrainingWorker(resources,remote.channel,remote.lifecycle,LlamaFactoryExecutor()),
+            ServingWorker(resources,remote.channel,remote.lifecycle,VllmExecutor()))

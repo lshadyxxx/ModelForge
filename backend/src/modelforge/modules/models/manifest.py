@@ -57,3 +57,33 @@ def content_fingerprint(files: list[dict]) -> str:
                  for f in sorted(files, key=lambda f: f['path'])]
     return hashlib.sha256(json.dumps(canonical, ensure_ascii=False, sort_keys=True,
                                     separators=(',', ':')).encode()).hexdigest()
+
+
+def model_structure(paths, metadata):
+    """Shared config/tokenizer/weight-shard structure; not runtime validation."""
+    paths = set(paths)
+    config = metadata.get('config.json')
+    if not isinstance(config, dict) or not isinstance(config.get('model_type'), str) or not config['model_type'].strip():
+        raise AppError(422, 'model_format_invalid', 'config.json requires model_type')
+    if not ({'tokenizer.json', 'tokenizer.model'} & paths) and not {'vocab.json', 'merges.txt'} <= paths:
+        raise AppError(422, 'model_format_invalid', 'Tokenizer files are missing')
+    indexes = {'model.safetensors.index.json', 'pytorch_model.bin.index.json'} & paths
+    if not ({'model.safetensors', 'pytorch_model.bin'} & paths) and not indexes:
+        raise AppError(422, 'model_format_invalid', 'Model weights or shard index are missing')
+    for index in sorted(indexes):
+        mapping = metadata.get(index)
+        mapping = mapping.get('weight_map') if isinstance(mapping, dict) else None
+        if not isinstance(mapping, dict) or not mapping:
+            raise AppError(422, 'model_format_invalid', 'Weight index requires a nonempty weight_map')
+        suffix = '.safetensors' if index == 'model.safetensors.index.json' else '.bin'
+        for shard in mapping.values():
+            try:
+                safe_path(shard)
+            except (ValueError, TypeError, AttributeError) as error:
+                raise AppError(422, 'model_format_invalid', 'Weight index contains an unsafe shard path') from error
+            if not shard.endswith(suffix):
+                raise AppError(422, 'model_format_invalid', 'Weight index must reference weight files of its format')
+            if shard not in paths:
+                raise AppError(422, 'model_format_invalid', 'Weight index references a missing shard', {'path': shard})
+    return {'model_type': config['model_type'], 'validation': 'directory_structure_only',
+            'runtime_verified': False}

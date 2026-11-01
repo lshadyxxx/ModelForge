@@ -1,0 +1,19 @@
+{
+  "schema": 1,
+  "id": "ucloud-cuda13.0-vllm-0.32.0-qwen3-20261101-r1",
+  "python": "3.13.5",
+  "cuda": "13.0",
+  "packages": {
+    "fastapi": "0.136.3",
+    "huggingface-hub": "2.4.0",
+    "numpy": "2.4.6",
+    "pydantic": "2.14.2",
+    "safetensors": "0.8.0",
+    "starlette": "1.10.0",
+    "tokenizers": "0.23.3",
+    "torch": "2.13.0",
+    "transformers": "5.19.0",
+    "uvicorn": "0.54.0",
+    "vllm": "0.32.0"
+  }
+}

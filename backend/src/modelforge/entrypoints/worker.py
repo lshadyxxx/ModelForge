@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 import logging
 import threading
 
-from modelforge.bootstrap import Resources
+from modelforge.bootstrap import Resources, execution_workers
 from modelforge.errors import configure_errors
 from modelforge.modules.models import ModelImports
 from modelforge.settings import get_settings
@@ -25,6 +25,17 @@ def import_loop(resources, stop):
             stop.wait(1)
 
 
+def execution_loop(resources, stop):
+    training, serving = execution_workers(resources)
+    while not stop.is_set():
+        try:
+            training.run_once()
+            serving.run_once()
+        except Exception:
+            logger.warning('Execution dependency unavailable; resources remain held for reconciliation')
+        stop.wait(2)
+
+
 @asynccontextmanager
 async def lifespan(app):
     import asyncio
@@ -32,12 +43,15 @@ async def lifespan(app):
     stop = threading.Event()
     thread = threading.Thread(target=import_loop, args=(resources, stop), name='model-importer')
     thread.start()
+    execution_thread = threading.Thread(target=execution_loop, args=(resources, stop), name="execution-worker")
+    execution_thread.start()
     app.state.import_thread = thread
     try:
         yield
     finally:
         stop.set()
         await asyncio.to_thread(thread.join)
+        await asyncio.to_thread(execution_thread.join)
         resources.close()
 
 app = FastAPI(title="ModelForge Worker probe", docs_url=None, redoc_url=None, lifespan=lifespan)

@@ -1,5 +1,5 @@
 from functools import lru_cache
-from pydantic import Field, SecretStr
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from psycopg.conninfo import make_conninfo
 
@@ -33,6 +33,32 @@ class Settings(BaseSettings):
     model_limits_version: str = 'initial-2026-10-30'
     model_limits_locked: bool = False
     model_temporary_directory: str = '/tmp/modelforge-models'
+
+    ucloud_public_key: SecretStr | None = None
+    ucloud_private_key: SecretStr | None = None
+    ucloud_region: str | None = None
+    ucloud_project_id: str | None = None
+    ucloud_api_url: str = "https://api.compshare.cn"
+    ucloud_timeout: float = Field(default=20, gt=0, le=60, allow_inf_nan=False)
+
+    @field_validator("ucloud_public_key", "ucloud_private_key", mode="before")
+    @classmethod
+    def nonblank_cloud_secret(cls, value):
+        if isinstance(value, str):
+            return value.strip() or None
+        return value
+
+    @field_validator("ucloud_api_url")
+    @classmethod
+    def official_cloud_endpoint(cls, value):
+        if value.rstrip("/") != "https://api.compshare.cn":
+            raise ValueError("Only the official HTTPS CompShare endpoint is supported")
+        return value.rstrip("/")
+
+
+    ssh_endpoints_file: str = '/run/modelforge/ssh/endpoints.json'
+    ssh_executable: str = 'ssh'
+    ssh_transfer_timeout: int = Field(default=1800, ge=10, le=7200)
 
     def conninfo(self) -> str:
         return make_conninfo(host=self.pg_host, port=self.pg_port,

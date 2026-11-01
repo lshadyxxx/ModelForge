@@ -45,6 +45,7 @@ Thumbs.db
 # Build outputs
 dist/
 *.egg-info/
+/backend/build/
 
 # Local-only internal integration research
 <internal-evidence>*.md
