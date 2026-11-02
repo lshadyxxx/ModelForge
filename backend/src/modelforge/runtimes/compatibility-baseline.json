@@ -1,0 +1,142 @@
+{
+  "schema": 1,
+  "id": "qwen3-0.6b-rtx4090-cn-bj2-partial-20261102-r1",
+  "status": "partial",
+  "generated_at": "2026-11-02",
+  "model": {
+    "display_name": "Qwen3-0.6B",
+    "architecture": "qwen3",
+    "allowed_fingerprints": [
+      "ffeb1654eaf9f55ac1ece9d1396c006cb17ff6d18f2d21a120fd0cef28a0166a"
+    ],
+    "max_model_len": 512
+  },
+  "training": {
+    "runtime_lock_id": "ucloud-cuda13.2-llamafactory-0.9.5-qwen3-20261101-r2",
+    "runtime_lock_sha256": "08a1c34b453406bd4a6d89ce5241827e973766d936baae6cc24378edb3cc032a",
+    "hardware": {
+      "region": "cn-bj2",
+      "zone": "cn-bj2-03",
+      "gpu_type": "4090",
+      "cpu": 14,
+      "memory_mb": 65536,
+      "image_id": "compshareImage-1fc8fjody17l",
+      "cpu_platform": "Amd/Auto",
+      "charge_type": "Postpay",
+      "boot_disk_gb": 100,
+      "boot_disk_type": "CLOUD_SSD",
+      "device_memory_bytes": 25280839680
+    },
+    "verified_preset": {
+      "epochs": 1,
+      "learning_rate": 0.0002,
+      "cutoff_len": 512,
+      "batch_size": 1,
+      "gradient_accumulation": 1,
+      "lora_rank": 8,
+      "lora_alpha": 16,
+      "lora_dropout": 0.0,
+      "scheduler": "cosine",
+      "warmup_ratio": 0.0,
+      "template": "qwen3_nothink",
+      "seed": 42
+    }
+  },
+  "inference": {
+    "runtime_lock_id": "ucloud-cuda13.0-vllm-0.32.0-qwen3-20261101-r1",
+    "runtime_lock_sha256": "e4e0a0ccc190393978b4e81b74d3df350a5b2913cf1fc005a123a08c69ac355b",
+    "hardware": {
+      "region": "cn-bj2",
+      "zone": "cn-bj2-03",
+      "gpu_type": "4090",
+      "cpu": 14,
+      "memory_mb": 65536,
+      "image_id": "compshareImage-1fc8fjody17l",
+      "cpu_platform": "Auto",
+      "charge_type": "Postpay",
+      "boot_disk_gb": 100,
+      "boot_disk_type": "CLOUD_SSD",
+      "device_memory_bytes": 25280839680
+    },
+    "config": {
+      "lora_rank": 8,
+      "max_model_len": 512,
+      "template": "qwen3_nothink"
+    },
+    "gpu_memory_utilization": 0.8,
+    "loaded_device_memory_bytes": 20587741184,
+    "conversation": {
+      "max_messages": 20,
+      "max_content_chars_per_message": 12000,
+      "max_total_content_chars": 12000,
+      "max_tokens_default": 128,
+      "max_tokens_limit": 256
+    }
+  },
+  "limits": {
+    "dataset": {
+      "configuration_version": "conservative-2026-11-02",
+      "locked": false,
+      "file_limit_bytes": 104857600,
+      "sample_limit": 100000,
+      "line_limit_bytes": 1048576,
+      "validation_error_limit": 100,
+      "preview_samples": 20,
+      "largest_observed_version_id": "dc344d8b-41ca-459a-9eb6-3c276eeb93a2",
+      "largest_observed_file_bytes": 4836,
+      "largest_observed_samples": 24
+    },
+    "model": {
+      "configuration_version": "conservative-2026-11-02",
+      "locked": false,
+      "file_limit_bytes": 21474836480,
+      "total_limit_bytes": 107374182400,
+      "file_count_limit": 10000,
+      "largest_observed_version_id": "51f7b869-9894-424b-bc5d-dba013723ddb",
+      "largest_observed_file_bytes": 1503300328,
+      "largest_observed_total_bytes": 1519209873,
+      "largest_observed_file_count": 11
+    }
+  },
+  "evidence": {
+    "training_attempt_id": "02504b93-efb7-4258-9029-45a963b07d47",
+    "training_exit_code": 0,
+    "trained_steps": 22,
+    "average_train_loss": 1.7858700981490652,
+    "eval_loss": 0.2147834300994873,
+    "adapter_best_id": "29fe9ea2-e11c-5dee-900d-73cc256d9b70",
+    "adapter_best_fingerprint": "780954de248533a08a91f7efc61c491192bdc00ac1d15fc4a2dc76519965fb7b",
+    "adapter_final_id": "f48e77f1-adca-5f3f-86fc-00456dac2c0c",
+    "adapter_final_fingerprint": "083cdd5a74c87c675f0de9f6561628ab8abb3ad65d3d74111cecc737272e461a",
+    "inference_trial_id": "3e73bdb1-f05b-4390-a0b9-a8ca09dc9e92",
+    "training_peak_memory": "pending",
+    "capacity_limits": "protected_not_locked"
+  },
+  "closure_gaps": [
+    "training_peak_memory_pending",
+    "dataset_and_model_capacity_limits_not_boundary_tested",
+    "only_the_single_verified_combination_is_enabled"
+  ],
+  "blocked_combinations": [
+    {
+      "code": "runtime_model_unsupported",
+      "reason": "Only model architecture qwen3 is enabled in this baseline."
+    },
+    {
+      "code": "runtime_model_version_unsupported",
+      "reason": "A qwen3 model is enabled only when its complete manifest fingerprint is in the allowlist."
+    },
+    {
+      "code": "runtime_parameters_unsupported",
+      "reason": "Training and Adapter parameters must match the real measured preset."
+    },
+    {
+      "code": "runtime_hardware_unsupported",
+      "reason": "The instance region, zone, GPU type and image must match the verified hardware and runtime image."
+    },
+    {
+      "code": "runtime_baseline_changed",
+      "reason": "Adapters created against an older baseline require explicit revalidation."
+    }
+  ]
+}

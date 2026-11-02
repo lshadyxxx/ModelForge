@@ -79,6 +79,26 @@ def test_model_limits_contract_reports_configuration(monkeypatch):
         'resume_granularity': 'file'}
 
 
+def test_runtime_baseline_contract_reports_locks_and_open_gaps(monkeypatch):
+    from modelforge.settings import Settings
+    settings = Settings(dataset_limits_locked=False, model_limits_locked=False)
+    monkeypatch.setattr(app.state, "resources", SimpleNamespace(settings=settings), raising=False)
+    response = TestClient(app).get("/api/v1/runtime/baseline")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["id"].endswith("partial-20261102-r1")
+    assert len(body["sha256"]) == 64
+    assert body["model"]["architecture"] == "qwen3"
+    assert body["training"]["runtime_lock_id"]
+    assert body["inference"]["runtime_lock_id"]
+    assert body["capacity"]["dataset"]["file_limit_bytes"] == 100 * 1024 * 1024
+    assert body["capacity"]["dataset"]["sample_limit"] == 100_000
+    assert body["capacity"]["model"]["file_limit_bytes"] == 20 * 1024**3
+    assert body["capacity"]["model"]["total_limit_bytes"] == 100 * 1024**3
+    assert body["capacity"]["dataset"]["locked"] is False
+    assert "training_peak_memory_pending" in body["closure_gaps"]
+
+
 def test_unexpected_errors_are_sanitized():
     from fastapi import FastAPI
     from modelforge.errors import configure_errors

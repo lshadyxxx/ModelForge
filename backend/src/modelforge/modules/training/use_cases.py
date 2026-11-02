@@ -9,19 +9,20 @@ from modelforge.errors import AppError
 from modelforge.modules.datasets import DatasetRegistry
 from modelforge.modules.models import ModelRegistry
 from modelforge.modules.resources import GpuLeases, InstanceSpec, LeaseToken, Catalog
+from modelforge.runtimes.compatibility import training_compatibility
 
 class TrainingConfig(BaseModel):
     model_config = ConfigDict(extra='forbid', frozen=True, allow_inf_nan=False, strict=True)
-    epochs: int = Field(3, ge=1, le=100)
+    epochs: int = Field(1, ge=1, le=100)
     learning_rate: float = Field(2e-4, ge=1e-7, le=.01)
-    cutoff_len: int = Field(2048, ge=128, le=32768)
+    cutoff_len: int = Field(512, ge=128, le=32768)
     batch_size: int = Field(1, ge=1, le=8)
-    gradient_accumulation: int = Field(8, ge=1, le=128)
+    gradient_accumulation: int = Field(1, ge=1, le=128)
     lora_rank: Literal[4,8,16,32,64] = 8
     lora_alpha: int = Field(16, ge=1, le=256)
     lora_dropout: float = Field(0, ge=0, le=.5)
     scheduler: Literal['cosine','linear'] = 'cosine'
-    warmup_ratio: float = Field(.1, ge=0, le=.3)
+    warmup_ratio: float = Field(0, ge=0, le=.3)
     template: Literal['qwen3_nothink','qwen','llama3','mistral']
     seed: int = Field(42, ge=0, le=2147483647)
 
@@ -46,15 +47,20 @@ class Training:
 
     def create(self, body):
         body = CreateTask.model_validate(body.model_dump())
+        registry = ModelRegistry(self.resources)
+        model_selection = registry.get(body.base_model_version_id)
+        if (model_selection['source_kind'] == 'ucloud_public'
+                and model_selection['external']['region'] != body.instance.region):
+            raise AppError(422, 'base_region_mismatch', 'External base and execution instance must use the same region')
+        compatibility = training_compatibility(model_selection, body.config, body.instance)
         Catalog(self.resources).validate_selection(body.instance)
         task_id, attempt_id = uuid.uuid4(), uuid.uuid4()
         with self.pool.connection() as connection:
             dataset = DatasetRegistry(self.resources).pin(body.dataset_version_id, 'training_task', str(task_id), connection=connection)
-            model = ModelRegistry(self.resources).pin(body.base_model_version_id, 'training_task', str(task_id), connection=connection)
-            if model['source_kind'] == 'ucloud_public' and model['external']['region'] != body.instance.region:
-                raise AppError(422, 'base_region_mismatch', 'External base and execution instance must use the same region')
+            model = registry.pin(body.base_model_version_id, 'training_task', str(task_id), connection=connection)
             snapshot = {'schema': 1, 'runtime': 'llamafactory-sft-lora-v1', 'dataset': dataset, 'base': model,
-                        'config': body.config.model_dump(), 'instance': body.instance.model_dump()}
+                        'config': body.config.model_dump(), 'instance': body.instance.model_dump(),
+                        'compatibility': compatibility}
             connection.execute('INSERT INTO training_tasks(id,name,snapshot,snapshot_sha256) VALUES (%s,%s,%s,%s)',
                 (task_id, body.name.strip(), Jsonb(snapshot), hashlib.sha256(canonical(snapshot)).hexdigest()))
             connection.execute('INSERT INTO training_attempts(id,task_id,number) VALUES (%s,%s,1)', (attempt_id,task_id))

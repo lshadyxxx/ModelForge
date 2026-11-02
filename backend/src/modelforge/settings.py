@@ -25,12 +25,12 @@ class Settings(BaseSettings):
     dataset_line_limit_bytes: int = 1 * 1024 * 1024
     dataset_validation_error_limit: int = 100
     dataset_preview_samples: int = 20
-    dataset_limits_version: str = "initial-2026-10-29"
+    dataset_limits_version: str = "conservative-2026-11-02"
     dataset_limits_locked: bool = False
     model_file_limit_bytes: int = 20 * 1024**3
     model_total_limit_bytes: int = 100 * 1024**3
     model_file_count_limit: int = 10_000
-    model_limits_version: str = 'initial-2026-10-30'
+    model_limits_version: str = 'conservative-2026-11-02'
     model_limits_locked: bool = False
     model_temporary_directory: str = '/tmp/modelforge-models'
 

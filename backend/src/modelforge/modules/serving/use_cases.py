@@ -10,6 +10,9 @@ from modelforge.errors import AppError
 from .contracts import ServingExecutor
 from modelforge.modules.models import Adapters,ModelExecution
 from modelforge.modules.resources import GpuLeases,InstanceSpec,LeaseToken,Catalog
+from modelforge.runtimes.compatibility import compatibility_baseline, inference_compatibility
+
+_CONVERSATION = compatibility_baseline().inference.conversation
 
 class CreateTrial(BaseModel):
     model_config=ConfigDict(extra='forbid')
@@ -19,12 +22,12 @@ class CreateTrial(BaseModel):
 class Message(BaseModel):
     model_config=ConfigDict(extra='forbid')
     role:Literal['system','user','assistant']
-    content:str=Field(min_length=1,max_length=32000)
+    content:str=Field(min_length=1,max_length=_CONVERSATION.max_content_chars_per_message)
 
 class Chat(BaseModel):
     model_config=ConfigDict(extra='forbid',allow_inf_nan=False)
-    messages:list[Message]=Field(min_length=1,max_length=100)
-    max_tokens:int=Field(512,ge=1,le=4096)
+    messages:list[Message]=Field(min_length=1,max_length=_CONVERSATION.max_messages)
+    max_tokens:int=Field(_CONVERSATION.max_tokens_default,ge=1,le=_CONVERSATION.max_tokens_limit)
     temperature:float=Field(.7,ge=0,le=2)
     top_p:float=Field(.9,gt=0,le=1)
 
@@ -36,15 +39,17 @@ class Serving:
 
     def create(self,body):
         body=CreateTrial.model_validate(body.model_dump())
-        Catalog(self.resources).validate_selection(body.instance)
         adapter=Adapters(self.resources).get(body.adapter_id)
+        compatibility=inference_compatibility(adapter,body.instance)
         if GpuLeases(self.pool).current():
             raise AppError(409,'gpu_busy','Complete existing training/trial instance cleanup before starting a new trial')
         base=adapter['snapshot']['base']
         if base['source_kind']=='ucloud_public' and base['external']['region']!=body.instance.region:
             raise AppError(422,'base_region_mismatch','Trial must use the pinned public model region')
+        Catalog(self.resources).validate_selection(body.instance)
         identifier=uuid.uuid4();snapshot={'base':base,'instance':body.instance.model_dump(),
-            'config':adapter['snapshot']['config'],'adapter_fingerprint':adapter['fingerprint']}
+            'config':adapter['snapshot']['config'],'adapter_fingerprint':adapter['fingerprint'],
+            'compatibility':compatibility}
         with self.pool.connection() as c:
             c.execute('INSERT INTO inference_trials(id,adapter_id,snapshot) VALUES (%s,%s,%s)',(identifier,body.adapter_id,Jsonb(snapshot)))
         return self.get(identifier)
@@ -79,7 +84,8 @@ class Serving:
         return self.get(identifier)
 
     def start_request(self,identifier,body):
-        if sum(len(m.content) for m in body.messages)>200000 or body.messages[-1].role!='user':
+        if (sum(len(m.content) for m in body.messages)>_CONVERSATION.max_total_content_chars
+                or body.messages[-1].role!='user'):
             raise AppError(422,'chat_invalid','End with a user message and keep context within the supported limit')
         with self.pool.connection() as c:
             row=c.execute('SELECT * FROM inference_trials WHERE id=%s FOR UPDATE',(identifier,)).fetchone()

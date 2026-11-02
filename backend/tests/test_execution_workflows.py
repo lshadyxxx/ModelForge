@@ -73,6 +73,17 @@ class Channel:
         self.files['result.json']=json.dumps({'best_path':'output/checkpoint-1','final_path':'output',
             'best_metrics':{'eval_loss':.5},'final_metrics':{'eval_loss':.7}}).encode()
         self.files['process.log']=b'loss=1.0 eval_loss=0.5'
+        self.files['gpu-memory.json']=json.dumps({
+            'schema':1,'status':'measured','sample_interval_ms':250,
+            'device_samples':[{'elapsed_ms':0,'used_bytes':1000}],
+            'device_peak_used_bytes':1000,
+            'torch_peaks':{
+                'peak_memory_allocated_bytes':800,
+                'peak_memory_reserved_bytes':900,
+                'device_name':'fixture GPU',
+            },
+            'sampler_error':None,'process_exit_code':0,
+        }).encode()
         for path in ('output','output/checkpoint-1'):
             self.files[path+'/adapter_config.json']=b'{"peft_type":"LORA"}'
             self.files[path+'/adapter_model.safetensors']=b'fixture-adapter-not-a-real-model'
@@ -80,6 +91,8 @@ class Channel:
 @pytest.fixture
 def env(monkeypatch):
     monkeypatch.setattr('modelforge.modules.resources.Catalog.validate_selection',lambda self,spec:spec)
+    monkeypatch.setattr('modelforge.modules.training.use_cases.training_compatibility',lambda *args:{})
+    monkeypatch.setattr('modelforge.modules.serving.use_cases.inference_compatibility',lambda *args:{})
     resources=Resources.open(Settings());resources.pool.wait()
     with resources.pool.connection() as c:
         c.execute('TRUNCATE training_tasks,gpu_slots,gpu_reservations,models,datasets CASCADE')

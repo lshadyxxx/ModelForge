@@ -1,4 +1,5 @@
 """Immutable validated GPU runtime identities."""
+from functools import lru_cache
 import hashlib
 import json
 from pathlib import Path
@@ -7,6 +8,7 @@ _TRAINING_LOCK_PATH = Path(__file__).with_name('training-runtime.lock.json')
 _INFERENCE_LOCK_PATH = Path(__file__).with_name('inference-runtime.lock.json')
 
 
+@lru_cache
 def _lock_bytes(path):
     return path.read_bytes()
 
@@ -57,3 +59,7 @@ def inference_runtime_lock():
 
 def inference_runtime_lock_sha256():
     return _sha256(_INFERENCE_LOCK_PATH)
+
+
+def reset_runtime_lock_cache():
+    _lock_bytes.cache_clear()

@@ -290,7 +290,8 @@ class ModelRegistry:
         self.add_reference(version_id, reference_type, reference_id, connection=connection)
         row = self._version(connection, version_id)
         snapshot = {'id': str(version_id), 'source_kind': row['source_kind'],
-                    'fingerprint': row['manifest_sha256'], 'bucket': row['bucket']}
+                    'fingerprint': row['manifest_sha256'], 'bucket': row['bucket'],
+                    'format_summary': row.get('format_summary')}
         if row['source_kind'] == 'ucloud_public':
             source = connection.execute('SELECT * FROM external_base_models WHERE model_version_id=%s', (version_id,)).fetchone()
             snapshot.update(external=source['source_snapshot'], files=source['pinned_manifest'])

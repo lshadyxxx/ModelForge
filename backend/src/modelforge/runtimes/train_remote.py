@@ -7,6 +7,8 @@ from pathlib import Path
 import platform
 import subprocess
 import sys
+import threading
+import time
 
 
 def runtime_mismatches(lock, python_version, cuda_version, versions):
@@ -20,6 +22,101 @@ def runtime_mismatches(lock, python_version, cuda_version, versions):
         if actual != expected:
             mismatches.append({'field': name, 'expected': expected, 'actual': actual})
     return mismatches
+
+
+def parse_device_memory_bytes(output):
+    values = []
+    for line in output.splitlines():
+        value = line.strip().split(',', 1)[0].strip()
+        if not value:
+            continue
+        mib = int(value)
+        if mib < 0:
+            raise ValueError('negative GPU memory sample')
+        values.append(mib * 1024 * 1024)
+    if not values:
+        raise ValueError('missing GPU memory sample')
+    return values
+
+
+class DeviceMemorySampler:
+    def __init__(self, interval_seconds=0.25):
+        self.interval_seconds = interval_seconds
+        self.samples = []
+        self.error = None
+        self.started = time.monotonic()
+        self.stop_event = threading.Event()
+        self.thread = threading.Thread(target=self._run, name='gpu-memory-sampler', daemon=True)
+
+    def start(self):
+        self.thread.start()
+
+    def _run(self):
+        command = ['nvidia-smi', '--query-gpu=memory.used', '--format=csv,noheader,nounits']
+        while not self.stop_event.is_set():
+            try:
+                result = subprocess.run(command, check=True, capture_output=True, text=True, timeout=2)
+                used_bytes = max(parse_device_memory_bytes(result.stdout))
+                self.samples.append({
+                    'elapsed_ms': round((time.monotonic() - self.started) * 1000),
+                    'used_bytes': used_bytes,
+                })
+            except Exception as error:
+                # Preserve only the exception class; command output can contain host
+                # details and is not needed to diagnose a sampling failure.
+                self.error = type(error).__name__
+            self.stop_event.wait(self.interval_seconds)
+
+    def stop(self):
+        if self.thread.is_alive():
+            self.stop_event.set()
+            self.thread.join(timeout=3)
+        return self.samples
+
+
+def write_training_memory(process, sampler, runtime_report):
+    sampler.stop()
+    torch_peaks = None
+    peaks_path = Path('gpu/torch-peaks.json')
+    if peaks_path.is_file():
+        try:
+            candidate = json.loads(peaks_path.read_text())
+            allocated = candidate.get('peak_memory_allocated_bytes')
+            reserved = candidate.get('peak_memory_reserved_bytes')
+            if (type(allocated) is int and type(reserved) is int
+                    and 0 <= allocated <= reserved):
+                torch_peaks = candidate
+        except (OSError, ValueError, TypeError):
+            torch_peaks = None
+    device_samples = sampler.samples
+    device_peak = max((sample['used_bytes'] for sample in device_samples), default=None)
+    measured = torch_peaks is not None or device_peak is not None
+    report = {
+        'schema': 1,
+        'status': 'measured' if measured else 'unavailable',
+        'sample_interval_ms': round(sampler.interval_seconds * 1000),
+        'device_samples': device_samples,
+        'device_peak_used_bytes': device_peak,
+        'torch_peaks': torch_peaks,
+        'sampler_error': sampler.error,
+        'process_exit_code': process.returncode,
+    }
+    Path('gpu-memory.json').write_text(json.dumps(report, sort_keys=True, allow_nan=False))
+    runtime_report['training_memory'] = {
+        'status': report['status'],
+        'sample_interval_ms': report['sample_interval_ms'],
+        'sample_count': len(device_samples),
+        'device_peak_used_bytes': device_peak,
+        'torch_peak_memory_allocated_bytes': (
+            torch_peaks['peak_memory_allocated_bytes'] if torch_peaks else None
+        ),
+        'torch_peak_memory_reserved_bytes': (
+            torch_peaks['peak_memory_reserved_bytes'] if torch_peaks else None
+        ),
+        'sampler_error': report['sampler_error'],
+    }
+    Path('runtime-baseline.json').write_text(json.dumps(runtime_report, sort_keys=True, allow_nan=False))
+    return report
 
 
 def run():
@@ -96,18 +193,38 @@ def run():
     # process so model imports and GPU memory are released before verification.
     entrypoint = (
         "import json\n"
+        "from pathlib import Path\n"
+        "import torch\n"
         "from llamafactory.train.tuner import run_exp\n"
-        "with open('train.json', encoding='utf-8') as stream:\n"
-        "    run_exp(json.load(stream))\n"
+        "try:\n"
+        "    with open('train.json', encoding='utf-8') as stream:\n"
+        "        run_exp(json.load(stream))\n"
+        "finally:\n"
+        "    try:\n"
+        "        torch.cuda.synchronize()\n"
+        "    finally:\n"
+        "        Path('gpu').mkdir(exist_ok=True)\n"
+        "        Path('gpu/torch-peaks.json').write_text(json.dumps({\n"
+        "            'peak_memory_allocated_bytes': torch.cuda.max_memory_allocated(),\n"
+        "            'peak_memory_reserved_bytes': torch.cuda.max_memory_reserved(),\n"
+        "            'device_name': torch.cuda.get_device_name(0)}))\n"
     )
     process = subprocess.Popen([sys.executable, '-c', entrypoint],
                                stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
+    sampler = DeviceMemorySampler()
+    sampler.start()
     tail=b''
-    while block:=process.stdout.read1(16384):
-        sys.stdout.buffer.write(block);sys.stdout.buffer.flush();tail=(tail+block)[-65536:]
-    if process.wait():
+    try:
+        while block:=process.stdout.read1(16384):
+            sys.stdout.buffer.write(block);sys.stdout.buffer.flush();tail=(tail+block)[-65536:]
+        process.wait()
+    finally:
+        memory_report = write_training_memory(process, sampler, report)
+    if process.returncode:
         code='oom' if b'out of memory' in tail.lower() or b'cudaoutofmemoryerror' in tail.lower() else 'training_failed'
-        Path('failure.json').write_text(json.dumps({'code':code,'exit_code':process.returncode}))
+        Path('failure.json').write_text(json.dumps({
+            'code': code, 'exit_code': process.returncode,
+            'memory_evidence': memory_report['status']}))
         return process.returncode
     history_path = Path('output/trainer_state.json')
     state = json.loads(history_path.read_text())

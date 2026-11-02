@@ -1,6 +1,6 @@
 # 本地运行与第一阶段验收
 
-当前开放工作台、数据集、模型管理、计算环境、训练和独立试用入口。数据集/模型页面调用实际 API；优云凭据由后端环境注入，未配置时显示明确提示，不提供演示目录。真实 Qwen3-0.6B SFT/LoRA、Best/Final、独立 vLLM Adapter 生成、多轮 SSE、取消、Worker 重启、断流恢复、十五分钟空闲回收和页面手动结束均已通过；所有训练/推理实例均已停止、删除并核对租约释放。首页工作台已在提交 `b8987dd` 中改为真实资产、GPU、最近训练、Loss、下一步动作和最近活动视图，并通过桌面及 390px 隔离浏览器验收。完整容量上限和模型/GPU/镜像兼容矩阵仍开放，见[工作流实施记录](implementation/mvp-workflows-2026-11-01.md)。真实存储与基础设施结果见[基础骨架验收](implementation/full-compose-2026-10-29.md)，历史增量见[连续记录](implementation/progress-2026-10-31.md)和[优云目录](implementation/ucloud-catalog-2026-10-31.md)。
+当前开放工作台、数据集、模型管理、计算环境、训练和独立试用入口。数据集/模型页面调用实际 API；优云凭据由后端环境注入，未配置时显示明确提示，不提供演示目录。真实 Qwen3-0.6B SFT/LoRA、Best/Final、独立 vLLM Adapter 生成、多轮 SSE、取消、Worker 重启、断流恢复、十五分钟空闲回收和页面手动结束均已通过；所有训练/推理实例均已停止、删除并核对租约释放。首页工作台已在提交 `b8987dd` 中改为真实资产、GPU、最近训练、Loss、下一步动作和最近活动视图，并通过桌面及 390px 隔离浏览器验收。版本化兼容基线已绑定模型/Adapter 指纹、完整训练与推理实例规格和数值容量；容量边界及训练 GPU 峰值仍未实测，基线保持 `partial`。完整兼容矩阵仍开放，见[运行时兼容记录](implementation/runtime-compatibility-2026-11-02.md)。真实存储与基础设施结果见[基础骨架验收](implementation/full-compose-2026-10-29.md)，历史增量见[连续记录](implementation/progress-2026-10-31.md)和[优云目录](implementation/ucloud-catalog-2026-10-31.md)。
 
 ## 启停
 
@@ -84,6 +84,19 @@ python -m venv .venv
 
 完整CLI验收包含 PostgreSQL 持续断开至少 40 秒并持续轮询，恢复后在原 API 容器核对状态与实际文件读写；不能通过重启 API 绕过恢复缺陷。仅本项目、执行过程中会启停依赖、最终停止服务：`python scripts/acceptance.py`。自定义端口时传 `--api` 和 `--web`；原始输出写到 `.runtime/acceptance.jsonl`，UI故障截图仍需单独核对。
 
+## 运行兼容基线
+
+`GET /api/v1/runtime/baseline` 返回当前版本化基线、运行时 lock、完整实例规格、锁定训练预设、推理会话边界、数值容量和开放缺口，并带 `Cache-Control: no-store`。基线加载时会与当前 runtime lock 文件和运行时容量设置逐项核对；任何数值、配置版本或 lock 漂移都会使服务拒绝返回兼容契约。
+
+训练或推理提交与基线不匹配时返回 `422`，稳定错误码为 `runtime_model_unsupported`、`runtime_model_version_unsupported`、`runtime_parameters_unsupported`、`runtime_hardware_unsupported` 或 `runtime_baseline_changed`。`details.mismatches` 同时给出字段、expected 和 actual。服务健康只说明进程与依赖可用，不能替代这些提交门禁。
+
+```powershell
+backend\.venv\Scripts\python.exe scripts\acceptance-runtime-baseline.py --api http://127.0.0.1:8102
+backend\.venv\Scripts\python.exe scripts\acceptance-runtime-baseline.py --api http://127.0.0.1:8102 --require-complete
+```
+
+默认模式允许 `partial`，但要求训练峰值和容量边界缺口显式声明；`--require-complete` 只用于票据最终关闭前，还要求峰值与容量证据已实测并锁定。
+
 ## 构建网络受限时
 
 本次 Docker Hub 不可达时，从 AWS ECR Public 的 Docker Official Images 命名空间取得同名基础镜像并本地重标记，没有改 Docker 全局配置。可在项目根目录按需执行；每步失败应停止：
@@ -129,7 +142,7 @@ backend\.venv\Scripts\python.exe scripts/acceptance-datasets.py
 | `POST` | `/api/v1/dataset-versions/{version_id}/publish` | 发布有效不可变版本 |
 | `DELETE` | `/api/v1/dataset-versions/{version_id}` | 删除未引用版本及其对象 |
 
-数据集容量初始值由后端环境配置提供：100 MiB 单文件、100000 个有效样本、1 MiB 单物理行、最多 100 个校验错误和 20 个预览样本。这些限制用于首版实现，尚未替代后续真实传输性能验证。
+数据集容量初始值由后端环境配置和兼容基线共同锁定：100 MiB 单文件、100000 个有效样本、1 MiB 单物理行、最多 100 个校验错误和 20 个预览样本。基线中的真实观测不得大于声明上限；当前 `locked=false`，尚未替代后续真实传输性能验证。
 
 ## 模型目录上传验收
 
@@ -143,7 +156,7 @@ backend/.venv/Scripts/python.exe scripts/acceptance-models.py
 
 模型目录 API：先 `POST /api/v1/models/directory-imports` 提交 `{name,model_id?,files:[{path,size_bytes,sha256}]}`；随后对 `/api/v1/model-versions/{id}/files?path=...` 按文件 PUT 原始字节，再 POST `/complete`。POST `/resume` 提交原 files 清单，返回 reusable_paths/upload_paths；POST `/cancel` 可取消待上传版本。GET 版本或 `/api/v1/models` 查询，DELETE 未引用版本。文件改变时新建版本。
 
-`GET /api/v1/models/limits` 返回初始限制及未锁定状态。初始为 20 GiB/文件、100 GiB/目录、10000 文件；临时文件位于容器可重建目录。存储检查全部通过的 available 仍为兼容性未验证。忙碌写操作返回 `409 model_busy`，表示未接受；稍后重试。取消不强行打断已经执行中的文件存储操作。优云公共 Qwen3-0.6B 已在真实实例上按固定指纹完成训练和独立 vLLM 加载；更广泛模型的兼容性仍需逐项验证。
+`GET /api/v1/models/limits` 返回初始限制及未锁定状态。初始为 20 GiB/文件、100 GiB/目录、10000 文件；这些数值同时写入兼容基线，环境配置漂移会使 `/runtime/baseline` fail closed。临时文件位于容器可重建目录。存储检查全部通过的 available 仍为兼容性未验证。忙碌写操作返回 `409 model_busy`，表示未接受；稍后重试。取消不强行打断已经执行中的文件存储操作。优云公共 Qwen3-0.6B 已在真实实例上按固定指纹完成训练和独立 vLLM 加载；更广泛的兼容性仍需逐项验证。
 
 ## ModelScope 后台导入
 

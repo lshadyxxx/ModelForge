@@ -16,9 +16,9 @@ def _json(value):
 
 class LlamaFactoryExecutor:
     evidence_files=('execution.json','data/dataset_info.json','runtime-lock.json','runtime-lock-report.json',
-                    'runtime-baseline.json','token-preflight.json',
+                    'runtime-baseline.json','token-preflight.json','gpu-memory.json','gpu/torch-peaks.json',
                     'train.json','output/trainer_state.json','process.log','result.json','failure.json')
-    required_evidence=frozenset({'execution.json','process.log','result.json'})
+    required_evidence=frozenset({'execution.json','process.log','result.json','gpu-memory.json'})
 
     def prepare(self,dataset,config,model_path):
         info={key:{'file_name':name+'.json','formatting':'sharegpt','columns':{'messages':'messages'},

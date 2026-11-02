@@ -20,6 +20,7 @@ from modelforge.modules.resources import router as resources_router
 from modelforge.modules.training import router as training_router
 from modelforge.modules.serving import router as serving_router
 from modelforge.modules.overview import router as overview_router
+from modelforge.runtimes import router as runtime_router
 
 
 def now():
@@ -43,6 +44,7 @@ app.include_router(resources_router)
 app.include_router(training_router)
 app.include_router(serving_router)
 app.include_router(overview_router)
+app.include_router(runtime_router)
 
 
 @app.get("/api/v1/health/live")
