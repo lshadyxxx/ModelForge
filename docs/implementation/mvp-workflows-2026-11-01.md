@@ -103,3 +103,9 @@ r1 在远端 runtime 模块加载 vLLM 前强制设置 `VLLM_USE_FLASHINFER_SAMP
 `ego-browser` 在 TaskSpace `3` 的隔离页面中向该 Trial 发送“请只回复：手动回收验收通过”，最大生成 32 token；页面渲染出模型非空回答“手动回收验收通过”，没有 `role=alert`，请求最终回到 `idle`。随后点击“结束试用并回收实例”，Trial 经历 `stopping → stopped` 且 `stop_requested=true`。精确实例 ID 连续两次供应商查询均为 `total=0/state=empty`；Lease 最终为 `released`、`process_state=exited`、`exit_code=-15`、`instance_state=deleted`、`cleanup_state=confirmed`，`cleanup_error_code=null`，`released_at=2026-11-02T00:36:38.521267+08:00`。页面终态显示“已结束”和错误“无”。
 
 原始证据保存在 `.runtime/evidence/manual-end-20261101/`，包括最终安装、就绪与进程日志，真实回答及终态页面截图，Trial/健康/停止轮询，两次精确空查询和数据库只读 Lease 快照；机器可读汇总为 `final-<redacted-instance-id>-acceptance-summary.json`。证据不包含私钥、SSH 主机端口、密码、运行时 token 或云 AccessKey。该轮只在最终页面点击一次请求和一次手动回收，没有改写数据库或伪造云状态。
+
+## 2026-11-02 工作台重构与票据状态收口
+
+首页工作台在提交 `b8987dd` 中改为真实资产与运行状态驱动的紧凑布局：服务健康条、五项关键指标、最近训练与 Loss、训练环境、下一步动作、最近活动及 Attempt 配置复用均接入真实 API。最终验证为后端定向 `6 passed`、全量 `261 passed, 192 skipped`，前端 `18 passed` 和生产构建通过；`ego-browser` 在同一 TaskSpace 内确认桌面 `1697/1697`、390px `390/390` 无页面横向溢出，可见文字最低 10px，健康详情、真实活动、推理入口及“复用 #2 配置”均通过，页面无 alert 或运行错误。
+
+截至本次收口，当前 API 报告 API、PostgreSQL、MinIO、Worker 全部 up，已有 1 个发布数据集、1 个基础模型、2 个可用 Adapter，GPU 空闲且无运行中任务。历史失败 Attempt 仍作为待处理记录保留。实现票据 02–14 中除 06 外均按各自当前范围关闭；Hugging Face 暂缓范围另立票据 16。票据 06 继续跟踪尚未完成的容量校准和完整兼容矩阵，票据 15 因依赖 06 保持开放。

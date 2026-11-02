@@ -1,16 +1,16 @@
 # 实施路线
 
-2026-11-01增量：训练/产物/独立试用工作流和页面已实现；后端 `mvp-release-20261101-r5`、Web `mvp-release-20261101-r6` 已部署，业务库为 `0011_execution_workflows`。真实 Qwen3-0.6B SFT/LoRA 已完成 22 step，平均 train loss 1.7859、eval loss 0.2148；Best/Final Adapter 已发布到 MinIO，训练实例已停止、删除并确认释放。另一台人工推理实例已加载同一基座和 Best Adapter，真实 SSE 的两轮上下文、生成取消、后续请求、Worker 重启、断流恢复和十五分钟空闲回收已通过。r5 为训练和独立推理增加不可漂移的运行时锁，最终隔离回归 445 通过、1 跳过。r6 修复实例表单传入空镜像名导致 `Request validation failed` 的前端缺陷；前端 18 项测试及生产构建通过，`ego-browser` 已完成六页桌面/390px移动端和两处收费确认交互验收。当前主门禁是另用一台人工实例独立验证手动结束；容量上限最终锁定和完整模型/GPU兼容矩阵也仍开放。状态以[本轮实施记录](implementation/mvp-workflows-2026-11-01.md)为准。
+2026-11-02 状态：核心 MVP 已在一个受支持组合上闭合，Qwen3-0.6B 在单卡 RTX 4090 上完成真实训练与独立 vLLM 推理；Best/Final、多轮 SSE、取消、Worker 重启、断流恢复、空闲回收、页面手动结束、实例删除和租约释放均有真实验收证据。首页工作台重构提交为 `b8987dd`，最近后端回归为 `261 passed, 192 skipped`，前端 `18 passed`，生产构建和桌面/390px 隔离浏览器验收通过。当前唯一产品基线门禁是票据 06 的容量上限锁定和完整模型/GPU/镜像兼容矩阵；票据 15 将继续保持阻塞，直到 06 收口。状态以[本轮实施记录](implementation/mvp-workflows-2026-11-01.md)为准。
 
 以下是建议的交付顺序。每阶段应先明确验收标准，再开始实现。
 
-产品首版以[已确认的产品 MVP 规格](../<internal-evidence>)为准：验收终点包含真实训练产物在平台内的推理试用，模型输入包括完整目录上传、ModelScope/Hugging Face 公开模型导入和优云公共基座引用。以下阶段属于逐步交付里程碑；基础骨架或模拟训练完成时，产品首版仍未完成。
+产品首版以[已确认的产品 MVP 规格](../<internal-evidence>)为准：当前 MVP 的验收终点已完成一个“真实训练产物在平台内独立推理试用”的组合；模型输入包括完整目录上传、ModelScope 公开模型导入和优云公共基座引用。Hugging Face 已从当前 MVP 拆出到票据 16。
 
-2026-10-30 调整：当前先实现 ModelScope，Hugging Face 暂缓。固定 commit 导入、持久 Worker 状态与 Qwen3-0.6B 真实整模型存储、复用及 API/Worker 重启后核验已通过，见[专项记录](implementation/modelscope-2026-10-30.md)。下文此前“公开仓库待实现”的进度描述由此记录补充；模型加载、容量锁定及 GPU 闭环仍待验收。
+2026-10-30 的范围调整仍是当前决定：MVP 先实现 ModelScope，Hugging Face 暂缓且不由当前 MVP 冒充支持。ModelScope 固定 commit 导入、持久 Worker 状态、Qwen3-0.6B 存储与复用均已实现；后续 GPU 闭环状态见页面顶部 2026-11-02 摘要。
 
 首版真实执行接入优云 API 工作流，见 [ADR-0001](adr/0001-ucompshare-remote-execution.md)。优云资源查询、远程任务与数据/产物传输纳入已确认的首版闭环；本地实现顺序拆分在[产品 MVP 任务目录](../<internal-evidence>)。
 
-当前 ticket 01 基础骨架已完成完整 Compose 验收，见[完整验收记录](implementation/full-compose-2026-10-29.md)。ticket 02 数据集后端已提交，代码审查及真实 PostgreSQL/MinIO 验收已完成，容量测量与限额锁定仍待完成，见[数据集实施记录](implementation/datasets-2026-10-29.md)。ticket 03 的目录上传后端和 ModelScope 固定 commit 后台导入均已实现；真实 Qwen3-0.6B 的 11 个文件已完成独立存储回读、原有 9 个文件复用及 API/Worker 重启后核验。2026-10-31 默认/命名分支解析与数据集/模型 UI 已接入，见[连续实施记录](implementation/progress-2026-10-31.md)；模型加载/兼容性、外部引用实际实例核对、容量锁定和其余业务页面仍待完成，Hugging Face 暂缓，见[模型实施记录](implementation/models-2026-10-30.md)及[专项记录](implementation/modelscope-2026-10-30.md)。进行 UI 重设计或选取实施任务前，读取[功能清单](FEATURE_INVENTORY.md)，区分真实能力与演示。连续流程原型已获用户基本认可，旧版三方向保留作对照；其他业务实施票仍开放。
+2026-10-31 历史快照：ticket 01 基础骨架已完成完整 Compose 验收，见[完整验收记录](implementation/full-compose-2026-10-29.md)；ticket 02 数据集后端完成真实 PostgreSQL/MinIO 验收，见[数据集实施记录](implementation/datasets-2026-10-29.md)；ticket 03 的目录上传与 ModelScope 固定 commit 导入已实现，见[模型实施记录](implementation/models-2026-10-30.md)及[专项记录](implementation/modelscope-2026-10-30.md)。其中“GPU 闭环、实际实例核对和业务页面仍未完成”的表述已由后续 2026-11-01/02 真实验收取代。进行 UI 重设计或选取实施任务前，读取[功能清单](FEATURE_INVENTORY.md)，区分当前能力与历史演示。
 
 2026-11-01：已实现后端PostgreSQL单GPU租约内核，包含owner/generation隔离、创建不确定保留、进程/实例/清理分离和核实后释放；尚未部署或接入真实云写操作及Worker。此为独立准备性增量，ticket04仍开放，产品ticket05保持阻塞。见[租约内核记录](implementation/gpu-leases-2026-11-01.md)。
 
@@ -42,7 +42,7 @@
 
 验收：messages JSONL 单轮和多轮样本可上传、预览、发布；无效 JSON/消息记录按物理行号报错并拒绝发布。每个训练输入可以确定地指向已发布的数据集版本；清理可重建本地缓存后，仍能从 MinIO 下载并校验同一原始版本。
 
-实施状态（更新至 2026-10-31）：数据集后端已提交并经新镜像回归；覆盖有效/无效 JSONL、MinIO 回读、PostgreSQL 元数据、确定性 10% split、发布、下载 checksum、引用保护和清理。容量限制仍是首版初始配置，训练/优云执行未开始。模型目录上传后端增量已通过真实存储验收；ModelScope 已支持默认/命名分支解析为固定 commit 后台导入，数据集/模型 UI 已接入；2026-10-31 新增优云只读目录接口和计算环境入口，真实账号目录筛选、分页和库存 API 已经同源 HTTP 验收，页面视觉/交互仍待安全隔离浏览器验收。Hugging Face 暂缓；外部引用登记与指纹内核已实现并经本地 fixture 验证，实际实例通道、训练和推理尚未实现，见[外部基座记录](implementation/external-bases-2026-10-31.md)。详见[数据集实施记录](implementation/datasets-2026-10-29.md)和[模型实施记录](implementation/models-2026-10-30.md)。
+实施状态补充：数据集、目录上传、ModelScope 导入、优云只读目录及浏览器交互均已完成真实服务验收。容量限制仍是首版初始配置，其校准由票据 06 跟踪；Hugging Face 暂缓并转入票据 16。详见[数据集实施记录](implementation/datasets-2026-10-29.md)、[模型实施记录](implementation/models-2026-10-30.md)和[当前工作流记录](implementation/mvp-workflows-2026-11-01.md)。
 
 ## 3. 训练任务与模拟执行器
 
@@ -71,7 +71,7 @@
 
 ## 5. 模型管理与推理服务
 
-- 完整目录上传按文件恢复；ModelScope/Hugging Face 公开模型导入记录解析后的版本、进度、取消与重试状态。正式托管文件保存并校验 MinIO，优云公共基座单独引用，不重复上传。
+- 完整目录上传按文件恢复；ModelScope 公开模型导入记录解析后的版本、进度、取消与重试状态。正式托管文件保存并校验 MinIO，优云公共基座单独引用，不重复上传。Hugging Face 公开导入由票据 16 单独交付。
 - 登记 MinIO 托管模型与训练产物，验证对象索引和校验和；优云公共基础模型登记外部只读来源和内容指纹。
 - 实现 vLLM 创建、启动、健康检查、请求转发、停止和日志。
 - 用户发起试用时创建独立优云 GPU 实例并运行 vLLM，在 ModelForge 内验证本次训练产物；训练实例释放确认后才申请推理 GPU，避免超过首版单 GPU 边界。提供手动结束，并由后端在无进行中的请求、空闲 15 分钟后删除推理实例；关闭页面继续计时，再次试用重新创建。

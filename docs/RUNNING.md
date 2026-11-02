@@ -1,6 +1,6 @@
 # 本地运行与第一阶段验收
 
-当前开放工作台、数据集、模型管理、计算环境、训练和独立试用入口。数据集/模型页面调用实际 API；优云凭据由后端环境注入，未配置时显示明确提示，不提供演示目录。优云真实目录/库存 API 和计算环境页面已通过同源 HTTP 与 `ego-browser` 隔离验收。训练/产物/独立试用流程已部署为后端 `mvp-release-20261101-r5`、Web `mvp-release-20261101-r6`。真实 Qwen3-0.6B SFT/LoRA 已完成并发布 Best/Final；另一台人工创建的 RTX 4090 已加载同一基座和 Best Adapter，真实 Adapter 生成、两轮上下文、取消、Worker 重启、断流恢复和十五分钟空闲回收通过。r6 修复了空镜像名参数导致 `Request validation failed` 的问题。独立手动结束仍需另一台人工实例，容量上限最终锁定和完整模型/GPU兼容矩阵也仍开放，见[工作流实施记录](implementation/mvp-workflows-2026-11-01.md)。真实存储与基础设施结果见[基础骨架验收](implementation/full-compose-2026-10-29.md)，最近增量与未验收项见[连续记录](implementation/progress-2026-10-31.md)和[优云目录](implementation/ucloud-catalog-2026-10-31.md)。
+当前开放工作台、数据集、模型管理、计算环境、训练和独立试用入口。数据集/模型页面调用实际 API；优云凭据由后端环境注入，未配置时显示明确提示，不提供演示目录。真实 Qwen3-0.6B SFT/LoRA、Best/Final、独立 vLLM Adapter 生成、多轮 SSE、取消、Worker 重启、断流恢复、十五分钟空闲回收和页面手动结束均已通过；所有训练/推理实例均已停止、删除并核对租约释放。首页工作台已在提交 `b8987dd` 中改为真实资产、GPU、最近训练、Loss、下一步动作和最近活动视图，并通过桌面及 390px 隔离浏览器验收。完整容量上限和模型/GPU/镜像兼容矩阵仍开放，见[工作流实施记录](implementation/mvp-workflows-2026-11-01.md)。真实存储与基础设施结果见[基础骨架验收](implementation/full-compose-2026-10-29.md)，历史增量见[连续记录](implementation/progress-2026-10-31.md)和[优云目录](implementation/ucloud-catalog-2026-10-31.md)。
 
 ## 启停
 
@@ -143,7 +143,7 @@ backend/.venv/Scripts/python.exe scripts/acceptance-models.py
 
 模型目录 API：先 `POST /api/v1/models/directory-imports` 提交 `{name,model_id?,files:[{path,size_bytes,sha256}]}`；随后对 `/api/v1/model-versions/{id}/files?path=...` 按文件 PUT 原始字节，再 POST `/complete`。POST `/resume` 提交原 files 清单，返回 reusable_paths/upload_paths；POST `/cancel` 可取消待上传版本。GET 版本或 `/api/v1/models` 查询，DELETE 未引用版本。文件改变时新建版本。
 
-`GET /api/v1/models/limits` 返回初始限制及未锁定状态。初始为 20 GiB/文件、100 GiB/目录、10000 文件；临时文件位于容器可重建目录。存储检查全部通过的 available 仍为兼容性未验证。忙碌写操作返回 `409 model_busy`，表示未接受；稍后重试。取消不强行打断已经执行中的文件存储操作。优云外部登记与指纹内核见下节专项说明，实际实例核对和模型加载验收仍未完成。
+`GET /api/v1/models/limits` 返回初始限制及未锁定状态。初始为 20 GiB/文件、100 GiB/目录、10000 文件；临时文件位于容器可重建目录。存储检查全部通过的 available 仍为兼容性未验证。忙碌写操作返回 `409 model_busy`，表示未接受；稍后重试。取消不强行打断已经执行中的文件存储操作。优云公共 Qwen3-0.6B 已在真实实例上按固定指纹完成训练和独立 vLLM 加载；更广泛模型的兼容性仍需逐项验证。
 
 ## ModelScope 后台导入
 
