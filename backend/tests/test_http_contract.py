@@ -67,6 +67,47 @@ def test_dataset_limits_contract_reports_configuration(monkeypatch):
     }
 
 
+def test_dataset_sample_pagination_rejects_unbounded_limit():
+    response = TestClient(app).get(
+        "/api/v1/dataset-versions/00000000-0000-0000-0000-000000000001/samples?limit=201"
+    )
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "validation_error"
+
+
+def test_derived_dataset_contract_requires_base_sha_and_valid_roles():
+    version_id = "00000000-0000-0000-0000-000000000001"
+    response = TestClient(app).post(
+        f"/api/v1/dataset-versions/{version_id}/derived",
+        json={
+            "request_id": "00000000-0000-0000-0000-000000000002",
+            "expected_sha256": "not-a-sha",
+            "line": 1,
+            "messages": [{"role": "tool", "content": "invalid"}],
+        },
+    )
+    assert response.status_code == 422
+    details = response.json()["error"]["details"]
+    assert any("request_id" in item["path"] for item in details) is False
+    assert any("expected_sha256" in item["path"] for item in details)
+    assert any("messages.0.role" in item["path"] for item in details)
+
+
+def test_derived_dataset_contract_requires_idempotency_request_id():
+    version_id = "00000000-0000-0000-0000-000000000001"
+    response = TestClient(app).post(
+        f"/api/v1/dataset-versions/{version_id}/derived",
+        json={
+            "expected_sha256": "0" * 64,
+            "line": 1,
+            "messages": [{"role": "assistant", "content": "valid"}],
+        },
+    )
+    assert response.status_code == 422
+    details = response.json()["error"]["details"]
+    assert any("request_id" in item["path"] for item in details)
+
+
 def test_model_limits_contract_reports_configuration(monkeypatch):
     from modelforge.settings import Settings
     settings = Settings(model_file_limit_bytes=17, model_total_limit_bytes=31,

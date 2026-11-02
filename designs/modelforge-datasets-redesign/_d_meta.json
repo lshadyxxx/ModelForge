@@ -1,0 +1,24 @@
+{
+  "type": "design",
+  "designSystems": [],
+  "primaryDesignSystem": null,
+  "assets": {
+    "ModelForge dataset module redesign": {
+      "versions": [
+        {
+          "path": "index.html",
+          "createdAt": "2026-11-02T15:20:38.838Z",
+          "status": "needs-review",
+          "subtitle": "C studio with portfolio statistics and custom dataset picker",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "section": "Dataset redesign"
+        }
+      ]
+    }
+  },
+  "createdAt": "2026-11-02T15:20:38.840Z",
+  "updatedAt": "2026-11-02T15:49:58.990Z"
+}

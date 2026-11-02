@@ -2,10 +2,12 @@
 from __future__ import annotations
 
 import uuid
+from typing import Literal
 
 from fastapi import APIRouter, Query, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import Response
+from pydantic import BaseModel, ConfigDict, Field
 from starlette.concurrency import run_in_threadpool
 
 from modelforge.errors import AppError
@@ -14,6 +16,22 @@ from .registry import DatasetRegistry
 
 
 router = APIRouter(prefix="/api/v1")
+
+
+class DatasetEditMessage(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    role: Literal["system", "user", "assistant"]
+    content: str
+
+
+class DatasetDerivedRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    request_id: uuid.UUID
+    expected_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    line: int = Field(ge=1)
+    messages: list[DatasetEditMessage] = Field(min_length=1)
 
 
 async def _dataset_body(request: Request) -> bytes:
@@ -68,6 +86,34 @@ def dataset_version(version_id: uuid.UUID, request: Request):
 def dataset_content(version_id: uuid.UUID, request: Request):
     row, data = DatasetRegistry(request.app.state.resources).download(version_id)
     return Response(data, media_type="application/x-ndjson", headers={"X-Content-SHA256": row["sha256"]})
+
+
+@router.get("/dataset-versions/{version_id}/samples")
+def dataset_samples(
+    version_id: uuid.UUID,
+    request: Request,
+    offset: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
+):
+    return jsonable_encoder(DatasetRegistry(request.app.state.resources).samples(version_id, offset, limit))
+
+
+@router.post("/dataset-versions/{version_id}/derived", status_code=201)
+async def derive_dataset_version(
+    version_id: uuid.UUID,
+    request: Request,
+    payload: DatasetDerivedRequest,
+):
+    registry = DatasetRegistry(request.app.state.resources)
+    messages = [message.model_dump() for message in payload.messages]
+    return jsonable_encoder(await run_in_threadpool(
+        registry.derive,
+        version_id,
+        payload.request_id,
+        payload.expected_sha256,
+        payload.line,
+        messages,
+    ))
 
 
 @router.post("/dataset-versions/{version_id}/split")
