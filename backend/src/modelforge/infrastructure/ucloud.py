@@ -130,6 +130,11 @@ class UCloudInstances(UCloud):
 
     def terminate(self, parameters):
         result = self._mutation('TerminateCompShareInstance', parameters)
-        if result.get('UHostId') != parameters['UHostId'] or result.get('InRecycle') not in ('Yes', 'No'):
+        recycle = result.get('InRecycle')
+        if (result.get('UHostId') != parameters['UHostId']
+                or recycle not in (None, 'Yes', 'No')):
             raise AppError(502, 'cloud_invalid_response', 'Termination acknowledgement is unverified')
-        return {'UHostId': result['UHostId'], 'InRecycle': result['InRecycle']}
+        return {
+            'UHostId': result['UHostId'],
+            'InRecycle': recycle if recycle is not None else 'NotReported',
+        }

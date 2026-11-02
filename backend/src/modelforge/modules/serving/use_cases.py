@@ -11,6 +11,7 @@ from .contracts import ServingExecutor
 from modelforge.modules.models import Adapters,ModelExecution
 from modelforge.modules.resources import GpuLeases,InstanceSpec,LeaseToken,Catalog
 from modelforge.runtimes.compatibility import compatibility_baseline, inference_compatibility
+from modelforge.runtimes.runtime_lock import inference_runtime_lock
 
 _CONVERSATION = compatibility_baseline().inference.conversation
 
@@ -165,6 +166,18 @@ class ServingWorker:
             if row['stop_requested']:
                 self.leases.release(lease_token);self.serving.update(identifier,state='stopped')
             return
+        if lease['process_state']=='not_started' and row['stop_requested']:
+            self.lifecycle.cleanup(lease_token,'discard');self.lifecycle.reconcile(lease_token);return
+        if lease['process_state']=='not_started':
+            runtime_report=self.channel.runtime_check(
+                row['instance_id'],identifier,inference_runtime_lock())
+            if not runtime_report['ready']:
+                raise AppError(409,'gpu_runtime_incompatible',
+                    'The instance runtime does not match the verified inference lock',
+                    {'lock_id':runtime_report.get('lock_id'),
+                     'mismatches':runtime_report.get('mismatches',[])})
+            if row['error_code']:
+                self.serving.update(identifier,error_code=None)
         # DB time and persistent last_activity survive API/page/Worker restarts.
         idle=row['state']=='ready' and row['request_state']=='idle' and row['last_activity_at']<=datetime.now(timezone.utc)-timedelta(minutes=15)
         if idle:

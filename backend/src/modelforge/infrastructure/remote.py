@@ -117,3 +117,29 @@ class RemoteChannel:
         source = Path(__file__).with_name('model_probe.py').read_bytes()
         return self.call(instance_id, job_id, 'probe', source=base64.b64encode(source).decode(),
                          path=path, timeout=self.settings.ssh_transfer_timeout)
+
+    def runtime_check(self, instance_id, job_id, runtime_lock):
+        """Prove the configured interpreter, packages, dependencies, CUDA and GPU before inputs."""
+        try:
+            report = self.call(
+                instance_id,
+                job_id,
+                'runtime_check',
+                lock=runtime_lock,
+                timeout=90,
+            )
+        except AppError as error:
+            raise AppError(
+                409,
+                'gpu_runtime_not_ready',
+                'The instance runtime is not installed or the backend SSH endpoint is not ready.',
+                {'cause': error.code},
+            ) from None
+        if (
+            not isinstance(report, dict)
+            or type(report.get('ready')) is not bool
+            or not isinstance(report.get('mismatches'), list)
+            or report.get('lock_id') != runtime_lock.get('id')
+        ):
+            raise AppError(502, 'runtime_probe_invalid', 'The instance runtime probe returned an invalid report')
+        return report

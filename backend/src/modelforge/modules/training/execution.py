@@ -8,6 +8,7 @@ from modelforge.errors import AppError
 from modelforge.modules.datasets import DatasetRegistry
 from modelforge.modules.models import Adapters, ModelExecution
 from modelforge.modules.resources import GpuLeases
+from modelforge.runtimes.runtime_lock import training_runtime_lock
 from .use_cases import Training, token_from
 from .contracts import TrainingExecutor
 
@@ -137,6 +138,29 @@ class TrainingWorker:
                     fields['error_code'] = None
                 self.training.update(identifier, **fields)
             return
+        if lease['process_state'] == 'not_started' and row['cancel_requested']:
+            self.training.update(identifier,state='cleanup',stage='cleanup',outcome='cancelled')
+            return
+        if lease['process_state'] == 'not_started':
+            runtime_report = self.channel.runtime_check(
+                row['instance_id'], identifier, training_runtime_lock()
+            )
+            self.training.update(
+                identifier,
+                runtime_report={'phase': 'preflight', **runtime_report},
+            )
+            if not runtime_report['ready']:
+                raise AppError(
+                    409,
+                    'gpu_runtime_incompatible',
+                    'The instance runtime does not match the verified training lock',
+                    {
+                        'lock_id': runtime_report.get('lock_id'),
+                        'mismatches': runtime_report.get('mismatches', []),
+                    },
+                )
+            if row['error_code']:
+                self.training.update(identifier, error_code=None)
         status = self.channel.call(row['instance_id'],identifier,'status')
         if status['state'] == 'not_started':
             if lease['process_state'] != 'not_started':

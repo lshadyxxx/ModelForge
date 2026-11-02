@@ -77,6 +77,12 @@ export type RuntimeBaseline = {
     adapter_final_fingerprint: string;
     inference_trial_id: string;
     training_peak_memory: 'pending' | 'measured';
+    training_peak_attempt_id: string | null;
+    training_peak_device_used_bytes: number | null;
+    training_peak_torch_allocated_bytes: number | null;
+    training_peak_torch_reserved_bytes: number | null;
+    training_peak_sample_count: number | null;
+    training_peak_sample_interval_ms: number | null;
     capacity_limits: 'protected_not_locked' | 'locked';
   };
   closure_gaps: string[];

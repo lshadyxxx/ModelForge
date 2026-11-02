@@ -104,3 +104,19 @@ def test_partial_contract_rejects_capacity_version_that_diverges_from_the_baseli
         item["name"] == "model_capacity_configuration_version_matches_baseline"
         for item in report["failures"]
     )
+
+
+def test_partial_contract_rejects_a_measured_peak_that_is_still_declared_as_pending():
+    partial = payload()
+    partial["closure_gaps"].append("training_peak_memory_pending")
+    report = acceptance.validate(partial)
+    assert report["passed"] is False
+    assert any(item["name"] == "training_peak_gap_absent" for item in report["failures"])
+
+
+def test_partial_contract_rejects_incomplete_measured_peak_evidence():
+    partial = payload()
+    partial["evidence"]["training_peak_torch_reserved_bytes"] = None
+    report = acceptance.validate(partial)
+    assert report["passed"] is False
+    assert any(item["name"] == "training_peak_evidence_complete" for item in report["failures"])

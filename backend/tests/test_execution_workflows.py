@@ -41,6 +41,7 @@ class Provider:
 class Channel:
     def __init__(self):
         self.files={};self.status={'state':'not_started'};self.starts=0;self.cancel_calls=0;self.fail_download=False
+        self.runtime_ready=True;self.runtime_checks=0
         self.health={'ready':True,'adapter_probe':True,
                      'runtime_lock_sha256':inference_runtime_lock_sha256()}
         self.request_result={'state':'running','chunks':[],'offset':0,'done':False}
@@ -51,6 +52,11 @@ class Channel:
     def download(self,instance,job,item,target):
         if self.fail_download:raise AppError(503,'fixture_sync_failure','Injected transfer failure')
         data=self.files[item['path']];assert hashlib.sha256(data).hexdigest()==item['sha256'];target.write(data)
+    def runtime_check(self,instance,job,lock):
+        self.runtime_checks+=1
+        return {'ready':self.runtime_ready,'lock_id':lock['id'],
+                'mismatches':[] if self.runtime_ready else [{
+                    'field':'llamafactory','expected':'fixture','actual':None}]}
     def call(self,instance,job,operation,**values):
         if operation=='status':return self.status
         if operation=='start':self.starts+=1;self.status={'state':'running'};return self.status
@@ -146,6 +152,21 @@ def test_manual_binding_requires_ack_and_exact_provider_match(env):
     with pytest.raises(AppError):training.bind(row['id'],'fixture-instance',True,lifecycle)
     assert GpuLeases(resources.pool).current()['create_state']=='not_requested'
     assert provider.writes==[]
+
+
+def test_training_runtime_preflight_blocks_inputs_until_versions_match(env):
+    row,training,worker=bound(env);resources,_,provider,channel,_=env
+    channel.runtime_ready=False
+    worker.run_once()
+    current=training.get(row['id'])
+    assert current['error_code']=='gpu_runtime_incompatible'
+    assert channel.runtime_checks==1 and channel.files=={} and channel.starts==0
+    assert provider.writes==[]
+    channel.runtime_ready=True
+    worker.run_once()
+    assert training.get(row['id'])['error_code'] is None
+    assert channel.runtime_checks==2 and channel.starts==1
+    assert channel.files['execution.json']
 
 def test_real_storage_publication_precedes_instance_cleanup(env):
     row,training,worker=bound(env);resources,_,provider,channel,_=env

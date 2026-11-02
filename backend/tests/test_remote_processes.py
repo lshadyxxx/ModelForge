@@ -82,3 +82,16 @@ def test_queued_cancellation_prevents_launch(rpc):
     call,_=rpc; call('cancel')
     result=call('start',argv=[sys.executable,'-c',"raise RuntimeError('must not execute')"])['result']
     assert result['state']=='exited' and result['cancelled'] and result['group_exited']
+
+def test_runtime_preflight_reports_version_drift_without_starting_work(rpc):
+    call,directory=rpc
+    lock={'schema':1,'id':'fixture-lock','python':'0.0.0','cuda':'0.0',
+          'packages':{'modelforge-runtime-package-that-does-not-exist':'1.0.0'}}
+    report=call('runtime_check',lock=lock)['result']
+    assert report['ready'] is False
+    assert report['lock_id']=='fixture-lock'
+    assert any(item['field']=='python' for item in report['mismatches'])
+    assert any(item['field']=='modelforge-runtime-package-that-does-not-exist'
+               for item in report['mismatches'])
+    assert not directory.exists()
+    assert call('status')['result']['state']=='not_started'

@@ -96,7 +96,10 @@ def test_runtime_baseline_contract_reports_locks_and_open_gaps(monkeypatch):
     assert body["capacity"]["model"]["file_limit_bytes"] == 20 * 1024**3
     assert body["capacity"]["model"]["total_limit_bytes"] == 100 * 1024**3
     assert body["capacity"]["dataset"]["locked"] is False
-    assert "training_peak_memory_pending" in body["closure_gaps"]
+    assert body["evidence"]["training_peak_memory"] == "measured"
+    assert body["evidence"]["training_peak_device_used_bytes"] == 2_580_545_536
+    assert body["evidence"]["training_peak_sample_count"] == 92
+    assert "training_peak_memory_pending" not in body["closure_gaps"]
 
 
 def test_unexpected_errors_are_sanitized():

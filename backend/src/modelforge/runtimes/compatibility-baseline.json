@@ -109,11 +109,16 @@
     "adapter_final_id": "f48e77f1-adca-5f3f-86fc-00456dac2c0c",
     "adapter_final_fingerprint": "083cdd5a74c87c675f0de9f6561628ab8abb3ad65d3d74111cecc737272e461a",
     "inference_trial_id": "3e73bdb1-f05b-4390-a0b9-a8ca09dc9e92",
-    "training_peak_memory": "pending",
+    "training_peak_memory": "measured",
+    "training_peak_attempt_id": "fbbe9980-1b83-44b9-9880-422efb4a1f4d",
+    "training_peak_device_used_bytes": 2580545536,
+    "training_peak_torch_allocated_bytes": 1659389440,
+    "training_peak_torch_reserved_bytes": 1686110208,
+    "training_peak_sample_count": 92,
+    "training_peak_sample_interval_ms": 250,
     "capacity_limits": "protected_not_locked"
   },
   "closure_gaps": [
-    "training_peak_memory_pending",
     "dataset_and_model_capacity_limits_not_boundary_tested",
     "only_the_single_verified_combination_is_enabled"
   ],

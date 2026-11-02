@@ -8,7 +8,7 @@ import math
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
 from modelforge.errors import AppError
 from .runtime_lock import (
@@ -169,7 +169,37 @@ class EvidenceRule(_StrictModel):
     adapter_final_fingerprint: str = Field(pattern=r"^[0-9a-f]{64}$")
     inference_trial_id: str = Field(min_length=1)
     training_peak_memory: Literal["pending", "measured"]
+    training_peak_attempt_id: str | None = Field(default=None, min_length=1)
+    training_peak_device_used_bytes: int | None = Field(default=None, gt=0)
+    training_peak_torch_allocated_bytes: int | None = Field(default=None, gt=0)
+    training_peak_torch_reserved_bytes: int | None = Field(default=None, gt=0)
+    training_peak_sample_count: int | None = Field(default=None, gt=0)
+    training_peak_sample_interval_ms: int | None = Field(default=None, gt=0)
     capacity_limits: Literal["protected_not_locked", "locked"]
+
+    @model_validator(mode="after")
+    def measured_training_peak_is_complete(self):
+        peak_fields = (
+            self.training_peak_attempt_id,
+            self.training_peak_device_used_bytes,
+            self.training_peak_torch_allocated_bytes,
+            self.training_peak_torch_reserved_bytes,
+            self.training_peak_sample_count,
+            self.training_peak_sample_interval_ms,
+        )
+        if self.training_peak_memory == "pending":
+            if any(value is not None for value in peak_fields):
+                raise ValueError("pending training peak cannot include measured values")
+            return self
+        if any(value is None for value in peak_fields):
+            raise ValueError("measured training peak requires all evidence fields")
+        if not (
+            self.training_peak_torch_allocated_bytes
+            <= self.training_peak_torch_reserved_bytes
+            <= self.training_peak_device_used_bytes
+        ):
+            raise ValueError("training peak memory values are inconsistent")
+        return self
 
 
 class BlockedCombination(_StrictModel):
@@ -239,6 +269,12 @@ def _load():
             raise ValueError("closure gaps must be unique")
         if baseline.evidence.training_exit_code != 0:
             raise ValueError("the verified training exit code must be zero")
+        if (
+            baseline.evidence.training_peak_memory == "measured"
+            and baseline.evidence.training_peak_device_used_bytes
+            > baseline.training.hardware.device_memory_bytes
+        ):
+            raise ValueError("training peak exceeds the verified device capacity")
 
         training_peak_pending = baseline.evidence.training_peak_memory == "pending"
         capacity_pending = baseline.evidence.capacity_limits == "protected_not_locked"

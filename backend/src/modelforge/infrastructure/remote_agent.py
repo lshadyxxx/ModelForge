@@ -4,9 +4,11 @@ import base64
 import contextlib
 import fcntl
 import hashlib
+import importlib.metadata
 import json
 import os
 from pathlib import Path, PurePosixPath
+import platform
 import re
 import signal
 import subprocess
@@ -86,6 +88,107 @@ def group_alive(record):
             if member and member['group'] == record['pid'] and member['state'] != 'Z': return True
     return False
 
+def runtime_check(lock):
+    if (not isinstance(lock, dict) or lock.get('schema') != 1
+            or not isinstance(lock.get('id'), str) or not lock['id']
+            or not isinstance(lock.get('python'), str)
+            or not isinstance(lock.get('cuda'), str)
+            or not isinstance(lock.get('packages'), dict)
+            or not lock['packages']
+            or any(not isinstance(name, str) or not name
+                   or not isinstance(version, str) or not version
+                   for name, version in lock['packages'].items())):
+        raise ValueError('Invalid runtime lock')
+
+    python_version = platform.python_version()
+    mismatches = []
+    if python_version != lock['python']:
+        mismatches.append({
+            'field': 'python',
+            'expected': lock['python'],
+            'actual': python_version,
+        })
+
+    versions = {}
+    for name, expected in sorted(lock['packages'].items()):
+        try:
+            actual = importlib.metadata.version(name)
+        except importlib.metadata.PackageNotFoundError:
+            actual = None
+        versions[name] = actual
+        if actual != expected:
+            mismatches.append({'field': name, 'expected': expected, 'actual': actual})
+
+    cuda_version = None
+    gpu_count = 0
+    gpu_name = None
+    memory_bytes = None
+    try:
+        import torch
+        cuda_version = torch.version.cuda
+        if cuda_version != lock['cuda']:
+            mismatches.append({
+                'field': 'cuda',
+                'expected': lock['cuda'],
+                'actual': cuda_version,
+            })
+        if not torch.cuda.is_available():
+            mismatches.append({
+                'field': 'gpu_count',
+                'expected': 1,
+                'actual': 0,
+            })
+        else:
+            gpu_count = torch.cuda.device_count()
+            if gpu_count != 1:
+                mismatches.append({
+                    'field': 'gpu_count',
+                    'expected': 1,
+                    'actual': gpu_count,
+                })
+            if gpu_count:
+                gpu_name = torch.cuda.get_device_name(0)
+                memory_bytes = torch.cuda.get_device_properties(0).total_memory
+    except Exception as error:
+        mismatches.append({
+            'field': 'torch.cuda',
+            'expected': 'available',
+            'actual': type(error).__name__,
+        })
+
+    pip_status = 'ok'
+    try:
+        checked = subprocess.run(
+            [sys.executable, '-m', 'pip', 'check'],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=60,
+            check=False,
+        )
+        if checked.returncode:
+            pip_status = 'dependency_conflict'
+    except (OSError, subprocess.TimeoutExpired):
+        pip_status = 'unavailable'
+    if pip_status != 'ok':
+        mismatches.append({
+            'field': 'pip_check',
+            'expected': 'ok',
+            'actual': pip_status,
+        })
+
+    return {
+        'ready': not mismatches,
+        'lock_id': lock['id'],
+        'python': python_version,
+        'cuda': cuda_version,
+        'versions': versions,
+        'gpu_count': gpu_count,
+        'gpu': gpu_name,
+        'memory_bytes': memory_bytes,
+        'pip_check': pip_status,
+        'mismatches': mismatches,
+    }
+
 def status(directory):
     path = directory / 'receipt.json'
     if not path.exists(): return {'state': 'not_started'}
@@ -142,8 +245,10 @@ def supervise(directory):
                 record['state'] = 'unknown'; atomic(directory / 'receipt.json', record)
 
 def dispatch(request):
-    directory = workspace(request['root'], request['job_id'])
     operation = request['operation']
+    if operation == 'runtime_check':
+        return runtime_check(request['lock'])
+    directory = workspace(request['root'], request['job_id'])
     if operation == 'ensure_token':
         import secrets
         path=directory/'runtime.token'

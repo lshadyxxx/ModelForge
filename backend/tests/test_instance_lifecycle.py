@@ -629,15 +629,13 @@ def test_create_cannot_adopt_kernel_only_creation_without_snapshot(environment, 
     assert seen == []
 
 
-@pytest.mark.parametrize('recycle', [None, True, False, 'Maybe', '', 0, 1])
+@pytest.mark.parametrize('recycle', [True, False, 'Maybe', '', 0, 1])
 def test_invalid_recycle_ack_requires_repeated_exact_absence(environment, recycle):
     leases, lifecycle, seen, state = environment
     token = leases.reserve('attempt', uuid.uuid4())
     lifecycle.create(token, InstanceSpec(**SPEC))
     state['instances'] = [instance(state['created_label'], State='Stopped')]
     state['terminate_result'] = {'UHostId': 'fixture-instance', 'InRecycle': recycle}
-    if recycle is None:
-        del state['terminate_result']['InRecycle']
     with pytest.raises(AppError) as caught:
         lifecycle.cleanup(token, 'discard')
     assert caught.value.code == 'cloud_invalid_response'
@@ -645,6 +643,20 @@ def test_invalid_recycle_ack_requires_repeated_exact_absence(environment, recycl
     result = lifecycle.reconcile(token)
     assert result['intent']['terminate_acknowledged'] is False
     assert result['lease']['state'] == 'released'
+
+
+def test_termination_ack_without_recycle_field_is_valid(environment):
+    leases, lifecycle, seen, state = environment
+    token = leases.reserve('attempt', uuid.uuid4())
+    lifecycle.create(token, InstanceSpec(**SPEC))
+    state['instances'] = [instance(state['created_label'], State='Stopped')]
+    state['terminate_result'] = {'UHostId': 'fixture-instance'}
+    result = lifecycle.cleanup(token, 'discard')
+    assert seen[-1]['Action'] == 'TerminateCompShareInstance'
+    assert result['intent']['terminate_acknowledged'] is True
+    assert result['lease']['state'] == 'held'
+    state['instances'] = []
+    assert lifecycle.reconcile(token)['lease']['state'] == 'released'
 
 
 def test_valid_recycle_yes_requires_later_absence_before_release(environment):

@@ -2,6 +2,7 @@ import json
 from types import SimpleNamespace
 
 import pytest
+from pydantic import ValidationError
 
 from modelforge.errors import AppError
 from modelforge.modules.resources import InstanceSpec
@@ -9,6 +10,7 @@ from modelforge.modules.serving.use_cases import Chat
 from modelforge.modules.training import TrainingConfig
 from modelforge.runtimes import compatibility
 from modelforge.runtimes.compatibility import (
+    EvidenceRule,
     compatibility_baseline,
     compatibility_baseline_sha256,
     inference_compatibility,
@@ -79,7 +81,14 @@ def test_versioned_baseline_cross_checks_current_runtime_locks():
     assert baseline.training.runtime_lock_sha256 == training_runtime_lock_sha256()
     assert baseline.inference.runtime_lock_sha256 == inference_runtime_lock_sha256()
     assert len(compatibility_baseline_sha256()) == 64
-    assert "training_peak_memory_pending" in baseline.closure_gaps
+    assert baseline.evidence.training_peak_memory == "measured"
+    assert baseline.evidence.training_peak_attempt_id == "fbbe9980-1b83-44b9-9880-422efb4a1f4d"
+    assert baseline.evidence.training_peak_device_used_bytes == 2_580_545_536
+    assert baseline.evidence.training_peak_torch_allocated_bytes == 1_659_389_440
+    assert baseline.evidence.training_peak_torch_reserved_bytes == 1_686_110_208
+    assert baseline.evidence.training_peak_sample_count == 92
+    assert baseline.evidence.training_peak_sample_interval_ms == 250
+    assert "training_peak_memory_pending" not in baseline.closure_gaps
     assert baseline.limits.dataset.file_limit_bytes == 100 * 1024 * 1024
     assert baseline.limits.dataset.sample_limit == 100_000
     assert baseline.limits.model.file_limit_bytes == 20 * 1024**3
@@ -87,6 +96,26 @@ def test_versioned_baseline_cross_checks_current_runtime_locks():
     assert baseline.limits.model.file_count_limit == 10_000
     assert baseline.limits.dataset.largest_observed_file_bytes <= baseline.limits.dataset.file_limit_bytes
     assert baseline.limits.model.largest_observed_total_bytes <= baseline.limits.model.total_limit_bytes
+
+
+def test_measured_training_peak_must_be_complete_and_consistent():
+    measured = compatibility_baseline().evidence.model_dump()
+    incomplete = {**measured, "training_peak_torch_reserved_bytes": None}
+    with pytest.raises(ValidationError):
+        EvidenceRule(**incomplete)
+    inconsistent = {
+        **measured,
+        "training_peak_torch_allocated_bytes": 2_000,
+        "training_peak_torch_reserved_bytes": 1_000,
+    }
+    with pytest.raises(ValidationError):
+        EvidenceRule(**inconsistent)
+    pending = {
+        **measured,
+        "training_peak_memory": "pending",
+    }
+    with pytest.raises(ValidationError):
+        EvidenceRule(**pending)
 
 
 def test_training_accepts_only_the_measured_complete_combination():

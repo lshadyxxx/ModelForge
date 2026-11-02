@@ -142,9 +142,45 @@ def validate(payload, *, require_complete=False):
 
     gaps = payload.get("closure_gaps")
     check("closure_gaps_list", isinstance(gaps, list), gaps)
+    peak_status = evidence.get("training_peak_memory")
+    peak_fields = (
+        "training_peak_attempt_id",
+        "training_peak_device_used_bytes",
+        "training_peak_torch_allocated_bytes",
+        "training_peak_torch_reserved_bytes",
+        "training_peak_sample_count",
+        "training_peak_sample_interval_ms",
+    )
+    check("training_peak_status", peak_status in {"pending", "measured"}, peak_status)
+    if peak_status == "pending":
+        check("training_peak_pending_has_no_values",
+              all(evidence.get(field) is None for field in peak_fields),
+              {field: evidence.get(field) for field in peak_fields})
+        check("training_peak_gap_matches_pending",
+              "training_peak_memory_pending" in (gaps or []), gaps)
+    elif peak_status == "measured":
+        check("training_peak_evidence_complete",
+              isinstance(evidence.get("training_peak_attempt_id"), str)
+              and bool(evidence["training_peak_attempt_id"])
+              and all(type(evidence.get(field)) is int and evidence[field] > 0
+                      for field in peak_fields[1:]),
+              {field: evidence.get(field) for field in peak_fields})
+        allocated = evidence.get("training_peak_torch_allocated_bytes")
+        reserved = evidence.get("training_peak_torch_reserved_bytes")
+        device = evidence.get("training_peak_device_used_bytes")
+        check("training_peak_order",
+              type(allocated) is int and type(reserved) is int and type(device) is int
+              and 0 < allocated <= reserved <= device,
+              {"allocated": allocated, "reserved": reserved, "device": device})
+        check("training_peak_fits_device",
+              type(device) is int
+              and isinstance(training_hardware.get("device_memory_bytes"), int)
+              and 0 < device <= training_hardware["device_memory_bytes"],
+              {"peak": device, "device": training_hardware.get("device_memory_bytes")})
+        check("training_peak_gap_absent",
+              "training_peak_memory_pending" not in (gaps or []), gaps)
     if payload.get("status") == "partial":
         check("closure_gaps_declared", bool(gaps), gaps)
-        check("training_peak_gap_declared", "training_peak_memory_pending" in (gaps or []), gaps)
         check("capacity_gap_declared",
               "dataset_and_model_capacity_limits_not_boundary_tested" in (gaps or []), gaps)
     elif payload.get("status") == "complete":

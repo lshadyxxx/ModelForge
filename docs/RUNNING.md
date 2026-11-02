@@ -1,6 +1,6 @@
 # 本地运行与第一阶段验收
 
-当前开放工作台、数据集、模型管理、计算环境、训练和独立试用入口。数据集/模型页面调用实际 API；优云凭据由后端环境注入，未配置时显示明确提示，不提供演示目录。真实 Qwen3-0.6B SFT/LoRA、Best/Final、独立 vLLM Adapter 生成、多轮 SSE、取消、Worker 重启、断流恢复、十五分钟空闲回收和页面手动结束均已通过；所有训练/推理实例均已停止、删除并核对租约释放。首页工作台已在提交 `b8987dd` 中改为真实资产、GPU、最近训练、Loss、下一步动作和最近活动视图，并通过桌面及 390px 隔离浏览器验收。版本化兼容基线已绑定模型/Adapter 指纹、完整训练与推理实例规格和数值容量；容量边界及训练 GPU 峰值仍未实测，基线保持 `partial`。完整兼容矩阵仍开放，见[运行时兼容记录](implementation/runtime-compatibility-2026-11-02.md)。真实存储与基础设施结果见[基础骨架验收](implementation/full-compose-2026-10-29.md)，历史增量见[连续记录](implementation/progress-2026-10-31.md)和[优云目录](implementation/ucloud-catalog-2026-10-31.md)。
+当前开放工作台、数据集、模型管理、计算环境、训练和独立试用入口。数据集/模型页面调用实际 API；优云凭据由后端环境注入，未配置时显示明确提示，不提供演示目录。真实 Qwen3-0.6B SFT/LoRA、Best/Final、独立 vLLM Adapter 生成、多轮 SSE、取消、Worker 重启、断流恢复、十五分钟空闲回收和页面手动结束均已通过；所有训练/推理实例均已停止、删除并核对租约释放。首页工作台已在提交 `b8987dd` 中改为真实资产、GPU、最近训练、Loss、下一步动作和最近活动视图，并通过桌面及 390px 隔离浏览器验收。版本化兼容基线已绑定模型/Adapter 指纹、完整训练与推理实例规格和数值容量，训练 GPU 峰值也已实测归档；容量边界实测和完整兼容矩阵仍开放，因此基线保持 `partial`，见[运行时兼容记录](implementation/runtime-compatibility-2026-11-02.md)。真实存储与基础设施结果见[基础骨架验收](implementation/full-compose-2026-10-29.md)，历史增量见[连续记录](implementation/progress-2026-10-31.md)和[优云目录](implementation/ucloud-catalog-2026-10-31.md)。
 
 ## 启停
 
@@ -95,7 +95,7 @@ backend\.venv\Scripts\python.exe scripts\acceptance-runtime-baseline.py --api ht
 backend\.venv\Scripts\python.exe scripts\acceptance-runtime-baseline.py --api http://127.0.0.1:8102 --require-complete
 ```
 
-默认模式允许 `partial`，但要求训练峰值和容量边界缺口显式声明；`--require-complete` 只用于票据最终关闭前，还要求峰值与容量证据已实测并锁定。
+默认模式允许 `partial`，但要求开放缺口显式声明；`--require-complete` 只用于票据最终关闭前，还要求容量证据已实测并锁定。
 
 ## 构建网络受限时
 
