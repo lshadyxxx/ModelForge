@@ -1,0 +1,197 @@
+{
+  "generatedAt": "2026-11-02T18:43:12.494Z",
+  "taskSpaceId": 15,
+  "page": "p1",
+  "keyboardResult": {
+    "selectedTab": "files",
+    "activeId": "workbench-tab-files",
+    "activeTab": "files",
+    "tabIndexes": [
+      -1,
+      0,
+      -1
+    ],
+    "panelId": "workbench-panel-files",
+    "panelLabelledBy": "workbench-tab-files"
+  },
+  "desktop": {
+    "viewport": 1440,
+    "pageScrollWidth": 1425,
+    "clientWidth": 1425,
+    "familyStatus": "1 可用 · 1 传输中",
+    "cardWidths": [
+      293,
+      293
+    ],
+    "adapterFont": "11px",
+    "contractFont": "11px",
+    "buttonHeights": [
+      38,
+      38,
+      38,
+      38,
+      38,
+      38
+    ],
+    "accessibleNames": [
+      "下载 BEST Adapter 包",
+      "校验 BEST Adapter 与基座配对",
+      "使用 BEST Adapter 进行推理试用",
+      "下载 FINAL Adapter 包",
+      "校验 FINAL Adapter 与基座配对",
+      "使用 FINAL Adapter 进行推理试用"
+    ],
+    "uniqueAccessibleNames": true,
+    "headings": [
+      {
+        "tag": "H3",
+        "text": "验证 Loss 0.2148"
+      },
+      {
+        "tag": "H3",
+        "text": "22 steps 完成"
+      }
+    ],
+    "archiveFiles": [
+      "manifest.json",
+      "adapter_config.json",
+      "adapter_model.safetensors"
+    ],
+    "hasBaseFingerprint": true,
+    "hasAdapterFingerprint": true,
+    "duplicateRailArtifactAction": false,
+    "legacyLabel": false,
+    "downloadHeight": 38
+  },
+  "mobile": {
+    "viewport": 390,
+    "pageScrollWidth": 390,
+    "clientWidth": 390,
+    "workbench": {
+      "top": 355,
+      "width": 366,
+      "height": 1144
+    },
+    "metrics": {
+      "top": 1511,
+      "width": 366,
+      "height": 362
+    },
+    "mobileAction": {
+      "top": 564,
+      "width": 331,
+      "height": 44
+    },
+    "family": {
+      "top": 1885,
+      "width": 366,
+      "height": 265
+    },
+    "rail": {
+      "top": 2162,
+      "width": 366,
+      "height": 534
+    },
+    "actionHeight": 44,
+    "scrollHints": [
+      "左右滑动查看更多模型家族",
+      "左右滑动切换版本",
+      "左右滑动查看完整证据链"
+    ],
+    "evidenceSpineOverflow": {
+      "clientWidth": 365,
+      "scrollWidth": 820,
+      "display": "flex"
+    },
+    "smallFunctionalText": [
+      {
+        "tag": "P",
+        "className": "eyebrow",
+        "fontSize": "9px",
+        "text": "C · VALIDATION STUDIO"
+      },
+      {
+        "tag": "SMALL",
+        "className": "",
+        "fontSize": "9px",
+        "text": "以不可变 model_id 分组"
+      },
+      {
+        "tag": "SMALL",
+        "className": "",
+        "fontSize": "9px",
+        "text": "2 个版本可用"
+      },
+      {
+        "tag": "SMALL",
+        "className": "",
+        "fontSize": "9px",
+        "text": "可进入训练基线检查"
+      },
+      {
+        "tag": "SMALL",
+        "className": "",
+        "fontSize": "9px",
+        "text": "1 传输中 · 1 待核对"
+      },
+      {
+        "tag": "SMALL",
+        "className": "",
+        "fontSize": "9px",
+        "text": "需要人工处理"
+      },
+      {
+        "tag": "SMALL",
+        "className": "",
+        "fontSize": "9px",
+        "text": "文件、兼容、实例核对独立记录"
+      },
+      {
+        "tag": "SMALL",
+        "className": "",
+        "fontSize": "9px",
+        "text": "文件已校验"
+      },
+      {
+        "tag": "SMALL",
+        "className": "",
+        "fontSize": "9px",
+        "text": "传输中"
+      },
+      {
+        "tag": "BUTTON",
+        "className": "",
+        "fontSize": "9px",
+        "text": "证据总览"
+      },
+      {
+        "tag": "BUTTON",
+        "className": "",
+        "fontSize": "9px",
+        "text": "文件清单 11"
+      },
+      {
+        "tag": "BUTTON",
+        "className": "",
+        "fontSize": "9px",
+        "text": "引用与训练产物 2"
+      }
+    ]
+  },
+  "mobileArtifacts": {
+    "cardWidths": [
+      345,
+      345
+    ],
+    "actionHeights": [
+      38,
+      38,
+      38,
+      38,
+      38,
+      38
+    ],
+    "adapterFont": "11px",
+    "contractFont": "11px"
+  }
+}

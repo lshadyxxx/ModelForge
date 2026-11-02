@@ -1,0 +1,103 @@
+{
+  "generatedAt": "2026-11-02T18:44:06.694Z",
+  "taskSpaceId": 15,
+  "page": "p1",
+  "keyboard": {
+    "selectedTab": "files",
+    "focusedTab": "files",
+    "tabIndexes": [
+      -1,
+      0,
+      -1
+    ],
+    "panelLabelledBy": "workbench-tab-files"
+  },
+  "pairingToast": "BEST Adapter 与基座指纹配对通过（原型模拟）；正式页面会重新校验清单、基座和 Adapter 指纹。",
+  "versionSwitch": {
+    "heading": "Qwen3-0.6B · v2",
+    "activeVersionPressed": "true",
+    "familyStatus": "1 可用 · 1 传输中",
+    "mobileActionText": "继续上传"
+  },
+  "mobile": {
+    "pageScrollWidth": 390,
+    "clientWidth": 390,
+    "order": [
+      {
+        "selector": ".page-heading",
+        "top": 220
+      },
+      {
+        "selector": ".evidence-workbench",
+        "top": 355
+      },
+      {
+        "selector": ".metric-strip",
+        "top": 1618
+      },
+      {
+        "selector": ".family-index",
+        "top": 1993
+      },
+      {
+        "selector": ".validation-rail",
+        "top": 2269
+      }
+    ],
+    "actionHeight": 44,
+    "visibleSmallFunctionalText": [
+      {
+        "tag": "P",
+        "className": "eyebrow",
+        "fontSize": "9px",
+        "text": "C · VALIDATION STUDIO"
+      },
+      {
+        "tag": "P",
+        "className": "",
+        "fontSize": "8px",
+        "text": "model-00002-of-00002.safetensors929.2 MiB / 1.41 GiB"
+      },
+      {
+        "tag": "CODE",
+        "className": "",
+        "fontSize": "8px",
+        "text": "model-00002-of-00002.safetensors"
+      },
+      {
+        "tag": "SMALL",
+        "className": "",
+        "fontSize": "8px",
+        "text": "已复用 8 个已验证文件；传输中断后可继续完成版本，不修改已固定 manifest。"
+      }
+    ],
+    "scrollHints": [
+      "左右滑动查看更多模型家族",
+      "左右滑动切换版本",
+      "左右滑动查看完整证据链"
+    ]
+  },
+  "mobileArtifacts": {
+    "cardWidths": [],
+    "actionHeights": [],
+    "cardFonts": [],
+    "contractFonts": []
+  },
+  "variantA": {
+    "pageScrollWidth": 390,
+    "clientWidth": 390,
+    "selectedTab": "overview",
+    "tabCount": 3,
+    "panelCount": 1,
+    "familyStatus": "1 可用 · 1 传输中"
+  },
+  "variantB": {
+    "pageScrollWidth": 390,
+    "clientWidth": 390,
+    "familyStatus": "8/11",
+    "selectedVersionPressed": [
+      "false",
+      "true"
+    ]
+  }
+}

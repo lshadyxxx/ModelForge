@@ -1,0 +1,336 @@
+[p1 "ModelForge 模型模块 · 三方案原型" | space "modelforge-model-ui-optimization-20261103"(15): 1 managed, 0 untracked — p1* "ModelForge 模型模块 · 三方案原型"]
+root
+  anchor [ref=1, loc=href:/modelforge-models-redesign/index.html#workspace, url=http://127.0.0.1:4312/modelforge-models-redesign/index.html#workspace]
+    text "跳到主要内容"
+  container "原型方案选择"
+    container
+      text "PROTOTYPE · 03"
+      container
+        text "模型模块重构"
+        text "同一组真实模型语义，三种工作方式"
+    tablist "选择设计方案"
+      tab [ref=2]
+        text "A"
+        container
+          text "模型资产台"
+          text "扫描与管理优先"
+      tab [ref=3]
+        text "B"
+        container
+          text "来源血缘账本"
+          text "指纹与追溯优先"
+      tab [ref=4]
+        text "C"
+        container
+          text "验证工作室"
+          text "训练准入优先 · 推荐"
+    container
+      button "切换信息密度" [ref=5, loc=css:button[aria-label="切换信息密度"]]
+        svg_root
+      button "切换到深色主题" [ref=6, loc=css:button[aria-label="切换到深色主题"]]
+        svg_root
+  container
+    container "主导航"
+      anchor [ref=33, url=http://127.0.0.1:4312/modelforge-models-redesign/index.html#models]
+        text "M"
+        container
+          text "ModelForge"
+          text "模型微调工作台"
+      container
+        anchor [ref=34, loc=href:/modelforge-models-redesign/index.html#dashboard, url=http://127.0.0.1:4312/modelforge-models-redesign/index.html#dashboard]
+          svg_root
+          text "工作台"
+        anchor [ref=35, loc=href:/modelforge-models-redesign/index.html#datasets, url=http://127.0.0.1:4312/modelforge-models-redesign/index.html#datasets]
+          svg_root
+          text "数据集"
+        anchor [ref=36, url=http://127.0.0.1:4312/modelforge-models-redesign/index.html#models]
+          svg_root
+          text "模型"
+          text "4"
+        anchor [ref=37, loc=href:/modelforge-models-redesign/index.html#compute, url=http://127.0.0.1:4312/modelforge-models-redesign/index.html#compute]
+          svg_root
+          text "计算环境"
+        anchor [ref=38, loc=href:/modelforge-models-redesign/index.html#training, url=http://127.0.0.1:4312/modelforge-models-redesign/index.html#training]
+          svg_root
+          text "训练"
+        anchor [ref=39, loc=href:/modelforge-models-redesign/index.html#inference, url=http://127.0.0.1:4312/modelforge-models-redesign/index.html#inference]
+          svg_root
+          text "推理试用"
+      container
+        text "本地控制面"
+        text "PostgreSQL · MinIO 已连接"
+    container
+      container
+        container
+          text "个人工作空间"
+          text "/"
+          text "模型"
+        container
+          text "对象存储已连接"
+          text "本机访问"
+      container [ref=40]
+        container
+          container
+            paragraph
+              text "C · VALIDATION STUDIO"
+            heading
+              text "模型验证工作室"
+            paragraph
+              text "先看整体资产与训练准入，再检查当前版本、文件指纹和实例核对证据。"
+          container
+            button [ref=41]
+              svg_root
+              text "刷新状态"
+            button [ref=42]
+              svg_root
+              text "添加模型"
+        container "模型整体统计"
+          container
+            text "模型家族"
+            text "4"
+            text "以不可变 model_id 分组"
+          container
+            text "模型版本"
+            text "5"
+            text "2 个文件已校验"
+          container
+            text "兼容已验证"
+            text "1"
+            text "可进入训练基线检查"
+          container
+            text "待处理"
+            text "2"
+            text "1 传输中 · 1 待核对"
+          container
+            text "异常"
+            text "1"
+            text "需要人工处理"
+          container
+            svg_root
+            container
+              text "状态分层正常"
+              text "文件、兼容、实例核对独立记录"
+        container
+          container
+            container
+              container
+                heading
+                  text "模型家族"
+                text "4 组 · 5 个版本"
+              button "添加模型" [ref=43, loc=css:button[aria-label="添加模型"]]
+                svg_root
+            container
+              svg_root
+              text "搜索模型家族"
+              searchbox [ref=44, loc=css:input[placeholder="搜索名称或 ID"]]
+                text "搜索名称或 ID"
+            container
+              text "筛选模型"
+              combobox [ref=45]
+                text "全部来源与状态"
+            container
+              button [ref=46]
+                text "MS"
+                container
+                  text "Qwen3-0.6B"
+                  container
+                    text "MDL-7A2F"
+                    text "· 2 版本"
+                text "文件已校验"
+                text "11-02 18:24"
+              button [ref=47]
+                text "U"
+                container
+                  text "Qwen3-0.6B · 优云公共基座"
+                  container
+                    text "MDL-9C41"
+                    text "· 1 版本"
+                text "待实例核对"
+                text "11-01 16:42"
+              button [ref=48]
+                text "DIR"
+                container
+                  text "客服助手基础模型"
+                  container
+                    text "MDL-3E8A"
+                    text "· 1 版本"
+                text "异常"
+                text "11-02 21:10"
+              button [ref=49]
+                text "DIR"
+                container
+                  text "Qwen3-0.6B 归档副本"
+                  container
+                    text "MDL-6B20"
+                    text "· 1 版本"
+                text "文件已校验"
+                text "10-31 14:06"
+          container
+            container
+              container
+                text "CURRENT EVIDENCE"
+                heading
+                  text "Qwen3-0.6B"
+                  text "· v1"
+                paragraph
+                  text "MV-51F7"
+                  text "· ModelScope · 1.41 GiB"
+              container
+                button [ref=50]
+                  text "v1"
+                  text "文件已校验"
+                button [ref=51]
+                  text "v2"
+                  text "传输中"
+            ordered_list
+              list_item
+                svg_root
+                text "来源固定"
+                text "ModelScope 固定快照"
+              list_item
+                svg_root
+                text "文件完整"
+                text "11 个文件"
+              list_item
+                svg_root
+                text "指纹固化"
+                text "manifest sha256"
+              list_item
+                svg_root
+                text "实例核对"
+                text "内容一致"
+              list_item
+                svg_root
+                text "训练准入"
+                text "兼容基线"
+            tablist "模型证据"
+              tab [ref=52]
+                text "证据总览"
+              tab [ref=53]
+                text "文件清单"
+                text "11"
+              tab [ref=54]
+                text "引用与训练产物"
+                text "2"
+            container
+              container
+                text "训练产物"
+                text "基座 → Attempt → Adapter"
+                paragraph
+                  text "产物独立同步到 MinIO，并绑定同一个基座与数据集指纹。部署包固定包含 manifest、Adapter 配置与权重文件。"
+              container
+                container
+                  text "BEST"
+                  text "已同步可用"
+                heading
+                  text "验证 Loss 0.2148"
+                unordered_list
+                  list_item
+                    text "Adapter"
+                  list_item
+                    text "29fe9ea2-e11c-5dee-900d-73cc256d9b70"
+                  list_item
+                    text "来源 Attempt"
+                  list_item
+                    text "02504b93…d47"
+                  list_item
+                    text "数据集"
+                  list_item
+                    text "客服123 · v2"
+                container
+                  button [ref=55]
+                    svg_root
+                    text "下载部署包"
+                  button [ref=56]
+                    text "用于推理试用"
+                paragraph
+                  text "adapter_config.json"
+                  text "+"
+                  text "adapter_model.safetensors"
+                  text "必须搭配同一 Qwen3-0.6B 基座指纹使用"
+              container
+                container
+                  text "FINAL"
+                  text "已同步可用"
+                heading
+                  text "22 steps 完成"
+                unordered_list
+                  list_item
+                    text "Adapter"
+                  list_item
+                    text "f48e77f1-adca-5f3f-86fc-00456dac2c0c"
+                  list_item
+                    text "来源 Attempt"
+                  list_item
+                    text "02504b93…d47"
+                  list_item
+                    text "退出码"
+                  list_item
+                    text "0"
+                container
+                  button [ref=57]
+                    svg_root
+                    text "下载部署包"
+                  button [ref=58]
+                    text "用于推理试用"
+                paragraph
+                  text "adapter_config.json"
+                  text "+"
+                  text "adapter_model.safetensors"
+                  text "必须搭配同一 Qwen3-0.6B 基座指纹使用"
+          container
+            container
+              text "验证与操作"
+              text "兼容已验证"
+            container "模型资产栈：来源、托管文件、兼容基线、Adapter 产物"
+              container
+                text "01"
+                text "来源引用"
+                text "commit / 公共目录"
+              container
+                text "02"
+                text "文件 manifest"
+                text "大小 · SHA-256"
+              container
+                text "03"
+                text "运行兼容基线"
+                text "硬件 · 镜像 · 参数"
+              container
+                text "04"
+                text "训练产物"
+                text "Best / Final"
+            container
+              container
+                svg_root
+                text "MinIO 回读"
+                text "11/11"
+              container
+                svg_root
+                text "结构入口"
+                text "config + tokenizer + weights"
+              container
+                svg_root
+                text "内容指纹"
+                text "已固化"
+              container
+                svg_root
+                text "运行兼容"
+                text "已验证"
+              container
+                svg_root
+                text "引用保护"
+                text "2"
+            container
+              svg_root
+              container
+                text "可以进入训练配置"
+                paragraph
+                  text "RTX 4090 · CUDA 13.2 · LLaMA-Factory 0.9.5"
+            container
+              button [ref=59]
+                text "进入训练配置"
+              button [ref=60]
+                svg_root
+                text "训练产物与下载"
+        svg_root
+        text "文件已校验只代表正式对象可读取；运行兼容必须绑定架构、内容指纹、参数、GPU、镜像和容量基线。"

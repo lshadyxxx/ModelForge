@@ -1,0 +1,801 @@
+{
+  "generatedAt": "2026-11-02T18:42:36.567Z",
+  "taskSpaceId": 15,
+  "page": "p1",
+  "keyboardResult": {
+    "selectedTab": "files",
+    "activeId": "",
+    "activeTab": null,
+    "panelId": "workbench-panel-files"
+  },
+  "desktopOverview": {
+    "label": "after-desktop-overview",
+    "url": "http://127.0.0.1:4312/modelforge-models-redesign/index.html?audit=1793644955437#c",
+    "document": {
+      "clientWidth": 1425,
+      "scrollWidth": 1425,
+      "bodyScrollWidth": 1425,
+      "pageHeight": 1103
+    },
+    "nodes": {
+      "heading": {
+        "text": "C · VALIDATION STUDIO 模型验证工作室 先看当前模型与训练准入，再检查文件指纹、实例核对和训练产物。 刷新状态 添加模型",
+        "top": 153,
+        "width": 1161,
+        "height": 75,
+        "fontSize": "16px",
+        "color": "rgb(22, 32, 51)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "overflowX": "visible",
+        "scrollWidth": 1161,
+        "clientWidth": 1161
+      },
+      "metrics": {
+        "text": "模型家族 4 以不可变 model_id 分组 模型版本 5 2 个版本可用 兼容已验证 1 可进入训练基线检查 待处理 2 1 传输中 · 1 待核对 异常 1 需要人工处理 状态分层正常文件、兼容、实例核对独立记录",
+        "top": 248,
+        "width": 1161,
+        "height": 107,
+        "fontSize": "16px",
+        "color": "rgb(22, 32, 51)",
+        "backgroundColor": "rgb(255, 255, 255)",
+        "overflowX": "hidden",
+        "scrollWidth": 1159,
+        "clientWidth": 1159
+      },
+      "family": {
+        "text": "模型家族4 组 · 5 个版本 搜索模型家族 筛选模型 全部来源与状态 ModelScope 目录上传 优云外部只读 待处理 仅看异常 兼容已验证 左右滑动查看更多模型家族 MS Qwen3-0.6B MDL-7A2F · 2 版本 1 传输中 · 1 可用 11-02 18:24 U Qwen3-0.6B · 优云公共基座 MDL-9C41 · 1 版本 1 待核对 11-01 16:42 DIR 客服助手基础模型 MDL-3E8A · 1 版本 1 异常 11-02 21",
+        "top": 372,
+        "width": 232,
+        "height": 669,
+        "fontSize": "16px",
+        "color": "rgb(22, 32, 51)",
+        "backgroundColor": "rgb(246, 248, 251)",
+        "overflowX": "visible",
+        "scrollWidth": 231,
+        "clientWidth": 231
+      },
+      "workbench": {
+        "text": "CURRENT EVIDENCE Qwen3-0.6B · v1 MV-51F7 · ModelScope · 1.41 GiB 文件已校验RTX 4090 · CUDA 13.2 · LLaMA-Factory 0.9.5 左右滑动切换版本 v1文件已校验 v2传输中 进入训练配置 左右滑动查看完整证据链 来源固定ModelScope 固定快照 文件完整11 个文件 指纹固化manifest sha256 实例核对内容一致 训练准入兼容基线 证据总览文件清单 11引用与训练",
+        "top": 372,
+        "width": 635,
+        "height": 669,
+        "fontSize": "16px",
+        "color": "rgb(22, 32, 51)",
+        "backgroundColor": "rgb(255, 255, 255)",
+        "overflowX": "visible",
+        "scrollWidth": 635,
+        "clientWidth": 635
+      },
+      "workbenchState": {
+        "text": "文件已校验RTX 4090 · CUDA 13.2 · LLaMA-Factory 0.9.5",
+        "top": 455,
+        "width": 270,
+        "height": 22,
+        "fontSize": "16px",
+        "color": "rgb(22, 32, 51)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "overflowX": "visible",
+        "scrollWidth": 270,
+        "clientWidth": 270
+      },
+      "mobileAction": {
+        "text": "进入训练配置",
+        "top": 0,
+        "width": 0,
+        "height": 0,
+        "fontSize": "16px",
+        "color": "rgb(22, 32, 51)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "overflowX": "visible",
+        "scrollWidth": 0,
+        "clientWidth": 0
+      },
+      "evidenceSpine": {
+        "text": "来源固定ModelScope 固定快照 文件完整11 个文件 指纹固化manifest sha256 实例核对内容一致 训练准入兼容基线",
+        "top": 493,
+        "width": 635,
+        "height": 74,
+        "fontSize": "16px",
+        "color": "rgb(22, 32, 51)",
+        "backgroundColor": "rgb(246, 248, 251)",
+        "overflowX": "visible",
+        "scrollWidth": 635,
+        "clientWidth": 635
+      },
+      "rail": {
+        "text": "验证与操作兼容已验证 01来源引用commit / 公共目录 02文件 manifest大小 · SHA-256 03运行兼容基线硬件 · 镜像 · 参数 04训练产物Best / Final MinIO 回读11/11结构入口config + tokenizer + weights内容指纹已固化运行兼容已验证引用保护2 可以进入训练配置RTX 4090 · CUDA 13.2 · LLaMA-Factory 0.9.5 进入训练配置",
+        "top": 372,
+        "width": 292,
+        "height": 669,
+        "fontSize": "16px",
+        "color": "rgb(22, 32, 51)",
+        "backgroundColor": "rgb(246, 248, 251)",
+        "overflowX": "visible",
+        "scrollWidth": 291,
+        "clientWidth": 291
+      },
+      "artifactIntro": null,
+      "artifactCard": null,
+      "adapterCode": null,
+      "contract": null
+    },
+    "familyStatus": "1 传输中 · 1 可用",
+    "selectedTab": "overview",
+    "tabs": [
+      {
+        "id": "workbench-tab-overview",
+        "text": "证据总览",
+        "selected": "true",
+        "controls": "workbench-panel-overview",
+        "tabIndex": 0
+      },
+      {
+        "id": "workbench-tab-files",
+        "text": "文件清单 11",
+        "selected": "false",
+        "controls": "workbench-panel-files",
+        "tabIndex": -1
+      },
+      {
+        "id": "workbench-tab-lineage",
+        "text": "引用与训练产物 2",
+        "selected": "false",
+        "controls": "workbench-panel-lineage",
+        "tabIndex": -1
+      }
+    ],
+    "panels": [
+      {
+        "id": "workbench-panel-overview",
+        "labelledBy": "workbench-tab-overview",
+        "role": "tabpanel"
+      }
+    ],
+    "familyPressed": "true",
+    "versionPressed": [
+      {
+        "text": "v1文件已校验",
+        "pressed": "true"
+      },
+      {
+        "text": "v2传输中",
+        "pressed": "false"
+      }
+    ],
+    "artifactCards": [],
+    "duplicateRailArtifactAction": false,
+    "bodyTextHasDeploymentPackageLabel": false
+  },
+  "desktopArtifacts": {
+    "label": "after-desktop-artifacts",
+    "url": "http://127.0.0.1:4312/modelforge-models-redesign/index.html?audit=1793644955437#c",
+    "document": {
+      "clientWidth": 1425,
+      "scrollWidth": 1425,
+      "bodyScrollWidth": 1425,
+      "pageHeight": 1277
+    },
+    "nodes": {
+      "heading": {
+        "text": "C · VALIDATION STUDIO 模型验证工作室 先看当前模型与训练准入，再检查文件指纹、实例核对和训练产物。 刷新状态 添加模型",
+        "top": 153,
+        "width": 1161,
+        "height": 75,
+        "fontSize": "16px",
+        "color": "rgb(22, 32, 51)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "overflowX": "visible",
+        "scrollWidth": 1161,
+        "clientWidth": 1161
+      },
+      "metrics": {
+        "text": "模型家族 4 以不可变 model_id 分组 模型版本 5 2 个版本可用 兼容已验证 1 可进入训练基线检查 待处理 2 1 传输中 · 1 待核对 异常 1 需要人工处理 状态分层正常文件、兼容、实例核对独立记录",
+        "top": 248,
+        "width": 1161,
+        "height": 107,
+        "fontSize": "16px",
+        "color": "rgb(22, 32, 51)",
+        "backgroundColor": "rgb(255, 255, 255)",
+        "overflowX": "hidden",
+        "scrollWidth": 1159,
+        "clientWidth": 1159
+      },
+      "family": {
+        "text": "模型家族4 组 · 5 个版本 搜索模型家族 筛选模型 全部来源与状态 ModelScope 目录上传 优云外部只读 待处理 仅看异常 兼容已验证 左右滑动查看更多模型家族 MS Qwen3-0.6B MDL-7A2F · 2 版本 1 传输中 · 1 可用 11-02 18:24 U Qwen3-0.6B · 优云公共基座 MDL-9C41 · 1 版本 1 待核对 11-01 16:42 DIR 客服助手基础模型 MDL-3E8A · 1 版本 1 异常 11-02 21",
+        "top": 372,
+        "width": 232,
+        "height": 843,
+        "fontSize": "16px",
+        "color": "rgb(22, 32, 51)",
+        "backgroundColor": "rgb(246, 248, 251)",
+        "overflowX": "visible",
+        "scrollWidth": 231,
+        "clientWidth": 231
+      },
+      "workbench": {
+        "text": "CURRENT EVIDENCE Qwen3-0.6B · v1 MV-51F7 · ModelScope · 1.41 GiB 文件已校验RTX 4090 · CUDA 13.2 · LLaMA-Factory 0.9.5 左右滑动切换版本 v1文件已校验 v2传输中 进入训练配置 左右滑动查看完整证据链 来源固定ModelScope 固定快照 文件完整11 个文件 指纹固化manifest sha256 实例核对内容一致 训练准入兼容基线 证据总览文件清单 11引用与训练",
+        "top": 372,
+        "width": 635,
+        "height": 843,
+        "fontSize": "16px",
+        "color": "rgb(22, 32, 51)",
+        "backgroundColor": "rgb(255, 255, 255)",
+        "overflowX": "visible",
+        "scrollWidth": 635,
+        "clientWidth": 635
+      },
+      "workbenchState": {
+        "text": "文件已校验RTX 4090 · CUDA 13.2 · LLaMA-Factory 0.9.5",
+        "top": 455,
+        "width": 270,
+        "height": 22,
+        "fontSize": "16px",
+        "color": "rgb(22, 32, 51)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "overflowX": "visible",
+        "scrollWidth": 270,
+        "clientWidth": 270
+      },
+      "mobileAction": {
+        "text": "进入训练配置",
+        "top": 0,
+        "width": 0,
+        "height": 0,
+        "fontSize": "16px",
+        "color": "rgb(22, 32, 51)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "overflowX": "visible",
+        "scrollWidth": 0,
+        "clientWidth": 0
+      },
+      "evidenceSpine": {
+        "text": "来源固定ModelScope 固定快照 文件完整11 个文件 指纹固化manifest sha256 实例核对内容一致 训练准入兼容基线",
+        "top": 493,
+        "width": 635,
+        "height": 74,
+        "fontSize": "16px",
+        "color": "rgb(22, 32, 51)",
+        "backgroundColor": "rgb(246, 248, 251)",
+        "overflowX": "visible",
+        "scrollWidth": 635,
+        "clientWidth": 635
+      },
+      "rail": {
+        "text": "验证与操作兼容已验证 01来源引用commit / 公共目录 02文件 manifest大小 · SHA-256 03运行兼容基线硬件 · 镜像 · 参数 04训练产物Best / Final MinIO 回读11/11结构入口config + tokenizer + weights内容指纹已固化运行兼容已验证引用保护2 可以进入训练配置RTX 4090 · CUDA 13.2 · LLaMA-Factory 0.9.5 进入训练配置",
+        "top": 372,
+        "width": 292,
+        "height": 843,
+        "fontSize": "16px",
+        "color": "rgb(22, 32, 51)",
+        "backgroundColor": "rgb(246, 248, 251)",
+        "overflowX": "visible",
+        "scrollWidth": 291,
+        "clientWidth": 291
+      },
+      "artifactIntro": {
+        "text": "训练产物 基座 → Attempt → Adapter 产物独立同步到 MinIO，并绑定同一个基座与数据集。Adapter 是增量权重，不能独立启动；下载包固定包含 manifest.json、adapter_config.json、adapter_model.safetensors。",
+        "top": 618,
+        "width": 597,
+        "height": 103,
+        "fontSize": "16px",
+        "color": "rgb(22, 32, 51)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "overflowX": "visible",
+        "scrollWidth": 596,
+        "clientWidth": 596
+      },
+      "artifactCard": {
+        "text": "BEST已同步可用 验证 Loss 0.2148 Adapter 版本a515ea2c-74f9-5982-b5aa-5c4985eb3604 Adapter 指纹a17222afbb6dcd3987bbc541379422bf42c0fa2c27e1448b6327ccbda21ae80c 来源 Attemptfbbe9980-1b83-44b9-9880-422efb4a1f4d 数据集live-gpu-sft-20261101-r1 · v1dc344d8b-41ca-",
+        "top": 733,
+        "width": 293,
+        "height": 699,
+        "fontSize": "16px",
+        "color": "rgb(22, 32, 51)",
+        "backgroundColor": "rgb(255, 255, 255)",
+        "overflowX": "visible",
+        "scrollWidth": 399,
+        "clientWidth": 291
+      },
+      "adapterCode": {
+        "text": "a515ea2c-74f9-5982-b5aa-5c4985eb3604",
+        "top": 815,
+        "width": 171,
+        "height": 31,
+        "fontSize": "10px",
+        "color": "rgb(82, 97, 120)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "overflowX": "visible",
+        "scrollWidth": 171,
+        "clientWidth": 171
+      },
+      "contract": {
+        "text": "LoRA Adapter 不能独立启动。部署时必须加载基座模型 Qwen3-0.6B，并核对指纹 ffeb1654eaf9f55ac1ece9d1396c006cb17ff6d18f2d21a120fd0cef28a0166a。",
+        "top": 1358,
+        "width": 263,
+        "height": 59,
+        "fontSize": "10px",
+        "color": "rgb(82, 97, 120)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "overflowX": "visible",
+        "scrollWidth": 385,
+        "clientWidth": 263
+      }
+    },
+    "familyStatus": "1 传输中 · 1 可用",
+    "selectedTab": "lineage",
+    "tabs": [
+      {
+        "id": "workbench-tab-overview",
+        "text": "证据总览",
+        "selected": "false",
+        "controls": "workbench-panel-overview",
+        "tabIndex": -1
+      },
+      {
+        "id": "workbench-tab-files",
+        "text": "文件清单 11",
+        "selected": "false",
+        "controls": "workbench-panel-files",
+        "tabIndex": -1
+      },
+      {
+        "id": "workbench-tab-lineage",
+        "text": "引用与训练产物 2",
+        "selected": "true",
+        "controls": "workbench-panel-lineage",
+        "tabIndex": 0
+      }
+    ],
+    "panels": [
+      {
+        "id": "workbench-panel-lineage",
+        "labelledBy": "workbench-tab-lineage",
+        "role": "tabpanel"
+      }
+    ],
+    "familyPressed": "true",
+    "versionPressed": [
+      {
+        "text": "v1文件已校验",
+        "pressed": "true"
+      },
+      {
+        "text": "v2传输中",
+        "pressed": "false"
+      }
+    ],
+    "artifactCards": [
+      {
+        "width": 293,
+        "heading": "验证 Loss 0.2148",
+        "headingLevel": 3,
+        "actions": [
+          "下载 BEST Adapter 包",
+          "校验 BEST Adapter 与基座配对",
+          "使用 BEST Adapter 进行推理试用"
+        ],
+        "archiveFiles": [
+          "manifest.json",
+          "adapter_config.json",
+          "adapter_model.safetensors"
+        ],
+        "hasBaseFingerprint": true,
+        "hasAdapterFingerprint": true
+      },
+      {
+        "width": 293,
+        "heading": "22 steps 完成",
+        "headingLevel": 3,
+        "actions": [
+          "下载 FINAL Adapter 包",
+          "校验 FINAL Adapter 与基座配对",
+          "使用 FINAL Adapter 进行推理试用"
+        ],
+        "archiveFiles": [
+          "manifest.json",
+          "adapter_config.json",
+          "adapter_model.safetensors"
+        ],
+        "hasBaseFingerprint": true,
+        "hasAdapterFingerprint": true
+      }
+    ],
+    "duplicateRailArtifactAction": false,
+    "bodyTextHasDeploymentPackageLabel": false
+  },
+  "mobileOverview": {
+    "label": "after-mobile-overview",
+    "url": "http://127.0.0.1:4312/modelforge-models-redesign/index.html?audit=1793644955437#c",
+    "document": {
+      "clientWidth": 390,
+      "scrollWidth": 390,
+      "bodyScrollWidth": 390,
+      "pageHeight": 2765
+    },
+    "nodes": {
+      "heading": {
+        "text": "C · VALIDATION STUDIO 模型验证工作室 先看当前模型与训练准入，再检查文件指纹、实例核对和训练产物。 刷新状态 添加模型",
+        "top": 220,
+        "width": 366,
+        "height": 123,
+        "fontSize": "16px",
+        "color": "rgb(22, 32, 51)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "overflowX": "visible",
+        "scrollWidth": 366,
+        "clientWidth": 366
+      },
+      "metrics": {
+        "text": "模型家族 4 以不可变 model_id 分组 模型版本 5 2 个版本可用 兼容已验证 1 可进入训练基线检查 待处理 2 1 传输中 · 1 待核对 异常 1 需要人工处理 状态分层正常文件、兼容、实例核对独立记录",
+        "top": 1511,
+        "width": 366,
+        "height": 362,
+        "fontSize": "16px",
+        "color": "rgb(22, 32, 51)",
+        "backgroundColor": "rgb(255, 255, 255)",
+        "overflowX": "hidden",
+        "scrollWidth": 365,
+        "clientWidth": 365
+      },
+      "family": {
+        "text": "模型家族4 组 · 5 个版本 搜索模型家族 筛选模型 全部来源与状态 ModelScope 目录上传 优云外部只读 待处理 仅看异常 兼容已验证 左右滑动查看更多模型家族 MS Qwen3-0.6B MDL-7A2F · 2 版本 1 传输中 · 1 可用 11-02 18:24 U Qwen3-0.6B · 优云公共基座 MDL-9C41 · 1 版本 1 待核对 11-01 16:42 DIR 客服助手基础模型 MDL-3E8A · 1 版本 1 异常 11-02 21",
+        "top": 1885,
+        "width": 366,
+        "height": 265,
+        "fontSize": "16px",
+        "color": "rgb(22, 32, 51)",
+        "backgroundColor": "rgb(246, 248, 251)",
+        "overflowX": "visible",
+        "scrollWidth": 365,
+        "clientWidth": 365
+      },
+      "workbench": {
+        "text": "CURRENT EVIDENCE Qwen3-0.6B · v1 MV-51F7 · ModelScope · 1.41 GiB 文件已校验RTX 4090 · CUDA 13.2 · LLaMA-Factory 0.9.5 左右滑动切换版本 v1文件已校验 v2传输中 进入训练配置 左右滑动查看完整证据链 来源固定ModelScope 固定快照 文件完整11 个文件 指纹固化manifest sha256 实例核对内容一致 训练准入兼容基线 证据总览文件清单 11引用与训练",
+        "top": 355,
+        "width": 366,
+        "height": 1144,
+        "fontSize": "16px",
+        "color": "rgb(22, 32, 51)",
+        "backgroundColor": "rgb(255, 255, 255)",
+        "overflowX": "hidden",
+        "scrollWidth": 365,
+        "clientWidth": 365
+      },
+      "workbenchState": {
+        "text": "文件已校验RTX 4090 · CUDA 13.2 · LLaMA-Factory 0.9.5",
+        "top": 439,
+        "width": 331,
+        "height": 22,
+        "fontSize": "16px",
+        "color": "rgb(22, 32, 51)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "overflowX": "visible",
+        "scrollWidth": 331,
+        "clientWidth": 331
+      },
+      "mobileAction": {
+        "text": "进入训练配置",
+        "top": 564,
+        "width": 331,
+        "height": 44,
+        "fontSize": "16px",
+        "color": "rgb(22, 32, 51)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "overflowX": "visible",
+        "scrollWidth": 331,
+        "clientWidth": 331
+      },
+      "evidenceSpine": {
+        "text": "来源固定ModelScope 固定快照 文件完整11 个文件 指纹固化manifest sha256 实例核对内容一致 训练准入兼容基线",
+        "top": 643,
+        "width": 365,
+        "height": 75,
+        "fontSize": "16px",
+        "color": "rgb(22, 32, 51)",
+        "backgroundColor": "rgb(246, 248, 251)",
+        "overflowX": "auto",
+        "scrollWidth": 820,
+        "clientWidth": 365
+      },
+      "rail": {
+        "text": "验证与操作兼容已验证 01来源引用commit / 公共目录 02文件 manifest大小 · SHA-256 03运行兼容基线硬件 · 镜像 · 参数 04训练产物Best / Final MinIO 回读11/11结构入口config + tokenizer + weights内容指纹已固化运行兼容已验证引用保护2 可以进入训练配置RTX 4090 · CUDA 13.2 · LLaMA-Factory 0.9.5 进入训练配置",
+        "top": 2162,
+        "width": 366,
+        "height": 534,
+        "fontSize": "16px",
+        "color": "rgb(22, 32, 51)",
+        "backgroundColor": "rgb(246, 248, 251)",
+        "overflowX": "hidden",
+        "scrollWidth": 365,
+        "clientWidth": 365
+      },
+      "artifactIntro": null,
+      "artifactCard": null,
+      "adapterCode": null,
+      "contract": null
+    },
+    "familyStatus": "1 传输中 · 1 可用",
+    "selectedTab": "overview",
+    "tabs": [
+      {
+        "id": "workbench-tab-overview",
+        "text": "证据总览",
+        "selected": "true",
+        "controls": "workbench-panel-overview",
+        "tabIndex": 0
+      },
+      {
+        "id": "workbench-tab-files",
+        "text": "文件清单 11",
+        "selected": "false",
+        "controls": "workbench-panel-files",
+        "tabIndex": -1
+      },
+      {
+        "id": "workbench-tab-lineage",
+        "text": "引用与训练产物 2",
+        "selected": "false",
+        "controls": "workbench-panel-lineage",
+        "tabIndex": -1
+      }
+    ],
+    "panels": [
+      {
+        "id": "workbench-panel-overview",
+        "labelledBy": "workbench-tab-overview",
+        "role": "tabpanel"
+      }
+    ],
+    "familyPressed": "true",
+    "versionPressed": [
+      {
+        "text": "v1文件已校验",
+        "pressed": "true"
+      },
+      {
+        "text": "v2传输中",
+        "pressed": "false"
+      }
+    ],
+    "artifactCards": [],
+    "duplicateRailArtifactAction": false,
+    "bodyTextHasDeploymentPackageLabel": false
+  },
+  "mobileArtifacts": {
+    "label": "after-mobile-artifacts",
+    "url": "http://127.0.0.1:4312/modelforge-models-redesign/index.html?audit=1793644955437#c",
+    "document": {
+      "clientWidth": 390,
+      "scrollWidth": 390,
+      "bodyScrollWidth": 390,
+      "pageHeight": 3731
+    },
+    "nodes": {
+      "heading": {
+        "text": "C · VALIDATION STUDIO 模型验证工作室 先看当前模型与训练准入，再检查文件指纹、实例核对和训练产物。 刷新状态 添加模型",
+        "top": 220,
+        "width": 366,
+        "height": 123,
+        "fontSize": "16px",
+        "color": "rgb(22, 32, 51)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "overflowX": "visible",
+        "scrollWidth": 366,
+        "clientWidth": 366
+      },
+      "metrics": {
+        "text": "模型家族 4 以不可变 model_id 分组 模型版本 5 2 个版本可用 兼容已验证 1 可进入训练基线检查 待处理 2 1 传输中 · 1 待核对 异常 1 需要人工处理 状态分层正常文件、兼容、实例核对独立记录",
+        "top": 2478,
+        "width": 366,
+        "height": 362,
+        "fontSize": "16px",
+        "color": "rgb(22, 32, 51)",
+        "backgroundColor": "rgb(255, 255, 255)",
+        "overflowX": "hidden",
+        "scrollWidth": 365,
+        "clientWidth": 365
+      },
+      "family": {
+        "text": "模型家族4 组 · 5 个版本 搜索模型家族 筛选模型 全部来源与状态 ModelScope 目录上传 优云外部只读 待处理 仅看异常 兼容已验证 左右滑动查看更多模型家族 MS Qwen3-0.6B MDL-7A2F · 2 版本 1 传输中 · 1 可用 11-02 18:24 U Qwen3-0.6B · 优云公共基座 MDL-9C41 · 1 版本 1 待核对 11-01 16:42 DIR 客服助手基础模型 MDL-3E8A · 1 版本 1 异常 11-02 21",
+        "top": 2852,
+        "width": 366,
+        "height": 265,
+        "fontSize": "16px",
+        "color": "rgb(22, 32, 51)",
+        "backgroundColor": "rgb(246, 248, 251)",
+        "overflowX": "visible",
+        "scrollWidth": 365,
+        "clientWidth": 365
+      },
+      "workbench": {
+        "text": "CURRENT EVIDENCE Qwen3-0.6B · v1 MV-51F7 · ModelScope · 1.41 GiB 文件已校验RTX 4090 · CUDA 13.2 · LLaMA-Factory 0.9.5 左右滑动切换版本 v1文件已校验 v2传输中 进入训练配置 左右滑动查看完整证据链 来源固定ModelScope 固定快照 文件完整11 个文件 指纹固化manifest sha256 实例核对内容一致 训练准入兼容基线 证据总览文件清单 11引用与训练",
+        "top": 355,
+        "width": 366,
+        "height": 2110,
+        "fontSize": "16px",
+        "color": "rgb(22, 32, 51)",
+        "backgroundColor": "rgb(255, 255, 255)",
+        "overflowX": "hidden",
+        "scrollWidth": 365,
+        "clientWidth": 365
+      },
+      "workbenchState": {
+        "text": "文件已校验RTX 4090 · CUDA 13.2 · LLaMA-Factory 0.9.5",
+        "top": 439,
+        "width": 331,
+        "height": 22,
+        "fontSize": "16px",
+        "color": "rgb(22, 32, 51)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "overflowX": "visible",
+        "scrollWidth": 331,
+        "clientWidth": 331
+      },
+      "mobileAction": {
+        "text": "进入训练配置",
+        "top": 564,
+        "width": 331,
+        "height": 44,
+        "fontSize": "16px",
+        "color": "rgb(22, 32, 51)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "overflowX": "visible",
+        "scrollWidth": 331,
+        "clientWidth": 331
+      },
+      "evidenceSpine": {
+        "text": "来源固定ModelScope 固定快照 文件完整11 个文件 指纹固化manifest sha256 实例核对内容一致 训练准入兼容基线",
+        "top": 643,
+        "width": 365,
+        "height": 75,
+        "fontSize": "16px",
+        "color": "rgb(22, 32, 51)",
+        "backgroundColor": "rgb(246, 248, 251)",
+        "overflowX": "auto",
+        "scrollWidth": 820,
+        "clientWidth": 365
+      },
+      "rail": {
+        "text": "验证与操作兼容已验证 01来源引用commit / 公共目录 02文件 manifest大小 · SHA-256 03运行兼容基线硬件 · 镜像 · 参数 04训练产物Best / Final MinIO 回读11/11结构入口config + tokenizer + weights内容指纹已固化运行兼容已验证引用保护2 可以进入训练配置RTX 4090 · CUDA 13.2 · LLaMA-Factory 0.9.5 进入训练配置",
+        "top": 3129,
+        "width": 366,
+        "height": 534,
+        "fontSize": "16px",
+        "color": "rgb(22, 32, 51)",
+        "backgroundColor": "rgb(246, 248, 251)",
+        "overflowX": "hidden",
+        "scrollWidth": 365,
+        "clientWidth": 365
+      },
+      "artifactIntro": {
+        "text": "训练产物 基座 → Attempt → Adapter 产物独立同步到 MinIO，并绑定同一个基座与数据集。Adapter 是增量权重，不能独立启动；下载包固定包含 manifest.json、adapter_config.json、adapter_model.safetensors。",
+        "top": 775,
+        "width": 345,
+        "height": 120,
+        "fontSize": "16px",
+        "color": "rgb(22, 32, 51)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "overflowX": "visible",
+        "scrollWidth": 343,
+        "clientWidth": 343
+      },
+      "artifactCard": {
+        "text": "BEST已同步可用 验证 Loss 0.2148 Adapter 版本a515ea2c-74f9-5982-b5aa-5c4985eb3604 Adapter 指纹a17222afbb6dcd3987bbc541379422bf42c0fa2c27e1448b6327ccbda21ae80c 来源 Attemptfbbe9980-1b83-44b9-9880-422efb4a1f4d 数据集live-gpu-sft-20261101-r1 · v1dc344d8b-41ca-",
+        "top": 907,
+        "width": 345,
+        "height": 765,
+        "fontSize": "16px",
+        "color": "rgb(22, 32, 51)",
+        "backgroundColor": "rgb(255, 255, 255)",
+        "overflowX": "visible",
+        "scrollWidth": 436,
+        "clientWidth": 343
+      },
+      "adapterCode": {
+        "text": "a515ea2c-74f9-5982-b5aa-5c4985eb3604",
+        "top": 988,
+        "width": 223,
+        "height": 34,
+        "fontSize": "11px",
+        "color": "rgb(82, 97, 120)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "overflowX": "visible",
+        "scrollWidth": 223,
+        "clientWidth": 223
+      },
+      "contract": {
+        "text": "LoRA Adapter 不能独立启动。部署时必须加载基座模型 Qwen3-0.6B，并核对指纹 ffeb1654eaf9f55ac1ece9d1396c006cb17ff6d18f2d21a120fd0cef28a0166a。",
+        "top": 1596,
+        "width": 319,
+        "height": 63,
+        "fontSize": "11px",
+        "color": "rgb(82, 97, 120)",
+        "backgroundColor": "rgba(0, 0, 0, 0)",
+        "overflowX": "visible",
+        "scrollWidth": 424,
+        "clientWidth": 319
+      }
+    },
+    "familyStatus": "1 传输中 · 1 可用",
+    "selectedTab": "lineage",
+    "tabs": [
+      {
+        "id": "workbench-tab-overview",
+        "text": "证据总览",
+        "selected": "false",
+        "controls": "workbench-panel-overview",
+        "tabIndex": -1
+      },
+      {
+        "id": "workbench-tab-files",
+        "text": "文件清单 11",
+        "selected": "false",
+        "controls": "workbench-panel-files",
+        "tabIndex": -1
+      },
+      {
+        "id": "workbench-tab-lineage",
+        "text": "引用与训练产物 2",
+        "selected": "true",
+        "controls": "workbench-panel-lineage",
+        "tabIndex": 0
+      }
+    ],
+    "panels": [
+      {
+        "id": "workbench-panel-lineage",
+        "labelledBy": "workbench-tab-lineage",
+        "role": "tabpanel"
+      }
+    ],
+    "familyPressed": "true",
+    "versionPressed": [
+      {
+        "text": "v1文件已校验",
+        "pressed": "true"
+      },
+      {
+        "text": "v2传输中",
+        "pressed": "false"
+      }
+    ],
+    "artifactCards": [
+      {
+        "width": 345,
+        "heading": "验证 Loss 0.2148",
+        "headingLevel": 3,
+        "actions": [
+          "下载 BEST Adapter 包",
+          "校验 BEST Adapter 与基座配对",
+          "使用 BEST Adapter 进行推理试用"
+        ],
+        "archiveFiles": [
+          "manifest.json",
+          "adapter_config.json",
+          "adapter_model.safetensors"
+        ],
+        "hasBaseFingerprint": true,
+        "hasAdapterFingerprint": true
+      },
+      {
+        "width": 345,
+        "heading": "22 steps 完成",
+        "headingLevel": 3,
+        "actions": [
+          "下载 FINAL Adapter 包",
+          "校验 FINAL Adapter 与基座配对",
+          "使用 FINAL Adapter 进行推理试用"
+        ],
+        "archiveFiles": [
+          "manifest.json",
+          "adapter_config.json",
+          "adapter_model.safetensors"
+        ],
+        "hasBaseFingerprint": true,
+        "hasAdapterFingerprint": true
+      }
+    ],
+    "duplicateRailArtifactAction": false,
+    "bodyTextHasDeploymentPackageLabel": false
+  }
+}

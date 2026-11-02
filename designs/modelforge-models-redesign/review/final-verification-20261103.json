@@ -1,0 +1,264 @@
+{
+  "generatedAt": "2026-11-02T18:49:49.681Z",
+  "dateLocal": "2026-11-03 Asia/Shanghai",
+  "taskSpaceId": 15,
+  "page": "p1",
+  "previewUrl": "http://127.0.0.1:4312/modelforge-models-redesign/index.html#c",
+  "browser": "ego-browser 2.2.0 TaskSpace 15",
+  "viewports": {
+    "desktop": "1440x900",
+    "mobile": "390x844"
+  },
+  "keyboard": [
+    {
+      "key": "files",
+      "selectedTab": "files",
+      "focusedTab": "files",
+      "tabIndexes": [
+        -1,
+        0,
+        -1
+      ],
+      "activePanel": "workbench-panel-files",
+      "visiblePanelCount": 1
+    },
+    {
+      "key": "lineage",
+      "selectedTab": "lineage",
+      "focusedTab": "lineage",
+      "tabIndexes": [
+        -1,
+        -1,
+        0
+      ],
+      "activePanel": "workbench-panel-lineage",
+      "visiblePanelCount": 1
+    },
+    {
+      "key": "overview",
+      "selectedTab": "overview",
+      "focusedTab": "overview",
+      "tabIndexes": [
+        0,
+        -1,
+        -1
+      ],
+      "activePanel": "workbench-panel-overview",
+      "visiblePanelCount": 1
+    }
+  ],
+  "tabRelations": [
+    {
+      "label": "模型证据",
+      "tabCount": 3,
+      "tabs": [
+        {
+          "id": "workbench-tab-overview",
+          "key": "overview",
+          "selected": "false",
+          "tabIndex": -1,
+          "controls": "workbench-panel-overview",
+          "resolvingPanelCount": 1,
+          "panelLabelledBy": "workbench-tab-overview",
+          "panelHidden": true
+        },
+        {
+          "id": "workbench-tab-files",
+          "key": "files",
+          "selected": "false",
+          "tabIndex": -1,
+          "controls": "workbench-panel-files",
+          "resolvingPanelCount": 1,
+          "panelLabelledBy": "workbench-tab-files",
+          "panelHidden": true
+        },
+        {
+          "id": "workbench-tab-lineage",
+          "key": "lineage",
+          "selected": "true",
+          "tabIndex": 0,
+          "controls": "workbench-panel-lineage",
+          "resolvingPanelCount": 1,
+          "panelLabelledBy": "workbench-tab-lineage",
+          "panelHidden": false
+        }
+      ]
+    }
+  ],
+  "desktopArtifacts": {
+    "cardCount": 2,
+    "downloadNames": [
+      "下载 BEST Adapter 包",
+      "下载 FINAL Adapter 包"
+    ],
+    "uniqueDownloadNames": 2,
+    "archiveFiles": [
+      "manifest.json",
+      "adapter_config.json",
+      "adapter_model.safetensors"
+    ],
+    "contracts": [
+      {
+        "role": "best",
+        "title": "验证 Loss 0.2148",
+        "text": "BEST已同步可用 验证 Loss 0.2148 Adapter 版本a515ea2c-74f9-5982-b5aa-5c4985eb3604 Adapter 指纹a17222afbb6dcd3987bbc541379422bf42c0fa2c27e1448b6327ccbda21ae80c 来源 Attemptfbbe9980-1b83-44b9-9880-422efb4a1f4d 数据集live-gpu-sft-20261101-r1 · v1dc344d8b-41ca-459a-9eb6-3c276eeb93a2 基座模型Qwen3-0.6B · v151f7b869-9894-424b-bc5d-dba013723ddb 基座指纹ffeb1654eaf9f55ac1ece9d1396c006cb17ff6d18f2d21a120fd0cef28a0166a Adapter 包固定包含 manifest.jsonadapter_config.jsonadapter_model.safetensors 下载 BEST Adapter 包 校验基座与 Adapter 配对 用于推理试用 LoRA Adapter 不能独立启动。部署时必须加载基座模型 Qwen3-0.6B，并核对指纹 ffeb1654eaf9f55ac1ece9d1396c006cb17ff6d18f2d21a120fd0cef28a0166a。",
+        "downloadName": "下载 BEST Adapter 包",
+        "pairName": "校验 BEST Adapter 与基座配对",
+        "cardWidth": 293
+      },
+      {
+        "role": "final",
+        "title": "22 steps 完成",
+        "text": "FINAL已同步可用 22 steps 完成 Adapter 版本ff6b1e74-67bb-543c-b03f-b9e151e40cf1 Adapter 指纹1e811e2128d4671c291899e4b65e718893e63410fbb4ddfb1318a81a29563bf0 来源 Attemptfbbe9980-1b83-44b9-9880-422efb4a1f4d 数据集live-gpu-sft-20261101-r1 · v1dc344d8b-41ca-459a-9eb6-3c276eeb93a2 基座模型Qwen3-0.6B · v151f7b869-9894-424b-bc5d-dba013723ddb 基座指纹ffeb1654eaf9f55ac1ece9d1396c006cb17ff6d18f2d21a120fd0cef28a0166a Adapter 包固定包含 manifest.jsonadapter_config.jsonadapter_model.safetensors 下载 FINAL Adapter 包 校验基座与 Adapter 配对 用于推理试用 LoRA Adapter 不能独立启动。部署时必须加载基座模型 Qwen3-0.6B，并核对指纹 ffeb1654eaf9f55ac1ece9d1396c006cb17ff6d18f2d21a120fd0cef28a0166a。",
+        "downloadName": "下载 FINAL Adapter 包",
+        "pairName": "校验 FINAL Adapter 与基座配对",
+        "cardWidth": 293
+      }
+    ],
+    "headingLevels": [
+      {
+        "level": "H1",
+        "text": "模型验证工作室"
+      },
+      {
+        "level": "H2",
+        "text": "模型家族"
+      },
+      {
+        "level": "H2",
+        "text": "Qwen3-0.6B · v1"
+      },
+      {
+        "level": "H3",
+        "text": "验证 Loss 0.2148"
+      },
+      {
+        "level": "H3",
+        "text": "22 steps 完成"
+      }
+    ],
+    "oldCopy": [],
+    "pageScrollWidth": 1425,
+    "clientWidth": 1425
+  },
+  "mobileOverview": {
+    "pageScrollWidth": 390,
+    "clientWidth": 390,
+    "primaryActionTop": 569,
+    "primaryActionHeight": 44,
+    "order": [
+      {
+        "selector": ".page-heading",
+        "top": 220
+      },
+      {
+        "selector": ".evidence-workbench",
+        "top": 357
+      },
+      {
+        "selector": ".metric-strip",
+        "top": 1530
+      },
+      {
+        "selector": ".family-index",
+        "top": 1910
+      },
+      {
+        "selector": ".validation-rail",
+        "top": 2189
+      }
+    ],
+    "scrollHints": [
+      "左右滑动查看更多模型家族",
+      "左右滑动切换版本",
+      "左右滑动查看完整证据链"
+    ],
+    "smallFunctionalText": []
+  },
+  "mobileArtifacts": {
+    "cardCount": 2,
+    "cardWidths": [
+      345,
+      345
+    ],
+    "cardOverflow": [
+      {
+        "clientWidth": 343,
+        "scrollWidth": 343
+      },
+      {
+        "clientWidth": 343,
+        "scrollWidth": 343
+      }
+    ],
+    "actionHeights": [
+      44,
+      44,
+      44,
+      44,
+      44,
+      44
+    ],
+    "cardFonts": [
+      "11px",
+      "11px",
+      "11px",
+      "11px",
+      "11px",
+      "11px",
+      "11px",
+      "11px",
+      "11px",
+      "11px",
+      "11px",
+      "11px"
+    ],
+    "contractFonts": [
+      "11px",
+      "11px"
+    ],
+    "pageScrollWidth": 390,
+    "clientWidth": 390
+  },
+  "variantA": {
+    "pageScrollWidth": 390,
+    "clientWidth": 390,
+    "tabCount": 3,
+    "panelCount": 3,
+    "resolvedControls": true,
+    "visiblePanelCount": 1,
+    "familyStatus": "1 可用 · 1 传输中"
+  },
+  "variantB": {
+    "pageScrollWidth": 390,
+    "clientWidth": 390,
+    "familyStatus": "11 项",
+    "selectedVersionPressed": [
+      "true",
+      "false"
+    ]
+  },
+  "screenshot": {
+    "captured": false,
+    "error": "Cannot capture a screenshot while the window is minimized."
+  },
+  "staticChecks": {
+    "nodeSyntaxCheck": "pass",
+    "impeccableDetector": "pass",
+    "impeccableFindings": []
+  },
+  "readabilityAudit": {
+    "checkedPanels": [
+      "overview",
+      "files",
+      "lineage"
+    ],
+    "visibleFunctionalTextBelow10px": [],
+    "adapterCardInternalOverflow": false
+  },
+  "boundaries": {
+    "prototypePairCheck": "simulated",
+    "prototypeDownload": "toast simulation; no formal endpoint request",
+    "productionIntegration": "not modified in this task"
+  }
+}
