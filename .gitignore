@@ -49,3 +49,12 @@ dist/
 
 # Local-only internal integration research
 <internal-evidence>*.md
+
+# Local verification evidence, browser profiles and cloud responses
+<internal-evidence>
+<internal-evidence>
+<internal-evidence>*/
+<internal-evidence>*
+<internal-evidence>*-20261103/
+*.log
+/test-datasets/
