@@ -1,2 +1,2 @@
 export {AdapterAssets} from './AdapterAssets';
-export {listAdapters,type AdapterVersion} from './adapters';
+export {adapterDownloadUrl,listAdapters,type AdapterVersion} from './adapters';

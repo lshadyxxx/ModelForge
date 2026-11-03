@@ -4,12 +4,41 @@ import io
 import json
 import tempfile
 import uuid
+import zipfile
 from pathlib import PurePosixPath
 from psycopg.types.json import Jsonb
 from modelforge.errors import AppError
 from .registry import ModelRegistry
 from .external import ExternalModels
 from .manifest import safe_path
+
+_ADAPTER_FILES = {'adapter_config.json', 'adapter_model.safetensors'}
+
+
+def _archive_file(path):
+    info = zipfile.ZipInfo(path, date_time=(1980, 1, 1, 0, 0, 0))
+    info.compress_type = zipfile.ZIP_STORED
+    info.create_system = 3
+    info.external_attr = 0o100600 << 16
+    return info
+
+
+class AdapterDownload:
+    """A verified, ready-to-stream Adapter ZIP and its response metadata."""
+
+    def __init__(self, row, stream, filename, size, sha256):
+        self.row = row
+        self.stream = stream
+        self.filename = filename
+        self.size = size
+        self.sha256 = sha256
+
+    def chunks(self, block_size=1024**2):
+        try:
+            while data := self.stream.read(block_size):
+                yield data
+        finally:
+            self.stream.close()
 
 class ModelExecution:
     def __init__(self, resources):
@@ -123,6 +152,111 @@ class Adapters:
             if size != item['size'] or digest.hexdigest() != item['sha256']:
                 raise AppError(503,'adapter_sync_failed','Adapter MinIO read-back verification failed')
         finally: response.close(); response.release_conn()
+
+    def download(self, identifier):
+        """Package the immutable Adapter after re-verifying every persisted byte."""
+        row = self.get(identifier)
+        files = self._download_manifest(row)
+        manifest = self._download_manifest_document(row)
+        archive_stream = tempfile.SpooledTemporaryFile(max_size=8*1024**2, mode='w+b')
+        try:
+            with zipfile.ZipFile(archive_stream, 'w', compression=zipfile.ZIP_STORED,
+                                 allowZip64=True) as archive:
+                archive.writestr(_archive_file('manifest.json'), manifest)
+                for item in files:
+                    key = 'adapters/' + str(identifier) + '/' + item['path']
+                    response = self.resources.store.get_object(row['bucket'], key)
+                    try:
+                        with archive.open(_archive_file(item['path']), 'w',
+                                          force_zip64=True) as target:
+                            digest = hashlib.sha256()
+                            size = 0
+                            while data := response.read(1024**2):
+                                size += len(data)
+                                if size > item['size']:
+                                    raise AppError(
+                                        503, 'adapter_download_integrity_failed',
+                                        'Stored Adapter is larger than its immutable manifest')
+                                digest.update(data)
+                                target.write(data)
+                        if size != item['size'] or digest.hexdigest() != item['sha256']:
+                            raise AppError(
+                                503, 'adapter_download_integrity_failed',
+                                'Stored Adapter does not match its immutable manifest',
+                                {'path': item['path']})
+                    finally:
+                        response.close()
+                        response.release_conn()
+            size = archive_stream.tell()
+            archive_stream.seek(0)
+            digest = hashlib.sha256()
+            while data := archive_stream.read(1024**2):
+                digest.update(data)
+            archive_stream.seek(0)
+            role = row['role'] if row['role'] in {'best', 'final'} else 'adapter'
+            return AdapterDownload(
+                row=row,
+                stream=archive_stream,
+                filename='modelforge-' + role + '-' + str(identifier)[:8] + '.zip',
+                size=size,
+                sha256=digest.hexdigest(),
+            )
+        except Exception:
+            archive_stream.close()
+            raise
+
+    def _download_manifest(self, row):
+        files = row['manifest']
+        if not isinstance(files, list) or len(files) != len(_ADAPTER_FILES):
+            raise AppError(503, 'adapter_download_manifest_invalid',
+                           'Adapter manifest does not contain exactly two files')
+        seen = set()
+        for item in files:
+            if not isinstance(item, dict):
+                raise AppError(503, 'adapter_download_manifest_invalid',
+                               'Adapter manifest contains an invalid file entry')
+            path = item.get('path')
+            try:
+                safe_path(path)
+            except (TypeError, ValueError) as error:
+                raise AppError(503, 'adapter_download_manifest_invalid',
+                               'Adapter manifest contains an unsafe file path') from error
+            if path not in _ADAPTER_FILES or path in seen:
+                raise AppError(503, 'adapter_download_manifest_invalid',
+                               'Adapter manifest contains an unexpected or duplicate file',
+                               {'path': path})
+            seen.add(path)
+            if (type(item.get('size')) is not int or item['size'] < 1
+                    or not isinstance(item.get('sha256'), str)
+                    or len(item['sha256']) != 64
+                    or any(char not in '0123456789abcdef' for char in item['sha256'])):
+                raise AppError(503, 'adapter_download_manifest_invalid',
+                               'Adapter manifest contains invalid file integrity data',
+                               {'path': path})
+        return sorted(files, key=lambda item: item['path'])
+
+    def _download_manifest_document(self, row):
+        expected = json.dumps({
+            'schema': 1,
+            'id': str(row['id']),
+            'attempt_id': str(row['source_attempt_id']),
+            'role': row['role'],
+            'fingerprint': row['fingerprint'],
+            'files': row['manifest'],
+            'snapshot': row['snapshot'],
+            'metrics': row['metrics'],
+        }, sort_keys=True, ensure_ascii=False, allow_nan=False).encode()
+        key = 'adapters/' + str(row['id']) + '/manifest.json'
+        response = self.resources.store.get_object(row['bucket'], key)
+        try:
+            data = response.read(len(expected) + 1)
+        finally:
+            response.close()
+            response.release_conn()
+        if data != expected:
+            raise AppError(503, 'adapter_download_manifest_invalid',
+                           'Stored Adapter manifest differs from its immutable lineage')
+        return data
 
     def restore(self, identifier, channel, instance_id, job_id):
         row = self.get(identifier)

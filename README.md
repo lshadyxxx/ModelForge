@@ -2,7 +2,7 @@
 
 ModelForge（模锻）是一个独立规划中的模型训练与推理平台，目标是把数据集、微调任务、模型产物和推理服务放进一条可追踪的生命周期中。
 
-当前状态（2026-11-03）：核心 MVP 已在使用者手动创建收费实例的边界内闭合一个受支持组合：Qwen3-0.6B、单卡 RTX 4090、固定训练与 vLLM 运行时。真实 SFT/LoRA、Best/Final、独立推理、多轮 SSE、取消、Worker 重启、空闲回收和页面手动结束均完成，训练与推理实例都已停止、删除并核对租约释放。当前代码包含首页工作台、数据集审阅工作室和版本化运行兼容基线；数据页面已支持按不可变 ID 分组、完整样本分页、单行原始 JSONL 审阅、逐行编辑并派生新版本，派生重试使用请求幂等身份。基线 `qwen3-0.6b-rtx4090-cn-bj2-partial-20261102-r1` 的数值容量已与运行时配置严格绑定，训练 GPU 峰值也已实测归档，但容量边界实测和更广模型/GPU/镜像兼容矩阵仍未完成，因此状态保持 `partial`。收费实例继续由用户手动创建，平台不会采购或预留资源。完整容量边界和模型/GPU/镜像兼容矩阵仍由票据 06 跟踪，详见[数据集审阅工作室记录](docs/implementation/datasets-review-studio-2026-11-03.md)、[运行时兼容记录](docs/implementation/runtime-compatibility-2026-11-02.md)及[运行说明](docs/RUNNING.md)。
+当前状态（2026-11-03）：核心 MVP 已在使用者手动创建收费实例的边界内闭合一个受支持组合：Qwen3-0.6B、单卡 RTX 4090、固定训练与 vLLM 运行时。真实 SFT/LoRA、Best/Final、独立推理、多轮 SSE、取消、Worker 重启、空闲回收和页面手动结束均完成，训练与推理实例都已停止、删除并核对租约释放。当前代码包含首页工作台、数据集审阅工作室、模型验证工作室和版本化运行兼容基线；数据页面已支持按不可变 ID 分组、完整样本分页、单行原始 JSONL 审阅、逐行编辑并派生新版本，派生重试使用请求幂等身份。模型页面已按不可变模型族组织全部版本，并可从最新成功 Attempt 查看和下载经过再次清单与 SHA-256 校验的 Best/Final Adapter ZIP。基线 `qwen3-0.6b-rtx4090-cn-bj2-partial-20261102-r1` 的数值容量已与运行时配置严格绑定，训练 GPU 峰值也已实测归档，但容量边界实测和更广模型/GPU/镜像兼容矩阵仍未完成，因此状态保持 `partial`。收费实例继续由用户手动创建，平台不会采购或预留资源。完整容量边界和模型/GPU/镜像兼容矩阵仍由票据 06 跟踪，详见[数据集审阅工作室记录](docs/implementation/datasets-review-studio-2026-11-03.md)、[模型验证工作室记录](docs/implementation/model-validation-studio-2026-11-03.md)、[Adapter 导出记录](docs/implementation/adapter-export-2026-11-03.md)、[运行时兼容记录](docs/implementation/runtime-compatibility-2026-11-02.md)及[运行说明](docs/RUNNING.md)。
 
 ## 产品目标
 

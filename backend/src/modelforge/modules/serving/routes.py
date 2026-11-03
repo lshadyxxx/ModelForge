@@ -19,6 +19,16 @@ class Binding(BaseModel):
 def adapters(request:Request,attempt_id:uuid.UUID|None=None,offset:int=Query(0,ge=0),limit:int=Query(200,ge=1,le=200)):
     return Adapters(request.app.state.resources).list(attempt_id=attempt_id,offset=offset,limit=limit)
 
+@router.get('/adapters/{identifier}/download')
+def download_adapter(identifier:uuid.UUID,request:Request):
+    archive=Adapters(request.app.state.resources).download(identifier)
+    return StreamingResponse(archive.chunks(),media_type='application/zip',headers={
+        'Content-Disposition':'attachment; filename="'+archive.filename+'"',
+        'Content-Length':str(archive.size),
+        'X-Content-SHA256':archive.sha256,
+        'X-Adapter-Fingerprint':archive.row['fingerprint'],
+    })
+
 @router.post('/trials',status_code=201)
 def create(body:CreateTrial,request:Request):return Serving(request.app.state.resources).create(body)
 
