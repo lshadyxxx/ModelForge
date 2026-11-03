@@ -958,10 +958,13 @@
   outline: none;
 }
 
-.training-select-wrap select {
-  min-height: 34px;
-  padding: 0 27px 0 9px;
-  font-size: 11px;
+.training-select-wrap {
+  min-width: 150px;
+  display: block;
+}
+
+.training-log-toolbar .training-select-wrap {
+  min-width: 122px;
 }
 
 .training-table-wrap {
@@ -3195,12 +3198,6 @@
   color: #7f8da1;
 }
 
-.training-log-toolbar .training-select-wrap select {
-  border-color: #38465d;
-  background: #172236;
-  color: #c7d2e1;
-}
-
 .training-follow-toggle {
   min-height: 34px;
   display: inline-flex;
@@ -4046,8 +4043,9 @@
     flex-direction: column;
   }
 
-  .training-select-wrap select {
+  .training-select-wrap {
     width: 100%;
+    min-width: 0;
   }
 
   .training-empty-panel,
@@ -4081,10 +4079,6 @@
   }
 
   .training-log-toolbar .training-log-search input {
-    width: 100%;
-  }
-
-  .training-log-toolbar .training-select-wrap select {
     width: 100%;
   }
 

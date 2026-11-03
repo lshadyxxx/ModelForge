@@ -1,4 +1,5 @@
 import {useMemo, useState} from 'react';
+import {SelectMenu} from '../../../shared/SelectMenu';
 import {
   chooseCurrentAttempt,
   filterAttempts,
@@ -23,6 +24,15 @@ import {LifecycleRail} from './LifecycleRail';
 import {MetricChart} from './MetricChart';
 import {TrainingIcon} from './TrainingIcon';
 import {TrainingStatusBadge} from './TrainingStatusBadge';
+
+const attemptStateOptions = [
+  {value: 'all', label: '全部状态'},
+  {value: 'active', label: '活动运行'},
+  {value: 'attention', label: '需要关注'},
+  {value: 'succeeded', label: '已成功'},
+  {value: 'failed', label: '已失败'},
+  {value: 'cancelled', label: '已取消'},
+];
 
 function SummaryMetric({
   label,
@@ -174,14 +184,15 @@ function AttemptLedger({
         </label>
         <label className="training-select-wrap">
           <span className="training-sr-only">筛选训练状态</span>
-          <select value={state} onChange={(event) => setState(event.target.value)}>
-            <option value="all">全部状态</option>
-            <option value="active">活动运行</option>
-            <option value="attention">需要关注</option>
-            <option value="succeeded">已成功</option>
-            <option value="failed">已失败</option>
-            <option value="cancelled">已取消</option>
-          </select>
+          <SelectMenu
+            value={state}
+            options={attemptStateOptions}
+            onChange={setState}
+            placeholder="全部状态"
+            searchable={false}
+            size="compact"
+            ariaLabel="筛选训练状态"
+          />
         </label>
       </div>
     </header>

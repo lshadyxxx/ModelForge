@@ -1,5 +1,6 @@
 import {useEffect, useRef, useState} from 'react';
 import {api} from '../../../shared/http';
+import {SelectMenu} from '../../../shared/SelectMenu';
 import {
   emptyInstance,
   InstanceFields,
@@ -164,6 +165,20 @@ export function CreateTrainingWizard({
   const selectedDataset = datasets.find((row) => row.version_id === dataset);
   const selectedModel = models.find((row) => row.version_id === model);
   const modelReason = selectedModel && runtime ? modelCompatibilityReason(selectedModel, runtime) : '';
+  const datasetOptions = datasets.map((row) => ({
+    value: row.version_id,
+    label: `${row.name} · v${row.version_number}`,
+    description: row.manifest_sha256 ? `内容 ${shortId(row.manifest_sha256, 12)}` : undefined,
+  }));
+  const modelOptions = models.map((row) => {
+    const reason = runtime ? modelCompatibilityReason(row, runtime) : '';
+    return {
+      value: row.version_id,
+      label: `${row.name} · v${row.version_number}`,
+      description: reason || `${row.format_summary?.model_type || '架构未标注'} · 指纹 ${shortId(row.manifest_sha256, 12)}`,
+      disabled: Boolean(reason),
+    };
+  });
   const stepErrorMap: Errors = step === 1
     ? {
         ...(name.trim() ? {} : {name: '请填写任务名称，再继续下一步。'}),
@@ -266,22 +281,33 @@ export function CreateTrainingWizard({
             </label>
             <label id="training-field-dataset">
               <span>已发布数据版本 <b>必填</b></span>
-              <select {...fieldProps(errors, 'dataset')} value={dataset} onChange={(event) => setDataset(event.target.value)}>
-                <option value="">选择数据集版本</option>
-                {datasets.map((row) => <option key={row.version_id} value={row.version_id}>{row.name} · v{row.version_number}</option>)}
-              </select>
+              <SelectMenu
+                {...fieldProps(errors, 'dataset')}
+                value={dataset}
+                options={datasetOptions}
+                onChange={setDataset}
+                placeholder="选择数据集版本"
+                searchPlaceholder="搜索数据集"
+                emptyText="没有已发布的数据集版本"
+                ariaLabel="已发布数据版本"
+                required
+              />
               <FieldError errors={errors} name="dataset"/>
               {selectedDataset && <small>{shortId(selectedDataset.version_id)} · 内容 {shortId(selectedDataset.manifest_sha256, 12)}</small>}
             </label>
             <label id="training-field-model">
               <span>可用基础模型 <b>必填</b></span>
-              <select {...fieldProps(errors, 'model')} value={model} onChange={(event) => setModel(event.target.value)}>
-                <option value="">选择基础模型版本</option>
-                {models.map((row) => {
-                  const reason = runtime ? modelCompatibilityReason(row, runtime) : '';
-                  return <option key={row.version_id} value={row.version_id} disabled={Boolean(reason)}>{row.name} · v{row.version_number}{reason ? ' · 未支持' : ''}</option>;
-                })}
-              </select>
+              <SelectMenu
+                {...fieldProps(errors, 'model')}
+                value={model}
+                options={modelOptions}
+                onChange={setModel}
+                placeholder="选择基础模型版本"
+                searchPlaceholder="搜索基础模型"
+                emptyText="没有可用的基础模型版本"
+                ariaLabel="可用基础模型"
+                required
+              />
               <FieldError errors={errors} name="model"/>
               {selectedModel && <small>{selectedModel.format_summary?.model_type || '架构未标注'} · 指纹 {shortId(selectedModel.manifest_sha256, 12)}</small>}
             </label>

@@ -1,4 +1,5 @@
 import {useEffect, useMemo, useRef, useState} from 'react';
+import {SelectMenu} from '../../../shared/SelectMenu';
 import {
   filterLogLines,
   parseLogLines,
@@ -15,6 +16,7 @@ const levelLabels: Record<string, string> = {
   debug: 'DEBUG',
   other: '其他',
 };
+const levelOptions = Object.entries(levelLabels).map(([value, label]) => ({value, label}));
 
 const levelTones: Record<LogLevel, string> = {
   error: 'error',
@@ -85,9 +87,16 @@ export function TrainingLogs({
       </label>
       <label className="training-select-wrap">
         <span className="training-sr-only">筛选日志级别</span>
-        <select value={level} onChange={(event) => setLevel(event.target.value)}>
-          {Object.entries(levelLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-        </select>
+        <SelectMenu
+          value={level}
+          options={levelOptions}
+          onChange={setLevel}
+          placeholder="全部级别"
+          searchable={false}
+          size="compact"
+          theme="dark"
+          ariaLabel="筛选日志级别"
+        />
       </label>
       <label className="training-follow-toggle">
         <input type="checkbox" checked={follow} onChange={(event) => setFollow(event.target.checked)}/>

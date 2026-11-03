@@ -5,4 +5,5 @@ import './shared/styles/app.css';
 import './shared/styles/workbench.css';
 import './shared/styles/datasets.css';
 import './shared/styles/models.css';
+import './shared/styles/controls.css';
 createRoot(document.getElementById('root')!).render(<React.StrictMode><App /></React.StrictMode>);
