@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ModelForge 训练模块 · 三方向对比</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23211d19'/%3E%3Cpath d='M9 23V9h3l4 6 4-6h3v14h-3v-8l-4 6-4-6v8z' fill='%23e4c4a7'/%3E%3C/svg%3E">
+  <style>
+    :root {
+      --paper: #e8ece8;
+      --sheet: #f7faf7;
+      --ink: #1d2621;
+      --muted: #54625b;
+      --line: #bcc9c1;
+      --copper: #2f6d62;
+      --green: #3f6f5e;
+      --blue: #245ad0;
+      --teal: #17675a;
+      font-family: "Segoe UI", "Microsoft YaHei UI", "PingFang SC", sans-serif;
+      color: var(--ink);
+      background: var(--paper);
+      font-variant-numeric: tabular-nums;
+    }
+
+    * { box-sizing: border-box; }
+    body { margin: 0; min-width: 1120px; }
+    a { color: inherit; }
+
+    .sheet {
+      width: 1600px;
+      min-height: 1000px;
+      margin: 0 auto;
+      padding: 30px 42px 28px;
+      background:
+        linear-gradient(90deg, rgba(42, 67, 56, 0.038) 1px, transparent 1px) 0 0 / 80px 100%,
+        var(--paper);
+    }
+
+    header {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 40px;
+      align-items: end;
+      padding: 8px 0 28px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .brandline {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: #526159;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.13em;
+      text-transform: uppercase;
+    }
+
+    .mark {
+      width: 25px;
+      height: 27px;
+      display: grid;
+      place-items: center;
+      border: 1px solid #6e8d7f;
+      color: #2f6d62;
+      font-family: "Iowan Old Style", "Palatino Linotype", "Noto Serif SC", "Songti SC", serif;
+      font-size: 16px;
+      font-style: italic;
+    }
+
+    h1 {
+      max-width: 1040px;
+      margin: 19px 0 8px;
+      font-family: "Iowan Old Style", "Palatino Linotype", "Noto Serif SC", "Songti SC", "SimSun", serif;
+      font-size: 50px;
+      font-weight: 500;
+      line-height: 1.08;
+      letter-spacing: -0.035em;
+    }
+
+    .lede {
+      max-width: 900px;
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.75;
+    }
+
+    .recommend {
+      width: 256px;
+      padding: 16px 18px;
+      border: 1px solid #b9c7be;
+      background: rgba(247, 250, 247, 0.84);
+      box-shadow: inset 3px 0 0 var(--copper);
+    }
+
+    .recommend span {
+      color: var(--copper);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.11em;
+    }
+
+    .recommend strong {
+      display: block;
+      margin-top: 6px;
+      font-family: "Iowan Old Style", "Palatino Linotype", "Noto Serif SC", "Songti SC", "SimSun", serif;
+      font-size: 20px;
+      font-weight: 500;
+    }
+
+    .recommend p {
+      margin: 7px 0 0;
+      color: #53625a;
+      font-size: 12px;
+      line-height: 1.65;
+    }
+
+    .directions {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 17px;
+      padding: 25px 0 22px;
+    }
+
+    .direction {
+      min-width: 0;
+      overflow: hidden;
+      border: 1px solid #bcc9c1;
+      background: var(--sheet);
+      box-shadow: 0 12px 35px rgba(34, 54, 44, 0.045);
+    }
+
+    .direction.a { border-top: 4px solid var(--blue); }
+    .direction.b { border-top: 4px solid var(--copper); }
+    .direction.c { border-top: 4px solid var(--teal); }
+
+    .direction-head {
+      display: grid;
+      grid-template-columns: 38px minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: start;
+      padding: 15px 16px 13px;
+    }
+
+    .index {
+      color: #6b7f73;
+      font-family: "Iowan Old Style", "Palatino Linotype", "Noto Serif SC", "Songti SC", serif;
+      font-size: 29px;
+      font-style: italic;
+      line-height: 0.95;
+    }
+
+    .direction h2 {
+      margin: 0;
+      font-size: 17px;
+      font-weight: 650;
+      letter-spacing: -0.02em;
+    }
+
+    .direction-head p {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.55;
+    }
+
+    .tag {
+      padding: 4px 7px;
+      border: 1px solid #bdc9c1;
+      color: #5a6961;
+      font-size: 11px;
+      font-weight: 750;
+      letter-spacing: 0.06em;
+      white-space: nowrap;
+    }
+
+    .direction.b .tag {
+      border-color: #91ae9f;
+      color: #2b6155;
+      background: #e4efe9;
+    }
+
+    .preview {
+      height: 324px;
+      overflow: hidden;
+      border-block: 1px solid #cfdad2;
+      background: #d3dcd6;
+    }
+
+    .preview img {
+      width: 100%;
+      height: auto;
+      display: block;
+      object-fit: cover;
+      object-position: top left;
+      filter: saturate(0.95);
+    }
+
+    .direction-meta {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr 1fr;
+      gap: 1px;
+      border-bottom: 1px solid #cfdad2;
+      background: #cfdad2;
+    }
+
+    .direction-meta div {
+      min-width: 0;
+      padding: 10px 12px;
+      background: #f7faf7;
+    }
+
+    .direction-meta span,
+    .direction-meta strong {
+      display: block;
+    }
+
+    .direction-meta span {
+      color: #5d6c64;
+      font-size: 11px;
+      font-weight: 750;
+      letter-spacing: 0.08em;
+    }
+
+    .direction-meta strong {
+      margin-top: 3px;
+      overflow: hidden;
+      color: #303e36;
+      font-size: 11.5px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .direction-foot {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 11px 15px;
+      color: #536159;
+      font-size: 11px;
+    }
+
+    .direction-foot a {
+      color: var(--ink);
+      font-weight: 750;
+      text-decoration: none;
+    }
+
+    .direction.a .direction-foot a { color: var(--blue); }
+    .direction.b .direction-foot a { color: var(--copper); }
+    .direction.c .direction-foot a { color: var(--teal); }
+
+    .common {
+      display: grid;
+      grid-template-columns: 190px minmax(0, 1fr);
+      gap: 28px;
+      align-items: start;
+      padding: 18px 20px;
+      border: 1px solid #bdc9c1;
+      background: rgba(247, 250, 247, 0.82);
+    }
+
+    .common h3 {
+      margin: 0;
+      font-family: "Iowan Old Style", "Palatino Linotype", "Noto Serif SC", "Songti SC", "SimSun", serif;
+      font-size: 22px;
+      font-weight: 500;
+    }
+
+    .common p {
+      margin: 5px 0 0;
+      color: #56645c;
+      font-size: 12px;
+      line-height: 1.55;
+    }
+
+    .guardrails {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 1px;
+      background: #ccd8d0;
+    }
+
+    .guardrails div {
+      padding: 11px 12px;
+      background: #f7faf7;
+    }
+
+    .guardrails span {
+      display: block;
+      color: #2f6d62;
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    .guardrails strong {
+      display: block;
+      margin-top: 4px;
+      color: #2d3a33;
+      font-size: 12px;
+      line-height: 1.4;
+    }
+
+    footer {
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+      padding-top: 14px;
+      color: #4f5d55;
+      font-family: "Cascadia Code", Consolas, monospace;
+      font-size: 11px;
+      letter-spacing: 0.05em;
+    }
+  </style>
+</head>
+<body>
+  <main class="sheet">
+    <header>
+      <div>
+        <div class="brandline"><span class="mark">M</span> ModelForge · Training Redesign · 2026.11.03</div>
+        <h1>三种训练工作方式，<br>一条共同的证据底线。</h1>
+        <p class="lede">不是三套换色皮肤。A 把异常与门禁放进同一视线；B 把训练组织成可观察、可验收的生命周期；C 把曲线与运行索引变成一张证据画布。三者共享同一组业务事实与状态边界。</p>
+      </div>
+      <aside class="recommend">
+        <span>RECOMMENDED / 推荐</span>
+        <strong>B · 铸程台</strong>
+        <p>最适合长时间运行的观察、等待与产物验收。保留 A 的日志纪律和 C 的图表克制，不把三者折衷成没有重心的万能后台。</p>
+      </aside>
+    </header>
+
+    <section class="directions" aria-label="三套设计方向">
+      <article class="direction a">
+        <div class="direction-head">
+          <span class="index">A</span>
+          <div><h2>运行控制墙</h2><p>异常在哪一步发生，就在哪一步处理。强调门禁、日志、实例成本与当前行动。</p></div>
+          <span class="tag">OPERATIONS</span>
+        </div>
+        <div class="preview"><img src="review/a/overview-1440.png" alt="A 方案训练控制台总览"></div>
+        <div class="direction-meta">
+          <div><span>FIRST FOCUS</span><strong>当前阻塞与门禁</strong></div>
+          <div><span>DENSITY</span><strong>最高</strong></div>
+          <div><span>RISK</span><strong>偏运维感</strong></div>
+        </div>
+        <div class="direction-foot"><span>适合高频值守与故障处置</span><a href="a-console.html#overview">打开 A 原型 →</a></div>
+      </article>
+
+      <article class="direction b">
+        <div class="direction-head">
+          <span class="index">B</span>
+          <div><h2>铸程台</h2><p>一条训练就是一份可追溯记录：阶段、曲线、日志与 Best / Final 出品门共享同一叙事。</p></div>
+          <span class="tag">推荐 / BRAND</span>
+        </div>
+        <div class="preview"><img src="review/b/overview-1440.png" alt="B 方案训练铸程台总览"></div>
+        <div class="direction-meta">
+          <div><span>FIRST FOCUS</span><strong>生命周期与产物</strong></div>
+          <div><span>DENSITY</span><strong>分区反差</strong></div>
+          <div><span>RISK</span><strong>需避免主题化</strong></div>
+        </div>
+        <div class="direction-foot"><span>适合观察、等待与验收单次训练</span><a href="b-forge.html#overview">打开 B 原型 →</a></div>
+      </article>
+
+      <article class="direction c">
+        <div class="direction-head">
+          <span class="index">C</span>
+          <div><h2>证据画布</h2><p>左定位运行、中读信号、右核对冻结输入。优先呈现真实曲线、异常空值与可比较结构。</p></div>
+          <span class="tag">ANALYTICS</span>
+        </div>
+        <div class="preview"><img src="review/c/overview-1440.png" alt="C 方案训练实验台总览"></div>
+        <div class="direction-meta">
+          <div><span>FIRST FOCUS</span><strong>曲线与数据形状</strong></div>
+          <div><span>DENSITY</span><strong>数据密、外围静</strong></div>
+          <div><span>RISK</span><strong>比较能力易超前</strong></div>
+        </div>
+        <div class="direction-foot"><span>适合指标阅读与参数迭代</span><a href="c-lab.html#overview">打开 C 原型 →</a></div>
+      </article>
+    </section>
+
+    <section class="common">
+      <div>
+        <h3>共同业务底线</h3>
+        <p>视觉可以不同，以下事实不能合并或补造。</p>
+      </div>
+      <div class="guardrails">
+        <div><span>01 / STATE</span><strong>执行、进程退出、产物发布、实例回收分别表达</strong></div>
+        <div><span>02 / ARTIFACT</span><strong>Best + Final 以 2 / 2 原子发布门禁开放试用</strong></div>
+        <div><span>03 / EVIDENCE</span><strong>缺失指标与日志缺口如实展示，不补点、不补造</strong></div>
+        <div><span>04 / SCOPE</span><strong>单用户、单卡、文本 SFT + LoRA，不膨胀能力矩阵</strong></div>
+      </div>
+    </section>
+
+    <footer>
+      <span>MODELFORGE / TRAINING REDESIGN / COMPARISON SHEET</span>
+      <span>静态设计原型 · 不调用训练 API · 不消耗 GPU</span>
+    </footer>
+  </main>
+</body>
+</html>

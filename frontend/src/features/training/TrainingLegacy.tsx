@@ -12,7 +12,7 @@ type Attempt={id:string;task_id:string;number:number;name:string;state:string;st
 type Log={offset_bytes:number;next_offset:number;content:string;gap:boolean};
 const initial:Config={epochs:1,learning_rate:.0002,cutoff_len:512,batch_size:1,gradient_accumulation:1,lora_rank:8,lora_alpha:16,lora_dropout:0,scheduler:'cosine',warmup_ratio:0,template:'qwen3_nothink',seed:42};
 const labels:Record<string,string>={queued:'排队',waiting_instance:'等待手动创建实例',preparing:'准备输入',running:'训练中',syncing:'同步产物',cleanup:'回收实例',succeeded:'已成功',failed:'已失败',cancelled:'已取消',blocked:'等待处理'};
-export function Training(){
+export function TrainingLegacy(){
  const [attempts,setAttempts]=useState<Attempt[]>([]),[selected,setSelected]=useState(''),[detail,setDetail]=useState<Attempt|null>(null),[logs,setLogs]=useState<Log[]>([]);
  const [datasets,setDatasets]=useState<Asset[]>([]),[models,setModels]=useState<Asset[]>([]);
  const [name,setName]=useState(''),[dataset,setDataset]=useState(''),[model,setModel]=useState(''),[config,setConfig]=useState(initial),[instance,setInstance]=useState(emptyInstance);

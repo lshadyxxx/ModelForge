@@ -1,2 +1,2 @@
-export {Training} from './Training';
+export {Training} from './page';
 export {requestTrainingReuse} from './reuse';
