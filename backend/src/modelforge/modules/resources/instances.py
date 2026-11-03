@@ -89,7 +89,17 @@ class InstanceLifecycle:
         spec = InstanceSpec(**intent['spec'])
         if lease['create_state'] == 'bound':
             rows = self._observe(lease, spec)
-            if not rows and intent['terminate_acknowledged']:
+            if (not rows
+                    and lease.get('cleanup_policy') is not None
+                    and lease.get('cleanup_state') == 'pending'):
+                # Explicit delete authorization already exists. A second exact-ID
+                # absence is enough to confirm provider deletion without relying
+                # on a terminate acknowledgement from an idempotent mutation.
+                confirmed_absent = self._observe(lease, spec)
+                if not confirmed_absent:
+                    self.leases.record_deletion(token, lease['provider_instance_id'], confirmed=True)
+                    self.leases.release(token)
+            elif not rows and intent['terminate_acknowledged']:
                 self.leases.record_deletion(token, lease['provider_instance_id'], confirmed=True)
                 self.leases.release(token)
             elif not rows and intent['terminate_requested']:
@@ -127,6 +137,73 @@ class InstanceLifecycle:
                 raise AppError(409, 'cloud_instance_conflict', 'Creation predates this reservation or is unverified')
             self.leases.bind_instance(token, lease['create_operation_id'], rows[0]['UHostId'])
         return self._state(token)
+
+    def observe(self, token):
+        """Read one exact provider instance and retain only verified state facts."""
+        result = self._state(token)
+        lease, intent = result['lease'], result['intent']
+        if lease['state'] == 'released' or lease['create_state'] != 'bound' or not intent:
+            return {**result, 'observation': None, 'absent': None}
+        rows = self._observe(lease, InstanceSpec(**intent['spec']))
+        observation = rows[0] if rows else None
+        if observation and observation['State'] == 'Stopped':
+            self.leases.record_instance_stopped(token, lease['provider_instance_id'])
+        return {**self._state(token), 'observation': observation, 'absent': not rows}
+
+    def start(self, token):
+        """Request start for a verified bound environment; never infer success."""
+        result = self._state(token)
+        lease, intent = result['lease'], result['intent']
+        if lease['state'] == 'released':
+            raise AppError(409, 'gpu_lease_released', 'The GPU lease is already released')
+        if lease['create_state'] != 'bound' or not intent:
+            raise AppError(409, 'cloud_instance_not_bound', 'Bind a verified instance before starting it')
+        if intent['terminate_requested'] or lease['cleanup_policy'] is not None:
+            raise AppError(409, 'cloud_instance_cleanup_started', 'An instance awaiting cleanup cannot be started')
+        rows = self._observe(lease, InstanceSpec(**intent['spec']))
+        if not rows:
+            raise AppError(409, 'cloud_instance_not_found', 'The bound instance is not present at the provider')
+        observation = rows[0]
+        if observation['State'] == 'Running':
+            return {**result, 'observation': observation}
+        if observation['State'] != 'Stopped':
+            raise AppError(409, 'cloud_instance_transition_conflict',
+                           'Only a stopped provider instance can be started')
+        self._fact(token, 'start_requested')
+        self.provider.start({
+            'Region': intent['spec']['region'],
+            'Zone': intent['spec']['zone'],
+            'UHostId': lease['provider_instance_id'],
+        })
+        return {**self._state(token), 'observation': observation, 'requested_state': 'Running'}
+
+    def stop(self, token):
+        """Stop a verified environment while retaining its instance and lease."""
+        result = self._state(token)
+        lease, intent = result['lease'], result['intent']
+        if lease['state'] == 'released':
+            raise AppError(409, 'gpu_lease_released', 'The GPU lease is already released')
+        if lease['create_state'] != 'bound' or not intent:
+            raise AppError(409, 'cloud_instance_not_bound', 'Bind a verified instance before stopping it')
+        if intent['terminate_requested'] or lease['cleanup_policy'] is not None:
+            raise AppError(409, 'cloud_instance_cleanup_started', 'Termination already owns this instance')
+        rows = self._observe(lease, InstanceSpec(**intent['spec']))
+        if not rows:
+            raise AppError(409, 'cloud_instance_not_found', 'The bound instance is not present at the provider')
+        observation = rows[0]
+        if observation['State'] == 'Stopped':
+            self.leases.record_instance_stopped(token, lease['provider_instance_id'])
+            return {**self._state(token), 'observation': observation}
+        if observation['State'] != 'Running':
+            raise AppError(409, 'cloud_instance_transition_conflict',
+                           'Only a running provider instance can be stopped')
+        self._fact(token, 'stop_requested')
+        self.provider.stop({
+            'Region': intent['spec']['region'],
+            'Zone': intent['spec']['zone'],
+            'UHostId': lease['provider_instance_id'],
+        })
+        return {**self._state(token), 'observation': observation, 'requested_state': 'Stopped'}
 
     @staticmethod
     def _match(row, spec):

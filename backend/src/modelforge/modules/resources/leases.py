@@ -15,7 +15,7 @@ class LeaseToken:
     def __post_init__(self):
         if (not isinstance(self.reservation_id, uuid.UUID)
                 or not isinstance(self.owner_id, uuid.UUID)
-                or self.owner_kind not in ('attempt', 'trial')
+                or self.owner_kind not in ('attempt', 'trial', 'environment')
                 or type(self.generation) is not int or not 1 <= self.generation < 2**63):
             raise AppError(422, 'validation_error', 'Use a valid UUID owner and positive integer lease generation')
 
@@ -25,8 +25,8 @@ class GpuLeases:
         self.pool = pool
 
     def reserve(self, owner_kind, owner_id):
-        if owner_kind not in ('attempt', 'trial'):
-            raise AppError(422, 'validation_error', 'Owner kind must be attempt or trial')
+        if owner_kind not in ('attempt', 'trial', 'environment'):
+            raise AppError(422, 'validation_error', 'Owner kind must be attempt, trial or environment')
         try:
             owner_id = uuid.UUID(str(owner_id))
         except (ValueError, TypeError, AttributeError) as error:

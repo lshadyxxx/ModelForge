@@ -25,6 +25,7 @@ SPEC = dict(region='fixture-region', zone='fixture-zone', gpu_type='fixture-gpu'
 def environment():
     pool = create_pool(Settings()); pool.open(wait=True)
     with pool.connection() as c:
+        c.execute('SET LOCAL statement_timeout = 0')
         c.execute('TRUNCATE gpu_lease_events, gpu_slots, gpu_reservations RESTART IDENTITY CASCADE')
         c.execute('INSERT INTO gpu_slots(id) VALUES (1)')
     leases = GpuLeases(pool)
@@ -42,6 +43,8 @@ def environment():
             if state.get('create_timeout'):
                 raise httpx.ReadTimeout('provider secret must not escape', request=request)
             data = state.get('create_result', {'UHostIds': ['fixture-instance']})
+        elif action == 'StartCompShareInstance':
+            data = state.get('start_result', {'UHostId': 'fixture-instance'})
         elif action == 'StopCompShareInstance':
             data = state.get('stop_result', {'UHostId': 'fixture-instance'})
         elif action == 'TerminateCompShareInstance':
@@ -368,6 +371,36 @@ def test_wrong_stop_ack_does_not_imply_instance_stopped(environment):
     assert leases.current()['state'] == 'held'
 
 
+def test_start_requires_a_verified_stopped_instance_and_never_infers_success(environment):
+    leases, lifecycle, seen, state = environment
+    token = leases.reserve('attempt', uuid.uuid4())
+    lifecycle.create(token, InstanceSpec(**SPEC))
+    state['instances'] = [instance(state['created_label'], State='Stopped')]
+    result = lifecycle.start(token)
+    assert seen[-1]['Action'] == 'StartCompShareInstance'
+    assert seen[-1]['UHostId'] == 'fixture-instance'
+    assert result['observation']['State'] == 'Stopped'
+    assert result['requested_state'] == 'Running'
+    assert result['intent']['start_requested'] is True
+    assert result['lease']['state'] == 'held'
+
+
+def test_start_rejects_wrong_ack_and_cleanup_owned_instance(environment):
+    leases, lifecycle, seen, state = environment
+    token = leases.reserve('attempt', uuid.uuid4())
+    lifecycle.create(token, InstanceSpec(**SPEC))
+    state['instances'] = [instance(state['created_label'], State='Stopped')]
+    state['start_result'] = {'UHostId': 'other-instance'}
+    with pytest.raises(AppError) as caught:
+        lifecycle.start(token)
+    assert caught.value.code == 'cloud_invalid_response'
+
+    leases.allow_cleanup(token, 'discard')
+    with pytest.raises(AppError) as caught:
+        lifecycle.start(token)
+    assert caught.value.code == 'cloud_instance_cleanup_started'
+
+
 def test_partial_recovery_listing_never_binds_from_incomplete_page(environment):
     leases, lifecycle, seen, state = environment
     state['create_timeout'] = True
@@ -399,6 +432,20 @@ def test_terminal_cleanup_is_idempotent_and_never_touches_next_owner(environment
     assert result['lease']['state'] == 'released'
     assert len(seen) == count
     assert leases.current()['id'] == str(next_token.reservation_id)
+
+
+def test_reconcile_confirms_cleanup_when_instance_vanishes_before_terminate_ack(environment):
+    leases, lifecycle, seen, state = environment
+    token = leases.reserve('attempt', uuid.uuid4())
+    lifecycle.create(token, InstanceSpec(**SPEC))
+    leases.allow_cleanup(token, 'discard')
+    state['instances'] = []
+    result = lifecycle.reconcile(token)
+    assert result['lease']['state'] == 'released'
+    assert result['lease']['cleanup_state'] == 'confirmed'
+    assert result['lease']['instance_state'] == 'deleted'
+    assert result['intent']['terminate_acknowledged'] is False
+    assert leases.current() is None
 
 
 def test_malformed_observed_instance_is_safe_error_and_keeps_gpu(environment):

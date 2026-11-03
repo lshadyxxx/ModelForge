@@ -1,7 +1,15 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { api, json } from '../../shared/http';
 import { Badge, date, Empty, Failure } from '../../shared/assets';
+import { ComputeWorkbench } from './compute/ComputeWorkbench';
 import { DEFAULT_IMAGE_TYPE, directoryPath, fetchDirectory, imageDirectoryQuery, matchesFilters, type Capacity, type Configuration, type Directory, type Image, type PublicModel, type Specification, type Zone } from './api';
+
+const DevComputePrototype = import.meta.env.DEV
+  ? lazy(() => import('./ComputeEnvironmentPrototype').then(module => ({default: module.ComputeEnvironmentPrototype})))
+  : null;
+const DevComputeFixture = import.meta.env.DEV
+  ? lazy(() => import('./compute/ComputeFixturePreview').then(module => ({default: module.ComputeFixturePreview})))
+  : null;
 
 function useDirectory<T>() {
   const [data, setData] = useState<Directory<T> | null>(null);
@@ -35,6 +43,16 @@ function DirectoryPanel<T>({title, result, fresh, children}: {title: string; res
 }
 
 export function Resources() {
+  const query = new URLSearchParams(location.search);
+  const legacy = query.get('compute') === 'legacy';
+  const prototype = import.meta.env.DEV && query.get('prototype') === 'compute';
+  const fixture = import.meta.env.DEV && query.get('computeFixture') === 'states';
+  if (prototype && DevComputePrototype) return <Suspense fallback={<p className="muted">正在加载设计预览…</p>}><DevComputePrototype /></Suspense>;
+  if (fixture && DevComputeFixture) return <Suspense fallback={<p className="muted">正在加载开发夹具…</p>}><DevComputeFixture /></Suspense>;
+  return legacy ? <ResourcesDirectory /> : <ComputeWorkbench />;
+}
+
+function ResourcesDirectory() {
   const [config, setConfig] = useState<Configuration | null>(null);
   const [configError, setConfigError] = useState<unknown>(null);
   const [configBusy, setConfigBusy] = useState(false);

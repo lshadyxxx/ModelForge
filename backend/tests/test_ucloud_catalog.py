@@ -154,7 +154,13 @@ def test_configuration_exposes_no_credentials_and_missing_is_not_empty(monkeypat
     r = resources(lambda q: pytest.fail("No query expected"), Settings(ucloud_public_key=None, ucloud_private_key=None))
     monkeypatch.setattr(app.state, "resources", r, raising=False)
     c = TestClient(app)
-    assert c.get("/api/v1/resources/ucloud/configuration").json() == {"configured": False, "default_region": None, "mode": "read_only"}
+    assert c.get("/api/v1/resources/ucloud/configuration").json() == {
+        "configured": False,
+        "default_region": None,
+        "mode": "read_only",
+        "write_enabled": False,
+        "reason": "未配置优云凭据；计算环境写入保持关闭。",
+    }
     response = c.get("/api/v1/resources/ucloud/zones")
     assert response.status_code == 503 and response.json()["error"]["code"] == "cloud_not_configured"
     assert "public_key" not in response.text
@@ -213,6 +219,156 @@ def test_capacity_http_uses_complete_selected_configuration(monkeypatch):
     assert c.post("/api/v1/resources/ucloud/capacity", json={**body, "PrivateKey": "secret"}).status_code == 422
     assert c.post("/api/v1/resources/ucloud/capacity", json={**body, "disks": []}).status_code == 422
     assert c.post("/api/v1/resources/ucloud/capacity", json={**body, "cpu_platform": "Intel/IceLake"}).status_code == 422
+
+
+def test_price_uses_official_postpay_fields_and_discounted_breakdown():
+    seen = {}
+
+    def handler(request):
+        payload = {
+            key: values[0]
+            for key, values in parse_qs(request.content.decode()).items()
+        }
+        seen.update(payload)
+        return result(
+            "GetCompShareInstanceUserPrice",
+            PriceDetails=[
+                {
+                    "ChargeType": "Postpay",
+                    "Instance": 1.48,
+                    "SystemDisks": 0.18,
+                    "Disks": 0,
+                    "CompShareImage": 0,
+                    "InstanceDiscountType": 1,
+                }
+            ],
+            OriginalPriceDetails=[
+                {
+                    "ChargeType": "Postpay",
+                    "Instance": 1.66,
+                    "SystemDisks": 0.18,
+                }
+            ],
+        )
+
+    value = Catalog(resources(handler)).price(
+        region="cn-test",
+        zone="cn-test-01",
+        gpu_type="4090",
+        cpu=16,
+        memory_mb=65536,
+        charge_type="Postpay",
+        image_id="image-test",
+        disks=[{"IsBoot": True, "Type": "CLOUD_SSD", "Size": 60}],
+    )
+    assert seen["Action"] == "GetCompShareInstanceUserPrice"
+    assert seen["Region"] == "cn-test"
+    assert seen["Zone"] == "cn-test-01"
+    assert seen["Gpu"] == "1"
+    assert seen["Cpu"] == "16"
+    assert seen["Memory"] == "65536"
+    assert seen["ChargeType"] == "Postpay"
+    assert seen["Disks.0.IsBoot"] == "true"
+    assert seen["Disks.0.Type"] == "CLOUD_SSD"
+    assert seen["Disks.0.Size"] == "60"
+    assert value["state"] == "available"
+    assert value["currency"] == "CNY"
+    assert value["unit"] == "hour"
+    assert value["hourly"] == 1.66
+    assert value["breakdown"] == {
+        "instance": 1.48,
+        "system_disks": 0.18,
+        "data_disks": 0.0,
+        "image": 0.0,
+    }
+    assert value["original_amount"] == 1.84
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {},
+        {"PriceDetails": []},
+        {"PriceDetails": [{"ChargeType": "Month", "Instance": 100}]},
+        {"PriceDetails": [{"ChargeType": "Postpay", "Instance": -1}]},
+        {"PriceDetails": [{"ChargeType": "Postpay", "Instance": True}]},
+    ],
+)
+def test_price_never_invents_amounts(payload):
+    r = resources(
+        lambda request: result("GetCompShareInstanceUserPrice", **payload)
+    )
+    with pytest.raises(AppError) as error:
+        Catalog(r).price(
+            region="cn-test",
+            zone="cn-test-01",
+            gpu_type="4090",
+            cpu=16,
+            memory_mb=65536,
+        )
+    assert error.value.code == "cloud_price_unavailable"
+
+
+def test_capacity_and_price_http_keep_quote_separate_from_inventory(monkeypatch):
+    def handler(request):
+        payload = {
+            key: values[0]
+            for key, values in parse_qs(request.content.decode()).items()
+        }
+        if payload["Action"] == "CheckCompShareResourceCapacity":
+            return result(
+                payload["Action"],
+                Specs=[
+                    {
+                        "Gpu": 1,
+                        "Cpu": 8,
+                        "Mem": 32,
+                        "ResourceEnough": True,
+                    }
+                ],
+            )
+        if payload["Action"] == "GetCompShareInstanceUserPrice":
+            return result(
+                payload["Action"],
+                PriceDetails=[
+                    {
+                        "ChargeType": "Postpay",
+                        "Instance": 0.99,
+                        "SystemDisks": 0.12,
+                    }
+                ],
+            )
+        raise AssertionError(payload["Action"])
+
+    monkeypatch.setattr(
+        app.state, "resources", resources(handler), raising=False
+    )
+    client = TestClient(app)
+    body = {
+        "region": "r",
+        "zone": "z",
+        "gpu_type": "gpu",
+        "cpu": 8,
+        "memory_mb": 32768,
+        "cpu_platform": "Auto",
+        "image_id": "image-test",
+        "charge_type": "Postpay",
+        "disks": [{"IsBoot": True, "Type": "CLOUD_SSD", "Size": 60}],
+    }
+    capacity = client.post("/api/v1/resources/ucloud/capacity", json=body)
+    assert capacity.status_code == 200
+    assert capacity.json()["state"] == "ready"
+    assert capacity.json()["quote"]["hourly"] == 1.11
+    price_body = {
+        key: value for key, value in body.items() if key != "cpu_platform"
+    }
+    price = client.post("/api/v1/resources/ucloud/price", json=price_body)
+    assert price.status_code == 200
+    assert price.json()["hourly"] == 1.11
+    assert client.post(
+        "/api/v1/resources/ucloud/price",
+        json={**price_body, "PrivateKey": "secret"},
+    ).status_code == 422
 
 
 def test_oversized_response_is_rejected_and_not_forwarded():

@@ -187,7 +187,7 @@
  .sidebar{padding:13px 14px 10px}
  .brand{padding:0 2px}
  .primary-nav{display:flex;overflow-x:auto;margin:12px -14px 0;padding:0 14px 5px;gap:5px;scrollbar-width:thin}
- .primary-nav .nav-item{min-width:max-content;min-height:40px;flex:0 0 auto;gap:6px;padding:7px 10px;font-size:11px;white-space:nowrap}
+ .primary-nav .nav-item{min-width:max-content;min-height:44px;flex:0 0 auto;gap:6px;padding:7px 10px;font-size:11px;white-space:nowrap}
  .workspace-page-heading{gap:10px}
  .workspace-page-heading p{max-width:260px}
  .workspace-heading-actions{gap:8px}

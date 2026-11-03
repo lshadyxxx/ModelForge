@@ -40,6 +40,7 @@ class Settings(BaseSettings):
     ucloud_project_id: str | None = None
     ucloud_api_url: str = "https://api.compshare.cn"
     ucloud_timeout: float = Field(default=20, gt=0, le=60, allow_inf_nan=False)
+    ucloud_write_enabled: bool = False
 
     @field_validator("ucloud_public_key", "ucloud_private_key", mode="before")
     @classmethod

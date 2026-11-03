@@ -10,6 +10,7 @@ x-backend: &backend
     MF_PG_HOST: postgres
     MF_MINIO_ENDPOINT: minio:9000
     MF_WORKER_URL: http://worker:8103
+    MF_UCLOUD_WRITE_ENABLED: ${MF_UCLOUD_WRITE_ENABLED:-false}
   init: true
   volumes:
     - ./.runtime/ssh:/run/modelforge/ssh:ro

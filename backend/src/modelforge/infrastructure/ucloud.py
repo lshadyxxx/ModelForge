@@ -13,7 +13,7 @@ READ_ACTIONS = frozenset({
     "DescribeCompShareSupportZone", "DescribeAvailableCompShareInstanceTypes",
     "DescribeCompShareImages", "DescribeModelRepositoryModels",
     "CheckCompShareResourceCapacity", "DescribeCompShareInstance",
-    "GetCompShareInstanceMonitor",
+    "GetCompShareInstanceMonitor", "GetCompShareInstanceUserPrice",
 })
 
 
@@ -121,6 +121,11 @@ class UCloudInstances(UCloud):
             raise AppError(502, 'cloud_invalid_response', 'Creation identity is unverified')
         return {'UHostIds': identifiers}
 
+    def start(self, parameters):
+        result = self._mutation('StartCompShareInstance', parameters)
+        if result.get('UHostId') != parameters['UHostId']:
+            raise AppError(502, 'cloud_invalid_response', 'Start acknowledgement is unverified')
+        return {'UHostId': result['UHostId']}
 
     def stop(self, parameters):
         result = self._mutation('StopCompShareInstance', parameters)
