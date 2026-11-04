@@ -24,6 +24,7 @@ import {
   buildCatalogOptions,
   type EnvironmentDraft,
 } from './compute-catalog';
+import { buildScopeOptions } from './compute-scope';
 import type {
   CreateAccepted,
   CreateEnvironmentPayload,
@@ -88,14 +89,6 @@ function messageOf(error: unknown): string {
 
 function sleep(milliseconds: number) {
   return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
-}
-
-function optionValue(value: string, label: string) {
-  return { value, label };
-}
-
-function regionLabel(zone: Zone): string {
-  return zone.Describe.replace(/\s*[A-Za-z]$/, '').trim() || zone.Region;
 }
 
 function applyMarketFilters(
@@ -437,34 +430,7 @@ export function ComputeWorkbench() {
     ),
   );
 
-  const regionOptions = useMemo(
-    () => {
-      const seen = new Set<string>();
-      return [
-        optionValue('', '请选择地域'),
-        ...zones.flatMap((zone) => {
-          if (seen.has(zone.Region)) return [];
-          seen.add(zone.Region);
-          return [optionValue(zone.Region, regionLabel(zone))];
-        }),
-      ];
-    },
-    [zones],
-  );
-  const zoneOptions = useMemo(
-    () => [
-      optionValue('', '全部可用区'),
-      ...zones
-        .filter((zone) => zone.Region === filters.region)
-        .map((zone) =>
-          optionValue(
-            zone.Zone,
-            `${zone.Describe} · ${zone.Zone}`,
-          ),
-        ),
-    ],
-    [filters.region, zones],
-  );
+  const scopeOptions = useMemo(() => buildScopeOptions(zones), [zones]);
   const environmentSummary = useMemo(() => ({
     total: environments.length,
     running: environments.filter((environment) => environment.status === 'running').length,
@@ -904,8 +870,7 @@ export function ComputeWorkbench() {
             onSelect={setSelectedId}
             filters={filters}
             onFiltersChange={setFilters}
-            regionOptions={regionOptions}
-            zoneOptions={zoneOptions}
+            scopeOptions={scopeOptions}
             images={images}
             imageTotal={imageTotal}
             loading={catalogLoading || zonesLoading}
@@ -920,6 +885,7 @@ export function ComputeWorkbench() {
               setFilters((current) => ({
                 ...emptyFilters,
                 region: current.region,
+                zone: current.zone,
                 imageType: current.imageType,
               }))
             }

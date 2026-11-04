@@ -1,5 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { SelectMenu } from '../../../shared/SelectMenu';
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from 'react';
 import type { Image } from '../api';
 import { ComputeIcon } from './ComputeIcon';
 import { ComputeStatusBadge } from './ComputeStatusBadge';
@@ -19,15 +24,14 @@ import {
   selectionKey,
   type EnvironmentDraft,
 } from './compute-catalog';
+import {
+  findScopeOption,
+  type ComputeScopeOption,
+} from './compute-scope';
 import type {
   ComputeCatalogOption,
   MarketFilters,
 } from './ResourceMarket';
-
-type OptionValue = {
-  value: string;
-  label: string;
-};
 
 type GpuGroup = {
   key: string;
@@ -77,8 +81,7 @@ export function ResourceConfigurator({
   onSelect,
   filters,
   onFiltersChange,
-  regionOptions,
-  zoneOptions,
+  scopeOptions,
   images,
   imageTotal,
   loading,
@@ -96,8 +99,7 @@ export function ResourceConfigurator({
   onSelect: (id: string) => void;
   filters: MarketFilters;
   onFiltersChange: (next: MarketFilters) => void;
-  regionOptions: OptionValue[];
-  zoneOptions: OptionValue[];
+  scopeOptions: ComputeScopeOption[];
   images: Image[];
   imageTotal?: number;
   loading: boolean;
@@ -139,6 +141,7 @@ export function ResourceConfigurator({
   });
   const checkController = useRef<AbortController | null>(null);
   const imageBrowseRef = useRef<HTMLButtonElement>(null);
+  const scopeRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
   useEffect(() => {
     setImageId((current) => {
@@ -221,8 +224,17 @@ export function ResourceConfigurator({
     inventory.quote ?? unavailableQuote();
   const quoteLabel = quoteRate(quote);
   const checkedAt = inventory.checkedAt;
-  const visibleRegions = regionOptions.filter((option) => option.value);
-  const visibleZones = zoneOptions.filter((option) => option.value);
+  const visibleScopes = scopeOptions;
+  const selectedScope = findScopeOption(
+    scopeOptions,
+    filters.region,
+    filters.zone,
+  );
+  const selectedScopeIndex = scopeOptions.findIndex(
+    (scope) =>
+      scope.region === filters.region
+      && scope.zone === filters.zone,
+  );
   const selectedAvailability = selectedImage
     ? imageAvailability(selectedImage)
     : null;
@@ -242,6 +254,28 @@ export function ResourceConfigurator({
       price: '',
       stock: 'all',
     });
+  }
+
+  function handleScopeKeyDown(
+    event: ReactKeyboardEvent<HTMLButtonElement>,
+    index: number,
+  ) {
+    let nextIndex: number | null = null;
+    if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+      nextIndex = (index + 1) % scopeOptions.length;
+    } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+      nextIndex = (index - 1 + scopeOptions.length) % scopeOptions.length;
+    } else if (event.key === 'Home') {
+      nextIndex = 0;
+    } else if (event.key === 'End') {
+      nextIndex = scopeOptions.length - 1;
+    }
+    if (nextIndex === null) return;
+
+    event.preventDefault();
+    const next = scopeOptions[nextIndex];
+    updateScope({ region: next.region, zone: next.zone });
+    scopeRefs.current[nextIndex]?.focus();
   }
 
   function chooseGpu(group: GpuGroup) {
@@ -459,41 +493,66 @@ export function ResourceConfigurator({
           </header>
 
           <fieldset className="mf-config-fieldset">
-            <legend>地域</legend>
+            <legend>地域 / 可用区</legend>
             <div
               className="mf-region-tabs"
               role="radiogroup"
-              aria-label="选择地域"
+              aria-label="选择地域和可用区"
             >
-              {visibleRegions.map((region) => (
+              {visibleScopes.map((scope, index) => (
                 <button
-                  key={region.value}
+                  key={scope.zone}
                   type="button"
                   role="radio"
-                  aria-checked={filters.region === region.value}
-                  onClick={() => updateScope({ region: region.value, zone: '' })}
+                  ref={(element) => {
+                    scopeRefs.current[index] = element;
+                  }}
+                  tabIndex={
+                    (selectedScopeIndex === -1 ? 0 : selectedScopeIndex)
+                    === index
+                      ? 0
+                      : -1
+                  }
+                  aria-checked={
+                    filters.region === scope.region
+                    && filters.zone === scope.zone
+                  }
+                  aria-label={`${scope.label}，${scope.zone}`}
+                  onKeyDown={(event) => handleScopeKeyDown(event, index)}
+                  onClick={() =>
+                    updateScope({
+                      region: scope.region,
+                      zone: scope.zone,
+                    })
+                  }
                 >
-                  <strong>{region.label}</strong>
-                  <small>{region.value}</small>
+                  <strong>{scope.label}</strong>
+                  <small>{scope.zone}</small>
                 </button>
               ))}
             </div>
+            <small className="mf-config-scope-help">
+              已展示目录返回的 {visibleScopes.length} 个可售地域与可用区；
+              目录可见不代表库存可用。
+            </small>
           </fieldset>
 
           <div className="mf-config-field-row">
-            <label className="mf-config-field">
-              <span>可用区</span>
-              <SelectMenu
-                value={filters.zone}
-                options={visibleZones}
-                onChange={(zone) => updateScope({ zone })}
-                ariaLabel="选择可用区"
-                placeholder="选择可用区"
-                emptyText="当前地域没有可用区"
-                disabled={loading || !visibleZones.length}
-              />
-              <small>目录只返回对应地域下可见的可用区。</small>
-            </label>
+            <div className="mf-config-field">
+              <span>当前选择</span>
+              <div className="mf-config-readonly">
+                <ComputeIcon name="location" />
+                <div>
+                  <strong>{selectedScope?.label ?? '请选择地域'}</strong>
+                  <small>
+                    {selectedScope
+                      ? `${selectedScope.region} · ${selectedScope.zone}`
+                      : '目录未返回可用的地域与可用区'}
+                  </small>
+                </div>
+              </div>
+              <small>目录可见不代表库存可用，库存仍以精确核对结果为准。</small>
+            </div>
             <div className="mf-config-field">
               <span>实例类型</span>
               <div className="mf-config-readonly">
@@ -653,10 +712,9 @@ export function ResourceConfigurator({
           <div>
             <dt>地域 / 可用区</dt>
             <dd>
-              {visibleRegions.find((item) => item.value === filters.region)?.label
-                ?? filters.region}
+              {selectedScope?.label ?? filters.region}
               {' · '}
-              {filters.zone}
+              {selectedScope?.zone ?? filters.zone}
             </dd>
           </div>
           <div>
