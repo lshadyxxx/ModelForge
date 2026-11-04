@@ -224,6 +224,10 @@ export function SelectMenu({
     }
   }
 
+  const portalTarget = open && triggerRef.current
+    ? triggerRef.current.closest<HTMLDialogElement>('dialog[open]') ?? document.body
+    : document.body;
+
   return <div className={`mf-select mf-select--${size}${theme === 'dark' ? ' mf-select--dark' : ''} ${className}`.trim()}>
     <button
       ref={triggerRef}
@@ -303,12 +307,15 @@ export function SelectMenu({
                 <strong>{option.label}</strong>
                 {option.description && <small>{option.description}</small>}
               </span>
+              <span className="mf-select__option-state" aria-hidden="true">
+                {option.disabled ? '不可选' : isSelected ? '已选' : null}
+              </span>
             </div>;
           }) : <div className="mf-select__empty">{emptyText}</div>}
         </div>
         {supportsSearch && <div className="mf-select__count">{filtered.length} / {options.length} 个选项</div>}
       </div>,
-      document.body,
+      portalTarget,
     )}
   </div>;
 }

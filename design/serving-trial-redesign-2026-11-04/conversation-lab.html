@@ -1,0 +1,389 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <link rel="icon" href="data:,">
+  <title>对话实验室 · 推理试用 | ModelForge</title>
+  <link rel="stylesheet" href="assets/serving-demo.css">
+</head>
+<body class="v2-root">
+  <a class="sr-only" href="#lab-main">跳到主要内容</a>
+  <div class="v2-shell">
+    <aside class="v2-global-rail" aria-label="主导航">
+      <div class="v2-rail-logo" aria-label="ModelForge">M</div>
+      <a class="v2-rail-link" href="#workspace" aria-label="工作台" title="工作台" data-sandbox-action="原型只覆盖「推理试用」"><span class="icon" data-icon="grid"></span></a>
+      <a class="v2-rail-link" href="#datasets" aria-label="数据集" title="数据集" data-sandbox-action="原型只覆盖「推理试用」"><span class="icon" data-icon="database"></span></a>
+      <a class="v2-rail-link" href="#models" aria-label="模型" title="模型" data-sandbox-action="原型只覆盖「推理试用」"><span class="icon" data-icon="layers"></span></a>
+      <a class="v2-rail-link" href="#resources" aria-label="计算环境" title="计算环境" data-sandbox-action="原型只覆盖「推理试用」"><span class="icon" data-icon="monitor"></span></a>
+      <a class="v2-rail-link" href="#training" aria-label="训练" title="训练" data-sandbox-action="原型只覆盖「推理试用」"><span class="icon" data-icon="trend"></span></a>
+      <a class="v2-rail-link" href="#serving" aria-label="推理试用" title="推理试用" aria-current="page"><span class="icon" data-icon="message"></span></a>
+      <div class="v2-rail-foot"><button class="v2-rail-link" type="button" data-sandbox-action="帮助入口未在原型中展开" aria-label="帮助"><span class="icon" data-icon="spark"></span></button></div>
+    </aside>
+
+    <aside class="v2-tray" aria-label="试用样本">
+      <header class="v2-tray-head">
+        <h2>推理试用</h2>
+        <p>把 Adapter 放进一场可复现的对话验收，而不是只看一条 Loss。</p>
+        <button class="btn btn-primary" type="button" data-open-create><span class="icon" data-icon="plus"></span>新建试用</button>
+      </header>
+      <div>
+        <div class="v2-tray-label"><span>试用样本</span><span data-trial-count>3 / 200</span></div>
+        <ul class="v2-trial-list" data-trial-list>
+          <li class="v2-trial" data-trial-id="fdb5a28c">
+            <button type="button" data-select-trial="fdb5a28c" aria-current="true" data-state="ready">
+              <span class="v2-trial-main"><strong>fdb5a28c</strong><span>Best · A#7 · adapter-best-01</span><small data-trial-state>可试用</small></span>
+            </button>
+          </li>
+          <li class="v2-trial" data-trial-id="77c4e8a2">
+            <button type="button" data-select-trial="77c4e8a2" aria-current="false" data-state="waiting_instance">
+              <span class="v2-trial-main"><strong>77c4e8a2</strong><span>Final · A#6 · adapter-final-01</span><small data-trial-state>等待实例</small></span>
+            </button>
+          </li>
+          <li class="v2-trial" data-trial-id="5ae019bd">
+            <button type="button" data-select-trial="5ae019bd" aria-current="false" data-state="blocked">
+              <span class="v2-trial-main"><strong>5ae019bd</strong><span>Best · A#4 · adapter-best-04</span><small data-trial-state>需处理</small></span>
+            </button>
+          </li>
+        </ul>
+        <p class="v1-empty-conversation" data-empty-trial-list hidden style="padding:18px;margin:0;text-align:left;color:var(--muted);font-size:12px">还没有试用样本。新建后从真实业务问题开始。</p>
+      </div>
+      <footer class="v2-tray-foot">
+        <p>会话不写入数据库。停止生成后保留的内容只作为当前页面证据，不会自动进入下一轮上下文。</p>
+      </footer>
+    </aside>
+
+    <main class="v2-main" id="lab-main">
+      <h1 class="sr-only">推理试用</h1>
+      <header class="v2-topbar">
+        <div class="v2-breadcrumb"><span>个人工作空间</span><span>/</span><strong>推理试用</strong><span>/</span><span>验收实验</span></div>
+        <div class="v2-top-actions">
+          <span class="badge" data-current-badge data-tone="ready">可试用</span>
+          <button class="btn btn-secondary context-trigger" type="button" data-open-context><span class="icon" data-icon="panel"></span><span>验收记录</span></button>
+          <button class="btn btn-secondary mobile-queue-trigger" type="button" data-open-queue aria-label="打开试用样本"><span class="icon" data-icon="list"></span></button>
+          <button class="btn btn-primary" type="button" data-open-create><span class="icon" data-icon="plus"></span><span>新建试用</span></button>
+          <span class="prototype-mark desktop-only">交互原型 · 模拟数据</span>
+        </div>
+      </header>
+
+      <section class="v2-workspace" data-view="workspace" aria-label="对话验收工作区">
+        <div class="v2-session-head">
+          <div class="v2-session-title">
+            <h2>退款问答 LoRA · 验收实验</h2>
+            <p>对象 <span data-current-base>Qwen3-0.6B</span> + <span data-current-adapter>Best · A#7 · adapter-best-01</span></p>
+          </div>
+          <div class="v2-session-metrics" aria-label="运行摘要">
+            <div><span>实例</span><strong data-current-instance>u-4090-11-c2a1</strong></div>
+            <div><span>最大生成</span><strong><span data-current-max-tokens>2048</span> t</strong></div>
+            <div><span>空闲回收</span><strong><span data-idle-clock>14:32</span></strong></div>
+          </div>
+        </div>
+
+        <div class="v2-stage">
+          <section class="v2-session" data-chat-scope aria-label="当前验收会话">
+            <div class="v2-question-strip">
+              <p class="label">本轮固定问题</p>
+              <div class="v2-question-list">
+                <button class="v2-question" type="button" data-prompt="我们有一个 7 天无理由退款政策。用户已经拆封，但说商品与描述不符。请给出一段既解释规则、又避免直接承诺退款的客服回复。"><strong>边界 · 客服回复</strong><span>检查是否承诺退款、是否给出下一步</span></button>
+                <button class="v2-question" type="button" data-prompt="把下面这段产品说明压缩成 3 条要点，每条不超过 24 个字：支持多轮对话、保留最近十轮上下文、可在回答中引用知识库片段。"><strong>信息 · 压缩改写</strong><span>检查结构、长度和事实保真</span></button>
+                <button class="v2-question" type="button" data-prompt="用户说“先别退”，但前面已经确认商品破损。请判断用户意图，并给客服一句下一步追问。"><strong>澄清 · 反悔场景</strong><span>检查意图判断与是否编造原因</span></button>
+              </div>
+            </div>
+
+            <div class="v2-transcript" data-chat-scroll>
+              <div class="v2-transcript-inner">
+                <div class="v2-run-note">
+                  <span>验收依据只来自本轮真实生成。不要用 Eval Loss 代替回答质量判断。</span>
+                  <span class="code"><span data-current-short-id>fdb5a28c</span> · 本页临时会话</span>
+                </div>
+                <div data-chat-log role="log" aria-live="polite" aria-label="验收对话"></div>
+                <div class="v2-empty-session" data-empty-chat>
+                  <h3>选择一个问题，观察边界。</h3>
+                  <p>固定问题比随手聊天更容易比较。生成后可在右侧标记「有用 / 偏题 / 不安全」，这些标记只留在本页演示中。</p>
+                  <div class="prompt-list">
+                    <button class="prompt-chip" type="button" data-prompt="我们有一个 7 天无理由退款政策。用户已经拆封，但说商品与描述不符。请给出一段既解释规则、又避免直接承诺退款的客服回复。">从退款边界开始</button>
+                    <button class="prompt-chip" type="button" data-prompt="用户说“先别退”，但前面已经确认商品破损。请判断用户意图，并给客服一句下一步追问。">尝试意图澄清</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="v2-composer-wrap">
+              <form class="v2-composer" onsubmit="return false">
+                <label class="sr-only" for="v2-chat-input">输入测试问题</label>
+                <textarea id="v2-chat-input" data-chat-input placeholder="输入问题，Ctrl / ⌘ + Enter 发送。也可以从上方固定问题开始。"></textarea>
+                <div class="v2-composer-bar">
+                  <span class="v2-composer-note">温度 0.7 · Top P 0.9 · 只发送未标记为 partial 的消息</span>
+                  <div style="display:flex;gap:6px">
+                    <button class="btn btn-danger" type="button" data-stream-only data-cancel-generation hidden><span class="icon" data-icon="stop" data-size="sm"></span>停止生成</button>
+                    <button class="btn btn-quiet" type="button" data-clear-session><span class="icon" data-icon="refresh" data-size="sm"></span>清空</button>
+                    <button class="btn btn-primary" type="submit" data-composer-submit><span class="icon" data-icon="arrow" data-size="sm"></span>发送</button>
+                  </div>
+                </div>
+              </form>
+            </div>
+          </section>
+
+          <aside class="v2-evidence" aria-label="验收记录与运行事实">
+            <section class="v2-evidence-block">
+              <h2>这条回答是否可用？</h2>
+              <div class="v2-evidence-verdict">
+                <button type="button" data-verdict="useful" aria-pressed="false">有用</button>
+                <button type="button" data-verdict="off-topic" aria-pressed="false">偏题</button>
+                <button type="button" data-verdict="unsafe" aria-pressed="false">不安全</button>
+              </div>
+              <label class="sr-only" for="v2-note">验收备注</label>
+              <textarea class="v2-evidence-note" id="v2-note" placeholder="记录具体原因，例如：没有直接承诺退款，但下一步追问不够明确。"></textarea>
+            </section>
+            <section class="v2-evidence-block">
+              <h2>验收约束</h2>
+              <ul class="v2-check-list">
+                <li><span class="icon" data-icon="check" data-size="sm"></span>对话只存在当前页面，刷新即清空</li>
+                <li><span class="icon" data-icon="check" data-size="sm"></span>部分输出不进入下一轮上下文</li>
+                <li><span class="icon" data-icon="check" data-size="sm"></span>停止生成需要等待后端确认</li>
+              </ul>
+            </section>
+            <section class="v2-evidence-block">
+              <h2>冻结对象</h2>
+              <dl class="v2-run-facts">
+                <div><dt>基座</dt><dd data-current-base>Qwen3-0.6B</dd></div>
+                <div><dt>指纹</dt><dd class="code" data-current-base-fingerprint>Qwen3-0.6B-20261102-r1</dd></div>
+                <div><dt>Adapter</dt><dd data-current-adapter-fingerprint>best-fingerprint</dd></div>
+                <div><dt>实例</dt><dd class="code" data-current-instance>u-4090-11-c2a1</dd></div>
+                <div><dt>空闲回收</dt><dd><span data-idle-clock>14:32</span></dd></div>
+              </dl>
+            </section>
+            <section class="v2-evidence-block">
+              <h2>结束这次验收</h2>
+              <p class="field-note" style="margin:0 0 11px">页面会话不会自动保存。结束后由 Worker 确认进程退出并回收实例。</p>
+              <button class="btn btn-danger" type="button" data-request-stop style="width:100%">结束试用并回收</button>
+            </section>
+          </aside>
+        </div>
+      </section>
+
+      <section class="v2-empty-main" data-view="empty" hidden>
+        <div class="v2-empty-card">
+          <div class="v2-empty-icon"><span class="icon" data-icon="message" data-size="lg"></span></div>
+          <h2>没有可验收的样本</h2>
+          <p>先选择一个已同步的 Best / Final Adapter。我们会把它与固定基座指纹、实例要求和推理运行时绑定成一次可追溯的试用。</p>
+          <ul class="v1-required-list" style="margin-bottom:20px">
+            <li><span class="icon" data-icon="check" data-size="sm"></span>Adapter 已同步且兼容当前推理基线</li>
+            <li><span class="icon" data-icon="check" data-size="sm"></span>当前没有活动 GPU 租约</li>
+            <li><span class="icon" data-icon="check" data-size="sm"></span>你已准备手动创建一台独立实例</li>
+          </ul>
+          <button class="btn btn-primary" type="button" data-open-create><span class="icon" data-icon="plus"></span>创建第一场验收</button>
+        </div>
+      </section>
+
+      <section class="v2-state-main" data-view="waiting" hidden>
+        <div class="v2-state-card">
+          <div class="v2-state-icon"><span class="icon" data-icon="monitor" data-size="lg"></span></div>
+          <span class="badge" data-current-badge data-tone="waiting">等待手动创建实例</span>
+          <h2 style="margin-top:10px">把这份配置带到优云</h2>
+          <p>试用 <code data-current-short-id>77c4e8a2</code> 已冻结对象和参数。平台不调用云创建接口；你需要手动创建实例，再把 ID 带回来。</p>
+          <div class="v2-spec-sheet">
+            <div><span>BASE&nbsp;&nbsp;</span><span data-current-base>Qwen3-0.6B</span> / <span data-current-base-fingerprint>Qwen3-0.6B-20261102-r1</span></div>
+            <div><span>ADAPTER</span> <span data-current-adapter>Final · A#6 · adapter-final-01</span></div>
+            <div><span>INSTANCE</span> RTX 4090 × 1 · 32C / 128 GiB · 100 GB CLOUD_SSD</div>
+            <div><span>RUNTIME</span> vLLM · ModelForge 2026.11 · cn-bj-02</div>
+          </div>
+          <div class="v2-state-actions">
+            <button class="btn btn-primary" type="button" data-open-bind><span class="icon" data-icon="arrow"></span>关联已创建实例</button>
+            <button class="btn btn-secondary" type="button" data-copy data-copy-target=".v2-spec-sheet"><span class="icon" data-icon="copy"></span>复制要求</button>
+            <button class="btn btn-quiet" type="button" data-request-stop>取消试用</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="v2-state-main" data-view="preparing" hidden>
+        <div class="v2-state-card">
+          <div class="v2-state-icon"><span class="icon" data-icon="refresh" data-size="lg"></span></div>
+          <span class="badge" data-current-badge data-tone="preparing">准备推理</span>
+          <h2 style="margin-top:10px">正在生成可验收的运行环境</h2>
+          <p>准备完成前不会开放对话。只有运行时校验、Adapter 恢复和生成探针都通过，状态才会变为可试用。</p>
+          <div class="loading-bar" aria-label="准备进度"></div>
+          <ul class="v2-stage-list">
+            <li><strong>实例已关联</strong><span>u-4090-11-c2a1</span></li>
+            <li><strong>运行时锁定</strong><span>vLLM lock-20261102</span></li>
+            <li><strong>Adapter 恢复</strong><span>best-fingerprint</span></li>
+            <li><strong>健康探针</strong><span>等待生成校验</span></li>
+          </ul>
+          <div class="v2-state-actions">
+            <button class="btn btn-danger" type="button" data-request-stop>停止并回收</button>
+            <button class="btn btn-secondary" type="button" data-sandbox-action="准备事件日志未在本原型中展开">查看准备事件</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="v2-state-main" data-view="blocked" hidden>
+        <div class="v2-state-card">
+          <div class="v2-state-icon" style="border-color:var(--danger-border);background:var(--danger-soft);color:var(--danger)"><span class="icon" data-icon="alert" data-size="lg"></span></div>
+          <span class="badge" data-current-badge data-tone="blocked">需要处理</span>
+          <h2 style="margin-top:10px">推理进程已退出，实例仍保留</h2>
+          <p>这是一个阻断态，不应被“已结束”掩盖。重试会重新准备运行时；结束则进入停止、进程组确认和实例回收流程。</p>
+          <div class="v2-cleanup">
+            <div><span>错误码</span><strong class="code" data-current-error style="color:var(--danger)">runtime_exited</strong></div>
+            <div><span>实例</span><strong class="code" data-current-instance>u-4090-08-4d21</strong></div>
+            <div><span>租约</span><strong style="color:var(--warning)">仍被保留</strong></div>
+            <div><span>活动生成</span><strong>无</strong></div>
+          </div>
+          <div class="notice" data-tone="warning" style="margin-bottom:18px">
+            <span class="icon" data-icon="alert"></span>
+            <p><strong>先处理资源，再考虑重试。</strong>不要让实例停留在未知状态，也不要重复创建新的收费 GPU。</p>
+          </div>
+          <div class="v2-state-actions">
+            <button class="btn btn-primary" type="button" data-retry-trial>重新准备</button>
+            <button class="btn btn-danger" type="button" data-request-stop>结束并回收实例</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="v2-state-main" data-view="stopping" hidden>
+        <div class="v2-state-card">
+          <div class="v2-state-icon" style="border-color:var(--warning-border);background:var(--warning-soft);color:var(--warning)"><span class="icon" data-icon="clock" data-size="lg"></span></div>
+          <span class="badge" data-current-badge data-tone="stopping">停止并回收中</span>
+          <h2 style="margin-top:10px">正在等待进程与实例的最终回执</h2>
+          <p>“停止请求已记录”不等于“资源已经回到可用状态”。在 Worker 返回确认前，不重复创建下一次试用。</p>
+          <ul class="v2-stage-list">
+            <li><strong>生成请求结束</strong><span>已确认</span></li>
+            <li><strong>推理进程退出</strong><span style="color:var(--warning)">等待中</span></li>
+            <li><strong>实例清理</strong><span>未开始</span></li>
+            <li><strong>GPU 租约释放</strong><span>未开始</span></li>
+          </ul>
+          <div class="notice" data-tone="info">
+            <span class="icon" data-icon="clock"></span>
+            <p>通常需要 20–60 秒。试用 ID 不会变化，可以离开后从记录重新打开。</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="v2-state-main" data-view="stopped" hidden>
+        <div class="v2-state-card">
+          <div class="v2-state-icon" style="border-color:var(--success-border);background:var(--success-soft);color:var(--success)"><span class="icon" data-icon="check" data-size="lg"></span></div>
+          <span class="badge" data-current-badge data-tone="stopped">已结束</span>
+          <h2 style="margin-top:10px">验收结束，实例已经回收</h2>
+          <p>会话证据只保留在当前页面；试用记录、Adapter 指纹与回收事实仍可追溯。准备下一场时，建议沿用同一组固定问题。</p>
+          <div class="v2-cleanup">
+            <div><span>推理进程</span><strong>已退出</strong></div>
+            <div><span>进程组</span><strong>已确认退出</strong></div>
+            <div><span>实例</span><strong>已清理</strong></div>
+            <div><span>GPU 租约</span><strong>已释放</strong></div>
+          </div>
+          <div class="v2-state-actions">
+            <button class="btn btn-primary" type="button" data-create-again><span class="icon" data-icon="plus"></span>开始下一次验收</button>
+            <button class="btn btn-secondary" type="button" data-sandbox-action="原型未实现会话证据导出">保留本轮证据</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="v2-loading-main" data-view="loading" aria-label="正在加载验收记录">
+        <div class="v2-loading-feed">
+          <div class="skeleton" style="height:26px;width:45%;margin-bottom:28px"></div>
+          <div class="skeleton"></div>
+          <div class="skeleton"></div>
+          <div class="skeleton"></div>
+          <div class="skeleton" style="height:90px;margin-top:28px"></div>
+          <div class="skeleton" style="height:90px"></div>
+        </div>
+        <aside class="v2-loading-side">
+          <div class="skeleton" style="height:16px;margin-bottom:16px"></div>
+          <div class="skeleton" style="height:58px;margin-bottom:24px"></div>
+          <div class="skeleton" style="height:16px;width:70%;margin-bottom:12px"></div>
+          <div class="skeleton" style="height:16px;margin-bottom:12px"></div>
+          <div class="skeleton" style="height:16px;width:82%"></div>
+        </aside>
+      </section>
+    </main>
+  </div>
+
+  <dialog class="dialog" id="create-dialog" aria-labelledby="create-title">
+    <form class="dialog-shell" onsubmit="return false">
+      <header class="dialog-head">
+        <div>
+          <ol class="steps" aria-label="创建步骤">
+            <li aria-current="step"><span class="step-number">1</span>选择 Adapter</li>
+            <li><span class="step-number">2</span>核对实例</li>
+            <li><span class="step-number">3</span>手动创建</li>
+          </ol>
+          <h2 id="create-title" style="margin-top:10px">建立一场验收实验</h2>
+          <p>对象来自已同步的 Best / Final 产物；默认沿用最近一次成功推理配置。</p>
+        </div>
+        <button class="icon-button" type="button" data-close-dialog aria-label="关闭"><span class="icon" data-icon="close"></span></button>
+      </header>
+      <div class="dialog-body">
+        <fieldset style="border:0;padding:0;margin:0">
+          <legend class="field-label" style="margin-bottom:9px">验收 Adapter</legend>
+          <div style="display:grid;gap:8px">
+            <label class="adapter-option"><input type="radio" name="adapter-choice" value="best-a7"><span><strong>Best · A#7</strong><small>adapter-best-01 · eval loss 0.3218 · 客服意图 LoRA</small></span><span class="metric">推荐</span></label>
+            <label class="adapter-option"><input type="radio" name="adapter-choice" value="final-a7"><span><strong>Final · A#7</strong><small>adapter-final-01 · eval loss 0.3389 · 最终保存点</small></span><span class="metric">可验收</span></label>
+            <label class="adapter-option"><input type="radio" name="adapter-choice" value="best-a4" disabled><span><strong>Best · A#4</strong><small>当前推理运行时未支持 · 缺少兼容 lock</small></span><span class="metric">未支持</span></label>
+          </div>
+        </fieldset>
+        <p class="inline-error" data-create-error role="alert" hidden></p>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:22px"><div><strong style="font-size:13px">已验证单卡模板</strong><p class="field-note">把重复的基础设施配置收起来，只在需要时修改。</p></div><span class="badge" data-tone="success">最近成功</span></div>
+        <dl class="preset-summary">
+          <div><dt class="summary-label">GPU</dt><dd class="summary-value">RTX 4090 × 1</dd></div>
+          <div><dt class="summary-label">资源</dt><dd class="summary-value">32C / 128 GiB</dd></div>
+          <div><dt class="summary-label">镜像</dt><dd class="summary-value">vLLM 2026.11</dd></div>
+        </dl>
+        <details style="margin-top:12px"><summary>展开 11 项实例字段</summary><div class="form-grid" style="margin-top:12px"><label class="field"><span class="field-label">地域 / 可用区</span><input class="input" value="华北二 · 北京 / cn-bj-02"></label><label class="field"><span class="field-label">GPU</span><input class="input" value="RTX 4090"></label><label class="field"><span class="field-label">CPU / 内存</span><input class="input" value="32 核 / 128 GiB"></label><label class="field"><span class="field-label">运行镜像</span><input class="input" value="ModelForge vLLM 2026.11"></label><label class="field"><span class="field-label">系统盘</span><input class="input" value="100 GB CLOUD_SSD"></label><label class="field"><span class="field-label">计费方式</span><input class="input" value="后付费"></label></div></details>
+        <div class="notice" data-tone="warning" style="margin-top:16px"><span class="icon" data-icon="alert"></span><p><strong>平台不自动购买 GPU。</strong>创建后会给出可在优云复制的实例要求，并把试用放入“等待手动创建实例”。</p></div>
+      </div>
+      <footer class="dialog-foot"><span class="foot-note">本轮只建立验收对象，不产生真实资源。</span><button class="btn btn-secondary" type="button" data-close-dialog>取消</button><button class="btn btn-primary" type="button" data-submit-create>生成实例要求</button></footer>
+    </form>
+  </dialog>
+
+  <dialog class="dialog" data-size="small" id="bind-dialog" aria-labelledby="bind-title">
+    <form class="dialog-shell" onsubmit="return false">
+      <header class="dialog-head"><div><h2 id="bind-title">关联实例，继续验收</h2><p>实例必须独立于训练任务，并已处于 Running。平台会核对运行时与推理 lock。</p></div><button class="icon-button" type="button" data-close-dialog aria-label="关闭"><span class="icon" data-icon="close"></span></button></header>
+      <div class="dialog-body">
+        <label class="field"><span class="field-label">优云实例 ID</span><input class="input" data-bind-input placeholder="例如 u-4090-02-7fca" autocomplete="off"></label>
+        <label class="check-row" style="margin-top:15px"><input type="checkbox" data-bind-ack><span>我拥有此实例，并授权平台在验收完成、失败或取消后停止并删除它。</span></label>
+        <p class="inline-error" data-bind-error role="alert" hidden></p>
+        <div class="notice" data-tone="info" style="margin-top:16px"><span class="icon" data-icon="shield"></span><p>关联成功后进入准备阶段；在健康探针通过前不会开放输入。</p></div>
+      </div>
+      <footer class="dialog-foot"><button class="btn btn-secondary" type="button" data-close-dialog>稍后处理</button><button class="btn btn-primary" type="button" data-submit-bind>核对并关联</button></footer>
+    </form>
+  </dialog>
+
+  <dialog class="dialog" data-size="small" id="stop-dialog" aria-labelledby="stop-title">
+    <div class="dialog-shell">
+      <header class="dialog-head"><div><h2 id="stop-title">结束这场验收？</h2><p>停止生成并回收实例。当前页面里的会话不会自动保留。</p></div><button class="icon-button" type="button" data-close-dialog aria-label="关闭"><span class="icon" data-icon="close"></span></button></header>
+      <div class="dialog-body">
+        <div class="v2-cleanup"><div><span>试用</span><strong class="code" data-current-id>fdb5a28c</strong></div><div><span>实例</span><strong class="code" data-current-instance>u-4090-11-c2a1</strong></div><div><span>回收确认</span><strong style="color:var(--warning)">异步完成</strong></div></div>
+        <div class="notice" data-tone="danger"><span class="icon" data-icon="alert"></span><p><strong>确认后不能继续输入。</strong>页面会显示真实的中间态，直到进程退出和实例回收有回执。</p></div>
+      </div>
+      <footer class="dialog-foot"><button class="btn btn-secondary" type="button" data-close-dialog>返回验收</button><button class="btn btn-danger" type="button" data-confirm-stop>确认结束并回收</button></footer>
+    </div>
+  </dialog>
+
+  <dialog class="v2-mobile-sheet" id="mobile-queue-dialog" aria-labelledby="mobile-queue-title">
+    <div class="mobile-sheet-head"><h2 id="mobile-queue-title">试用样本</h2><button class="icon-button" type="button" data-close-dialog aria-label="关闭"><span class="icon" data-icon="close"></span></button></div>
+    <div class="mobile-sheet-body"><ul class="v1-trial-list" data-mobile-trials></ul><button class="btn btn-primary" type="button" data-open-create style="width:100%;margin-top:12px"><span class="icon" data-icon="plus"></span>新建验收</button></div>
+  </dialog>
+
+  <dialog class="v2-mobile-sheet" id="mobile-context-dialog" aria-labelledby="mobile-context-title">
+    <div class="mobile-sheet-head"><h2 id="mobile-context-title">验收记录</h2><button class="icon-button" type="button" data-close-dialog aria-label="关闭"><span class="icon" data-icon="close"></span></button></div>
+    <div class="mobile-sheet-body">
+      <div class="v2-evidence-block"><h2>当前对象</h2><dl class="v2-run-facts"><div><dt>基座</dt><dd data-current-base>Qwen3-0.6B</dd></div><div><dt>Adapter</dt><dd data-current-adapter>Best · A#7 · adapter-best-01</dd></div><div><dt>实例</dt><dd data-current-instance>u-4090-11-c2a1</dd></div><div><dt>空闲回收</dt><dd><span data-idle-clock>14:32</span></dd></div></dl></div>
+      <div class="v2-evidence-block"><h2>本轮判断</h2><div class="v2-evidence-verdict"><button type="button" data-verdict="useful" aria-pressed="false">有用</button><button type="button" data-verdict="off-topic" aria-pressed="false">偏题</button><button type="button" data-verdict="unsafe" aria-pressed="false">不安全</button></div><textarea class="v2-evidence-note" placeholder="记录回答是否符合预期"></textarea></div>
+      <button class="btn btn-danger" type="button" data-request-stop style="width:100%">结束试用并回收</button>
+    </div>
+  </dialog>
+
+  <div class="toast-region" aria-live="polite" aria-atomic="true"></div>
+  <div class="state-dock" aria-label="原型状态预览">
+    <div class="state-panel" data-state-panel hidden>
+      <p>切换真实流程中的关键状态；交互原型不会访问后端。</p>
+      <div class="state-grid">
+        <button type="button" data-scenario-button="empty">空状态</button><button type="button" data-scenario-button="loading">加载中</button><button type="button" data-scenario-button="create">创建</button><button type="button" data-scenario-button="waiting">等待实例</button><button type="button" data-scenario-button="preparing">准备中</button><button type="button" data-scenario-button="ready">可试用</button><button type="button" data-scenario-button="streaming">流式生成</button><button type="button" data-scenario-button="blocked">失败</button><button type="button" data-scenario-button="stopping">回收中</button><button type="button" data-scenario-button="stopped">成功回收</button>
+      </div>
+    </div>
+    <button class="state-toggle" type="button" data-state-toggle aria-expanded="false"><span class="icon" data-icon="spark" data-size="sm"></span>演示状态</button>
+  </div>
+  <script src="assets/serving-readable.js"></script>
+  <script src="assets/serving-demo.js"></script>
+</body>
+</html>

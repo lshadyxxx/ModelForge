@@ -1,0 +1,136 @@
+{
+  "trainingCreate": {
+    "triggers": [
+      {
+        "label": "已发布数据版本",
+        "text": "选择数据集版本",
+        "disabled": false
+      },
+      {
+        "label": "可用基础模型",
+        "text": "选择基础模型版本",
+        "disabled": false
+      }
+    ],
+    "dataset": {
+      "parent": {
+        "tag": "body",
+        "open": null
+      },
+      "rect": {
+        "left": 273,
+        "top": 520,
+        "width": 548,
+        "height": 178
+      },
+      "options": [
+        {
+          "text": "客服123 · v1",
+          "height": 40,
+          "active": true,
+          "disabled": false
+        },
+        {
+          "text": "客服123 · v2",
+          "height": 40,
+          "active": false,
+          "disabled": false
+        },
+        {
+          "text": "客服123 · v1",
+          "height": 40,
+          "active": false,
+          "disabled": false
+        },
+        {
+          "text": "live-gpu-sft-20261101-r1 · v1",
+          "height": 40,
+          "active": false,
+          "disabled": false
+        }
+      ],
+      "overflow": false
+    }
+  },
+  "trainingList": {
+    "triggers": [
+      {
+        "label": "筛选训练状态",
+        "text": "全部状态"
+      }
+    ],
+    "status": {
+      "parent": {
+        "tag": "body",
+        "open": null
+      },
+      "rect": {
+        "left": 1188,
+        "top": 516,
+        "width": 240,
+        "height": 262
+      },
+      "options": [
+        {
+          "text": "全部状态已选",
+          "height": 40,
+          "active": true,
+          "disabled": false
+        },
+        {
+          "text": "活动运行",
+          "height": 40,
+          "active": false,
+          "disabled": false
+        },
+        {
+          "text": "需要关注",
+          "height": 40,
+          "active": false,
+          "disabled": false
+        },
+        {
+          "text": "已成功",
+          "height": 40,
+          "active": false,
+          "disabled": false
+        },
+        {
+          "text": "已失败",
+          "height": 40,
+          "active": false,
+          "disabled": false
+        },
+        {
+          "text": "已取消",
+          "height": 40,
+          "active": false,
+          "disabled": false
+        }
+      ],
+      "overflow": false
+    }
+  },
+  "modelsNative": {
+    "className": "",
+    "appearance": "auto",
+    "minHeight": "40px",
+    "border": "1px solid rgb(203, 213, 226)",
+    "borderRadius": "5px",
+    "background": "rgb(255, 255, 255) none repeat scroll 0% 0% / auto padding-box border-box",
+    "fontSize": "12px",
+    "withinDialog": false
+  },
+  "computeNative": {
+    "className": "",
+    "appearance": "none",
+    "minHeight": "44px",
+    "border": "1px solid rgb(199, 208, 220)",
+    "borderRadius": "6px",
+    "background": "rgb(255, 255, 255) url(\"data:image/svg+xml,%3Csvg width='14' height='14' viewBox='0 0 14 14' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M3.25 5.25 7 9l3.75-3.75' fill='none' stroke='%235e6b7c' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E\") no-repeat scroll calc(100% - 11px) 50% / 14px 14px padding-box border-box",
+    "fontSize": "12px",
+    "withinDialog": false
+  },
+  "computeNativeCount": 8,
+  "errors": []
+}

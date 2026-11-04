@@ -14,6 +14,53 @@ from modelforge.runtimes.compatibility import compatibility_baseline, inference_
 from modelforge.runtimes.runtime_lock import inference_runtime_lock
 
 _CONVERSATION = compatibility_baseline().inference.conversation
+_LIFECYCLE_EVENTS = {
+    'reserved', 'creation_requested', 'instance_bound', 'execution_requested',
+    'process_exited', 'cleanup_allowed', 'instance_stopped', 'deletion_failed',
+    'deletion_confirmed', 'released',
+}
+
+
+def _last_event(events, action):
+    matching = [event for event in events if event.get('action') == action]
+    return matching[-1].get('recorded_at') if matching else None
+
+
+def project_lifecycle(row, lease):
+    """Project only the lifecycle facts Serving needs for a truthful receipt."""
+    if row.get('lease_id') is None:
+        return {'status': 'not_reserved'}
+    events = [
+        {'action': event.get('action'), 'recorded_at': event.get('recorded_at')}
+        for event in (lease.get('events') or [])
+        if event.get('action') in _LIFECYCLE_EVENTS and event.get('recorded_at')
+    ][-50:]
+    return {
+        'status': 'tracked',
+        'creation': {'state': lease.get('create_state')},
+        'process': {
+            'state': lease.get('process_state'),
+            'exit_code': lease.get('exit_code'),
+            'cancelled': bool(lease.get('process_cancelled', False)),
+            'exited_at': _last_event(events, 'process_exited'),
+        },
+        'instance': {
+            'state': lease.get('instance_state'),
+            'stopped_at': _last_event(events, 'instance_stopped'),
+            'deleted_at': _last_event(events, 'deletion_confirmed'),
+        },
+        'cleanup': {
+            'policy': lease.get('cleanup_policy'),
+            'state': lease.get('cleanup_state'),
+            'error_code': lease.get('cleanup_error_code'),
+        },
+        'lease': {
+            'state': lease.get('state'),
+            'created_at': lease.get('created_at'),
+            'released_at': lease.get('released_at'),
+        },
+        'events': events,
+    }
 
 class CreateTrial(BaseModel):
     model_config=ConfigDict(extra='forbid')
@@ -62,6 +109,19 @@ class Serving:
         with self.pool.connection() as c:row=c.execute('SELECT * FROM inference_trials WHERE id=%s',(identifier,)).fetchone()
         if not row:raise AppError(404,'not_found','Inference trial not found')
         return row
+
+    def get_with_lifecycle(self,identifier):
+        row=self.get(identifier)
+        result=dict(row)
+        if row.get('lease_id') is None:
+            result['lifecycle']={'status':'not_reserved'}
+            return result
+        try:
+            lease=GpuLeases(self.pool).get(row['lease_id'])
+            result['lifecycle']=project_lifecycle(row,lease)
+        except Exception:
+            result['lifecycle']={'status':'unavailable','error_code':'lifecycle_unavailable'}
+        return result
 
     def update(self,identifier,**fields):
         allowed={'state','lease_id','instance_id','stop_requested','error_code','last_activity_at',

@@ -1,0 +1,1382 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <link rel="icon" href="data:,">
+  <script src="prototype-readable.js" defer></script>
+  <title>铸程线 · ModelForge 推理训练重设计</title>
+  <style>
+    :root {
+      --paper: #f5f1e7;
+      --paper-deep: #ece6d9;
+      --surface: #fbf8f0;
+      --surface-strong: #ffffff;
+      --ink: #17211c;
+      --ink-soft: #354039;
+      --muted: #647067;
+      --faint: #66746b;
+      --line: #d8d1c2;
+      --line-strong: #bbb3a4;
+      --forest: #1f4f3e;
+      --forest-deep: #133a2e;
+      --forest-soft: #e2ece6;
+      --copper: #c35b31;
+      --copper-deep: #963d1d;
+      --copper-soft: #f3e0d5;
+      --gold: #7a5a17;
+      --gold-soft: #f7ecd5;
+      --danger: #a43e35;
+      --danger-soft: #f8e3df;
+      --success: #236947;
+      --success-soft: #deeee5;
+      --info: #346d75;
+      --info-soft: #dfedef;
+      --log: #141a17;
+      --log-soft: #202a25;
+      --display: "Songti SC", "STSong", "SimSun", Georgia, serif;
+      --sans: "Segoe UI", "Microsoft YaHei UI", "PingFang SC", sans-serif;
+      --mono: "Cascadia Code", "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+      --shadow: 0 16px 50px rgba(40, 34, 23, .08);
+      --radius: 4px;
+      --focus: #2c6da1;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 86% 8%, rgba(195, 91, 49, .055), transparent 27rem),
+        linear-gradient(90deg, rgba(23, 33, 28, .028) 1px, transparent 1px),
+        var(--paper);
+      background-size: auto, 72px 72px, auto;
+      font-family: var(--sans);
+      font-size: 14px;
+      line-height: 1.55;
+      min-width: 320px;
+    }
+    button, input, select, textarea { font: inherit; }
+    button, a { -webkit-tap-highlight-color: transparent; }
+    button { cursor: pointer; }
+    button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible, summary:focus-visible {
+      outline: 3px solid color-mix(in srgb, var(--focus) 68%, transparent);
+      outline-offset: 3px;
+    }
+    a { color: inherit; }
+    svg { display: block; }
+    .sr-only {
+      position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+      overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+    }
+    .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+    .topbar {
+      position: sticky; top: 0; z-index: 30;
+      min-height: 68px;
+      display: flex; align-items: center; gap: 26px;
+      padding: 0 30px;
+      color: #e8eee7;
+      background: rgba(21, 31, 26, .97);
+      border-bottom: 1px solid rgba(232, 238, 231, .14);
+      backdrop-filter: blur(14px);
+    }
+    .brand { display: flex; align-items: center; gap: 12px; min-width: 176px; }
+    .brand-mark {
+      width: 31px; height: 34px; display: grid; place-items: center;
+      border: 1px solid rgba(255,255,255,.34);
+      color: #f3c398; font-family: var(--display); font-size: 23px;
+      box-shadow: inset 0 -5px 0 rgba(195, 91, 49, .52);
+    }
+    .brand-copy strong { display: block; font-size: 14px; letter-spacing: .02em; }
+    .brand-copy small { display: block; margin-top: 1px; color: #aebbb2; font-size: 10px; letter-spacing: .11em; text-transform: uppercase; }
+    .primary-nav { display: flex; align-self: stretch; gap: 2px; }
+    .nav-link {
+      min-height: 44px; display: inline-flex; align-items: center; padding: 0 14px;
+      border: 0; background: transparent; color: #aab7af; font-size: 12px;
+      border-bottom: 2px solid transparent;
+    }
+    .nav-link:hover { color: #fff; background: rgba(255,255,255,.04); }
+    .nav-link.active { color: #fff; border-bottom-color: #e48a5f; }
+    .topbar-meta { margin-left: auto; display: flex; align-items: center; gap: 20px; color: #aebbb2; font-size: 11px; }
+    .system-state { display: inline-flex; align-items: center; gap: 7px; }
+    .system-state i { width: 7px; height: 7px; border-radius: 50%; background: #77c39a; box-shadow: 0 0 0 4px rgba(119,195,154,.12); }
+    .user-chip { width: 31px; height: 31px; display: grid; place-items: center; border: 1px solid rgba(255,255,255,.25); color: #f3c398; }
+    .page { width: min(1460px, 100%); margin: 0 auto; padding: 38px 34px 70px; }
+    .breadcrumbs {
+      display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
+      margin-bottom: 23px; color: var(--muted); font-size: 11px; letter-spacing: .07em; text-transform: uppercase;
+    }
+    .breadcrumbs span:last-child { color: var(--ink); }
+    .breadcrumbs .slash { color: var(--line-strong); }
+    .hero { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 28px; align-items: end; margin-bottom: 32px; }
+    .eyebrow { color: var(--copper-deep); font-family: var(--mono); font-size: 10px; letter-spacing: .14em; text-transform: uppercase; margin-bottom: 10px; }
+    .hero h1 {
+      max-width: 900px; margin: 0;
+      font-family: var(--display); font-size: clamp(38px, 4vw, 58px); font-weight: 600;
+      letter-spacing: -.035em; line-height: 1.1; text-wrap: balance;
+    }
+    .hero-line { display: block; }
+    .hero h1 em { color: var(--forest); font-style: normal; border-bottom: 1px solid rgba(31,79,62,.35); }
+    .hero p { max-width: 700px; margin: 13px 0 0; color: var(--muted); font-size: 13px; }
+    .hero-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+    .button {
+      min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 9px;
+      padding: 0 17px; border: 1px solid var(--forest); border-radius: 2px;
+      background: var(--forest); color: #fff; font-weight: 600; font-size: 12px;
+      text-decoration: none; transition: background .18s ease, border-color .18s ease, transform .18s ease;
+    }
+    .button:hover { background: var(--forest-deep); border-color: var(--forest-deep); }
+    .button:active { transform: translateY(1px); }
+    .button.secondary { background: transparent; color: var(--ink); border-color: var(--line-strong); }
+    .button.secondary:hover { background: var(--surface-strong); border-color: var(--ink-soft); }
+    .button.ghost { background: transparent; color: var(--forest); border-color: transparent; padding-inline: 11px; }
+    .button.ghost:hover { background: var(--forest-soft); }
+    .button.danger { background: transparent; color: var(--danger); border-color: #d8aca7; }
+    .button.danger:hover { background: var(--danger-soft); }
+    .button.small { min-height: 44px; padding: 0 12px; font-size: 11px; }
+    .button:disabled { cursor: not-allowed; opacity: .5; }
+    .icon { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; flex: 0 0 auto; }
+    .panel { background: rgba(251,248,240,.86); border: 1px solid var(--line); }
+    .section-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding: 22px 24px 19px; }
+    .section-head h2 { margin: 0; font-family: var(--display); font-size: 23px; line-height: 1.2; letter-spacing: -.02em; }
+    .section-head p { margin: 5px 0 0; color: var(--muted); font-size: 12px; }
+    .runway {
+      position: relative; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr));
+      border-top: 1px solid var(--line-strong); border-bottom: 1px solid var(--line);
+      margin-bottom: 22px; background: rgba(251,248,240,.62);
+    }
+    .runway::before {
+      content: ""; position: absolute; top: 27px; left: 9%; right: 9%; height: 1px;
+      background: var(--line); pointer-events: none;
+    }
+    .stage {
+      position: relative; z-index: 1; min-height: 91px; padding: 17px 16px 15px;
+      display: flex; flex-direction: column; align-items: flex-start; gap: 7px;
+      background: transparent; border: 0; border-right: 1px solid var(--line);
+      text-align: left; color: var(--muted);
+    }
+    .stage:last-child { border-right: 0; }
+    .stage:hover { background: rgba(255,255,255,.55); }
+    .stage-index { display: flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 10px; }
+    .stage-index span:first-child {
+      width: 22px; height: 22px; display: grid; place-items: center;
+      color: var(--muted); background: var(--surface); border: 1px solid var(--line-strong); border-radius: 50%;
+    }
+    .stage strong { color: var(--ink-soft); font-size: 12px; font-weight: 650; }
+    .stage small { color: var(--muted); font-size: 10px; }
+    .stage.done .stage-index span:first-child { background: var(--forest); border-color: var(--forest); color: white; }
+    .stage.active { background: var(--surface); box-shadow: inset 0 2px 0 var(--copper); }
+    .stage.active .stage-index span:first-child { background: var(--copper); border-color: var(--copper); color: white; }
+    .stage.active strong { color: var(--ink); }
+    .overview-grid { display: grid; grid-template-columns: minmax(0, 1.75fr) minmax(280px, .72fr); gap: 20px; }
+    .current-run { min-width: 0; }
+    .current-head { display: flex; justify-content: space-between; gap: 20px; padding: 24px 25px 18px; border-bottom: 1px solid var(--line); }
+    .run-title-row { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+    .run-title { margin: 0; font-size: 20px; line-height: 1.25; letter-spacing: -.02em; }
+    .run-sub { margin: 6px 0 0; color: var(--muted); font-size: 11px; }
+    .status {
+      display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+      padding: 4px 8px; border: 1px solid transparent; border-radius: 2px;
+      font-size: 10px; font-weight: 650;
+    }
+    .status::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+    .status.running { color: var(--success); background: var(--success-soft); }
+    .status.waiting { color: var(--gold); background: var(--gold-soft); }
+    .status.success { color: var(--success); background: var(--success-soft); }
+    .status.error { color: var(--danger); background: var(--danger-soft); }
+    .status.idle { color: var(--muted); background: var(--paper-deep); }
+    .status.locked { color: var(--muted); background: var(--paper-deep); }
+    .metric-strip { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-bottom: 1px solid var(--line); }
+    .metric { min-width: 0; padding: 18px 20px 16px; border-right: 1px solid var(--line); }
+    .metric:last-child { border-right: 0; }
+    .metric small { display: block; color: var(--muted); font-size: 10px; letter-spacing: .06em; text-transform: uppercase; }
+    .metric strong { display: block; margin-top: 7px; font-family: var(--mono); font-size: clamp(21px, 2vw, 27px); font-weight: 500; letter-spacing: -.04em; }
+    .metric span { display: block; margin-top: 3px; color: var(--faint); font-size: 10px; }
+    .run-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(270px, .92fr); }
+    .run-narrative { padding: 23px 25px 22px; border-right: 1px solid var(--line); }
+    .run-narrative h3, .evidence-side h3 { margin: 0; font-size: 13px; font-weight: 650; }
+    .run-narrative > p { margin: 7px 0 19px; color: var(--muted); font-size: 12px; line-height: 1.75; }
+    .live-line { display: flex; align-items: flex-start; gap: 11px; padding: 12px 0; border-top: 1px solid var(--line); font-size: 11px; }
+    .live-line:last-of-type { border-bottom: 1px solid var(--line); }
+    .live-line time { flex: 0 0 65px; color: var(--faint); font-family: var(--mono); font-size: 10px; }
+    .live-line span { color: var(--ink-soft); }
+    .run-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 18px; }
+    .curve-wrap {
+      margin: 0; padding: 17px 18px 15px; color: #dce8df; background: var(--log); min-height: 250px;
+      display: flex; flex-direction: column; justify-content: space-between;
+    }
+    .curve-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+    .curve-title { font-size: 11px; color: #e8efea; }
+    .curve-legend { display: flex; gap: 12px; font-size: 9px; color: #a9bab0; }
+    .curve-legend i { width: 15px; height: 2px; display: inline-block; margin-right: 5px; vertical-align: middle; }
+    .curve-legend .train { background: #8fc7aa; }
+    .curve-legend .eval { background: #e5a97e; }
+    .curve { width: 100%; height: 145px; margin: 9px 0 4px; overflow: visible; }
+    .curve-grid { stroke: rgba(232,239,234,.12); stroke-width: 1; }
+    .curve-axis { fill: #789089; font-family: var(--mono); font-size: 8px; }
+    .curve-train { fill: none; stroke: #8fc7aa; stroke-width: 2.2; }
+    .curve-eval { fill: none; stroke: #e5a97e; stroke-width: 1.8; stroke-dasharray: 5 4; }
+    .curve-dot { fill: #dff4e8; stroke: #1f4f3e; stroke-width: 2; }
+    .curve-foot { display: flex; justify-content: space-between; gap: 12px; color: #9fb2a7; font-size: 9px; }
+    .artifact-mini {
+      margin: 0; padding: 18px; min-height: 250px; display: flex; flex-direction: column; justify-content: center;
+      color: #dbe9df; background: var(--log);
+    }
+    .artifact-mini-head { display: flex; justify-content: space-between; align-items: baseline; padding-bottom: 14px; border-bottom: 1px solid #334039; color: #91a69a; font-family: var(--mono); font-size: 9px; letter-spacing: .1em; }
+    .artifact-mini-head strong { color: #eef6f0; font-size: 28px; font-weight: 500; letter-spacing: -.04em; }
+    .artifact-mini-row { display: grid; grid-template-columns: 55px minmax(0, 1fr) auto; gap: 9px; align-items: center; padding: 15px 0; border-bottom: 1px solid #334039; font-family: var(--mono); font-size: 9px; }
+    .artifact-mini-row span { color: #91a69a; }
+    .artifact-mini-row b { color: #fff; font-size: 17px; font-weight: 500; }
+    .artifact-mini-row small { color: #91a69a; }
+    .artifact-mini-foot { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 16px; color: #a1c8ae; font-size: 9px; }
+    .evidence-side { padding: 22px 22px 21px; }
+    .side-kicker { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .side-kicker span { color: var(--copper-deep); font-family: var(--mono); font-size: 9px; letter-spacing: .1em; text-transform: uppercase; }
+    .side-main {
+      margin-top: 17px; padding: 17px 16px; background: var(--surface-strong); border: 1px solid var(--line);
+    }
+    .side-main strong { display: block; font-family: var(--display); font-size: 21px; line-height: 1.25; letter-spacing: -.02em; }
+    .side-main p { margin: 8px 0 0; color: var(--muted); font-size: 11px; line-height: 1.7; }
+    .side-main .button { width: 100%; margin-top: 15px; }
+    .side-divider { height: 1px; background: var(--line); margin: 20px 0 16px; }
+    .fact-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 13px; }
+    .fact-list li { display: grid; grid-template-columns: 74px minmax(0, 1fr); gap: 10px; font-size: 10px; }
+    .fact-list dt, .fact-list .fact-key { color: var(--muted); }
+    .fact-list .fact-value { min-width: 0; color: var(--ink-soft); overflow-wrap: anywhere; }
+    .fact-list .fact-value strong { font-weight: 600; }
+    .queue { margin-top: 20px; }
+    .queue-tools { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .input, .select {
+      min-height: 42px; border: 1px solid var(--line-strong); border-radius: 2px;
+      color: var(--ink); background: var(--surface-strong); padding: 0 11px;
+    }
+    .input::placeholder { color: #59695f; }
+    .table-wrap { overflow-x: auto; }
+    .job-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 11px; }
+    .job-table th {
+      padding: 11px 18px; color: var(--muted); background: rgba(236,230,217,.55);
+      border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+      font-weight: 550; white-space: nowrap;
+    }
+    .job-table td { padding: 15px 18px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+    .job-table tr:last-child td { border-bottom: 0; }
+    .job-table tbody tr { transition: background .16s ease; }
+    .job-table tbody tr:hover { background: rgba(255,255,255,.55); }
+    .job-title { display: block; color: var(--ink); font-weight: 600; font-size: 12px; }
+    .job-id { display: block; margin-top: 4px; color: var(--faint); font-family: var(--mono); font-size: 9px; }
+    .job-action { min-width: 44px; min-height: 44px; border: 0; background: transparent; color: var(--forest); font-size: 11px; padding: 0 4px; }
+    .job-action:hover { text-decoration: underline; }
+    .empty, .loading {
+      min-height: 420px; display: grid; place-content: center; text-align: center;
+      padding: 52px 22px;
+    }
+    .empty-mark, .loading-mark {
+      width: 56px; height: 56px; margin: 0 auto 18px; display: grid; place-items: center;
+      border: 1px solid var(--line-strong); color: var(--forest); background: var(--surface-strong);
+    }
+    .empty h2, .loading h2 { margin: 0; font-family: var(--display); font-size: 26px; letter-spacing: -.02em; }
+    .empty p, .loading p { max-width: 460px; margin: 10px auto 0; color: var(--muted); font-size: 12px; }
+    .empty .button { margin-top: 18px; }
+    .empty-path { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 24px; color: var(--muted); font-family: var(--mono); font-size: 9px; }
+    .empty-path span:nth-child(even) { color: var(--line-strong); }
+    .skeleton { background: linear-gradient(90deg, rgba(216,209,194,.34), rgba(255,255,255,.78), rgba(216,209,194,.34)); background-size: 220% 100%; animation: shimmer 1.8s infinite; }
+    @keyframes shimmer { to { background-position: -220% 0; } }
+    .loading-lines { width: min(660px, 80vw); margin: 28px auto 0; display: grid; gap: 10px; }
+    .loading-lines span { height: 13px; display: block; }
+    .error-board { border-color: #d3aaa4; background: #fff7f2; }
+    .error-board .section-head { border-bottom: 1px solid #e7cbc4; }
+    .error-body { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(300px, .9fr); }
+    .error-copy { padding: 24px; border-right: 1px solid #e7cbc4; }
+    .error-code { color: var(--danger); font-family: var(--mono); font-size: 10px; letter-spacing: .08em; }
+    .error-copy h2 { margin: 8px 0 10px; font-family: var(--display); font-size: 28px; }
+    .error-copy p { margin: 0; max-width: 620px; color: var(--ink-soft); font-size: 12px; line-height: 1.8; }
+    .diff-list { margin: 19px 0 0; display: grid; gap: 8px; }
+    .diff-row { display: grid; grid-template-columns: 1.1fr 1fr 1fr; gap: 12px; padding: 10px 12px; background: rgba(255,255,255,.7); border: 1px solid #e2cfca; font-size: 10px; }
+    .diff-row.head { color: var(--muted); font-weight: 600; background: transparent; border-color: transparent; padding-top: 0; }
+    .diff-row code { color: var(--danger); }
+    .error-next { padding: 24px; }
+    .error-next h3 { margin: 0 0 12px; font-size: 13px; }
+    .error-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+    .error-steps li { padding: 14px 0; border-top: 1px solid #e7cbc4; display: grid; grid-template-columns: 24px 1fr; gap: 10px; font-size: 11px; }
+    .error-steps b { width: 21px; height: 21px; display: grid; place-items: center; border: 1px solid #d3aaa4; color: var(--danger); font-family: var(--mono); font-size: 9px; font-weight: 500; }
+    .error-steps span { color: var(--muted); display: block; margin-top: 2px; }
+    .wizard-shell { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(300px, .6fr); gap: 24px; align-items: start; }
+    .wizard-steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border: 1px solid var(--line); background: rgba(251,248,240,.7); }
+    .wizard-step { min-height: 64px; border: 0; border-right: 1px solid var(--line); background: transparent; color: var(--muted); display: flex; align-items: center; gap: 9px; padding: 0 13px; text-align: left; font-size: 10px; }
+    .wizard-step:last-child { border-right: 0; }
+    .wizard-step b { font-family: var(--mono); font-size: 9px; color: var(--faint); }
+    .wizard-step.active { background: var(--surface-strong); color: var(--ink); box-shadow: inset 0 -2px 0 var(--copper); }
+    .wizard-step.active b { color: var(--copper); }
+    .wizard-step.done b { color: var(--success); }
+    .wizard-main { border: 1px solid var(--line); background: var(--surface); margin-top: 14px; min-height: 540px; display: flex; flex-direction: column; }
+    .wizard-body { padding: 27px 29px 24px; flex: 1; }
+    .wizard-kicker { color: var(--copper-deep); font-family: var(--mono); font-size: 9px; letter-spacing: .1em; text-transform: uppercase; }
+    .wizard-body h2 { margin: 7px 0 7px; font-family: var(--display); font-size: 30px; letter-spacing: -.025em; }
+    .wizard-body > p { margin: 0 0 24px; color: var(--muted); font-size: 12px; }
+    .field { display: grid; gap: 7px; margin-bottom: 17px; }
+    .field label { font-size: 11px; font-weight: 600; }
+    .field small { color: var(--muted); font-size: 10px; }
+    .input.wide { width: 100%; min-height: 46px; }
+    .choice-grid { display: grid; gap: 10px; }
+    .choice-card {
+      display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 12px;
+      align-items: start; padding: 16px; border: 1px solid var(--line); background: var(--surface-strong);
+    }
+    .choice-card.selected { border-color: var(--forest); box-shadow: inset 3px 0 0 var(--forest); }
+    .choice-radio { width: 17px; height: 17px; border: 1px solid var(--line-strong); border-radius: 50%; margin-top: 2px; display: grid; place-items: center; }
+    .choice-card.selected .choice-radio::after { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--forest); }
+    .choice-title { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 12px; font-weight: 600; }
+    .choice-meta { margin: 5px 0 0; color: var(--muted); font-size: 10px; line-height: 1.65; }
+    .tag { display: inline-flex; align-items: center; min-height: 21px; padding: 0 6px; border: 1px solid var(--line); color: var(--muted); font-size: 9px; font-weight: 500; }
+    .tag.good { color: var(--success); border-color: #b4d2c1; background: var(--success-soft); }
+    .tag.warn { color: var(--gold); border-color: #e0c894; background: var(--gold-soft); }
+    .boundary {
+      display: grid; grid-template-columns: 25px 1fr; gap: 11px; padding: 14px 15px;
+      border-left: 3px solid var(--copper); background: var(--copper-soft); color: var(--ink-soft); font-size: 11px; line-height: 1.7;
+    }
+    .boundary svg { color: var(--copper-deep); margin-top: 1px; }
+    .plan-card { border: 1px solid var(--line); background: var(--surface-strong); padding: 18px; }
+    .plan-top { display: flex; justify-content: space-between; gap: 15px; align-items: flex-start; }
+    .plan-top strong { font-size: 13px; }
+    .plan-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 22px; margin-top: 17px; }
+    .plan-grid div { border-top: 1px solid var(--line); padding-top: 9px; }
+    .plan-grid small { color: var(--muted); display: block; font-size: 9px; }
+    .plan-grid span { display: block; margin-top: 2px; font-size: 11px; }
+    .param-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); }
+    .param-cell { min-height: 79px; padding: 13px; background: var(--surface-strong); }
+    .param-cell small { display: flex; align-items: center; justify-content: space-between; color: var(--muted); font-size: 9px; }
+    .param-cell strong { display: block; margin-top: 7px; font-family: var(--mono); font-size: 14px; font-weight: 500; }
+    .param-cell.locked::after { content: "LOCKED"; color: var(--faint); font-family: var(--mono); font-size: 8px; }
+    .param-cell.editable { box-shadow: inset 0 -2px 0 var(--copper); }
+    .wizard-foot { display: flex; justify-content: space-between; gap: 12px; align-items: center; padding: 15px 20px; border-top: 1px solid var(--line); background: rgba(236,230,217,.4); }
+    .wizard-foot small { color: var(--muted); font-size: 10px; }
+    .manifest { position: sticky; top: 92px; border: 1px solid var(--line); background: var(--surface-strong); box-shadow: var(--shadow); }
+    .manifest-head { padding: 18px 18px 15px; background: var(--forest); color: #f3f6f3; }
+    .manifest-head small { display: block; color: #bfcfc5; font-family: var(--mono); font-size: 9px; letter-spacing: .1em; text-transform: uppercase; }
+    .manifest-head strong { display: block; margin-top: 5px; font-family: var(--display); font-size: 21px; }
+    .manifest-body { padding: 17px 18px; }
+    .manifest-row { display: grid; grid-template-columns: 72px 1fr; gap: 9px; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 10px; }
+    .manifest-row:last-of-type { border-bottom: 0; }
+    .manifest-row span { color: var(--muted); }
+    .manifest-row strong { font-weight: 550; overflow-wrap: anywhere; }
+    .manifest-foot { margin-top: 10px; padding: 12px; background: var(--paper-deep); color: var(--muted); font-size: 10px; line-height: 1.7; }
+    .error-summary { display: none; margin-bottom: 17px; border: 1px solid #d8aaa3; background: var(--danger-soft); padding: 13px 15px; color: var(--danger); font-size: 11px; }
+    .error-summary.show { display: block; }
+    .field-error { display: none; color: var(--danger); font-size: 10px; }
+    .field.invalid .field-error { display: block; }
+    .field.invalid .input { border-color: var(--danger); }
+    .detail-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; margin-bottom: 22px; }
+    .detail-title { display: flex; align-items: flex-start; gap: 15px; }
+    .back-button { min-width: 44px; min-height: 44px; display: grid; place-items: center; border: 1px solid var(--line-strong); background: transparent; color: var(--ink-soft); }
+    .back-button:hover { background: var(--surface-strong); }
+    .detail-title h1 { margin: 0; font-family: var(--display); font-size: 35px; letter-spacing: -.03em; line-height: 1.1; }
+    .detail-title p { margin: 7px 0 0; color: var(--muted); font-size: 11px; }
+    .detail-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+    .tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line-strong); overflow-x: auto; }
+    .tab { min-height: 45px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--muted); padding: 0 16px; white-space: nowrap; font-size: 11px; }
+    .tab:hover { color: var(--ink); background: rgba(255,255,255,.38); }
+    .tab.active { color: var(--ink); border-bottom-color: var(--copper); font-weight: 600; }
+    .detail-layout { display: grid; grid-template-columns: minmax(0, 1fr) 310px; gap: 20px; align-items: start; margin-top: 20px; }
+    .detail-main { min-width: 0; }
+    .fact-banner { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border: 1px solid var(--line); background: var(--surface); }
+    .fact-banner div { min-height: 76px; padding: 14px 15px; border-right: 1px solid var(--line); }
+    .fact-banner div:last-child { border-right: 0; }
+    .fact-banner small { color: var(--muted); display: block; font-size: 9px; }
+    .fact-banner strong { display: block; margin-top: 6px; font-family: var(--mono); font-size: 12px; font-weight: 500; overflow-wrap: anywhere; }
+    .timeline-panel { margin-top: 16px; border: 1px solid var(--line); background: var(--surface); }
+    .timeline-panel .section-head { padding-bottom: 14px; }
+    .timeline { padding: 4px 24px 24px; }
+    .timeline-row { position: relative; display: grid; grid-template-columns: 65px 18px minmax(0, 1fr) auto; gap: 11px; align-items: start; min-height: 57px; font-size: 11px; }
+    .timeline-row time { color: var(--faint); font-family: var(--mono); font-size: 9px; padding-top: 2px; }
+    .timeline-pin { position: relative; width: 15px; height: 15px; border: 1px solid var(--line-strong); border-radius: 50%; background: var(--surface); margin-top: 1px; }
+    .timeline-row:not(:last-child) .timeline-pin::after { content: ""; position: absolute; top: 14px; left: 6px; width: 1px; height: 43px; background: var(--line); }
+    .timeline-row.done .timeline-pin { background: var(--forest); border-color: var(--forest); }
+    .timeline-row.active .timeline-pin { border-color: var(--copper); box-shadow: 0 0 0 4px var(--copper-soft); }
+    .timeline-row strong { display: block; font-size: 11px; font-weight: 600; }
+    .timeline-row p { margin: 3px 0 0; color: var(--muted); font-size: 10px; }
+    .timeline-row .status { justify-self: end; }
+    .analysis-card, .logs-card, .artifacts-main { border: 1px solid var(--line); background: var(--surface); }
+    .analysis-chart { padding: 0 18px 18px; }
+    .metric-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+    .metric-table th, .metric-table td { padding: 10px 13px; text-align: left; border-bottom: 1px solid var(--line); }
+    .metric-table th { color: var(--muted); background: var(--paper-deep); font-weight: 550; }
+    .log-console { background: var(--log); color: #cedbd3; font-family: var(--mono); font-size: 11px; line-height: 1.8; min-height: 410px; }
+    .log-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 13px; background: var(--log-soft); border-bottom: 1px solid #314039; }
+    .log-toolbar .input, .log-toolbar .select { background: #18211c; color: #dce8df; border-color: #43544b; min-height: 36px; }
+    .log-toolbar .button { background: #1f3129; border-color: #43544b; }
+    .log-lines { padding: 12px 0; min-height: 320px; }
+    .log-line { display: grid; grid-template-columns: 70px 68px 48px minmax(0, 1fr); gap: 7px; padding: 3px 14px; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .log-line:hover { background: rgba(255,255,255,.035); }
+    .log-time { color: #758a7e; }
+    .log-level { color: #9ab29f; }
+    .log-level.error { color: #ef978b; }
+    .log-source { color: #719e8a; }
+    .log-empty { padding: 40px 20px; text-align: center; color: #8fa397; }
+    .artifact-gate { border: 1px solid var(--line); background: var(--surface-strong); padding: 22px; display: flex; justify-content: space-between; gap: 18px; align-items: center; }
+    .artifact-gate h2 { margin: 0; font-family: var(--display); font-size: 25px; }
+    .artifact-gate p { margin: 5px 0 0; color: var(--muted); font-size: 11px; }
+    .artifact-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 15px; }
+    .artifact-card { border: 1px solid var(--line); background: var(--surface); display: flex; flex-direction: column; }
+    .artifact-card.best { border-top: 3px solid var(--forest); }
+    .artifact-card.final { border-top: 3px solid var(--copper); }
+    .artifact-head { padding: 17px 18px 14px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; gap: 12px; }
+    .artifact-role { color: var(--muted); font-family: var(--mono); font-size: 9px; letter-spacing: .1em; text-transform: uppercase; }
+    .artifact-head strong { display: block; margin-top: 4px; font-family: var(--display); font-size: 22px; }
+    .artifact-body { padding: 14px 18px; flex: 1; }
+    .artifact-metric { display: flex; align-items: baseline; gap: 7px; margin-bottom: 13px; }
+    .artifact-metric b { font-family: var(--mono); font-size: 28px; font-weight: 500; }
+    .artifact-metric span { color: var(--muted); font-size: 9px; }
+    .artifact-facts { display: grid; gap: 7px; margin: 0; }
+    .artifact-facts div { display: grid; grid-template-columns: 72px minmax(0, 1fr); gap: 8px; font-size: 10px; }
+    .artifact-facts span { color: var(--muted); }
+    .artifact-facts code { font-family: var(--mono); font-size: 9px; overflow-wrap: anywhere; }
+    .artifact-actions { padding: 13px 18px 18px; display: grid; gap: 8px; }
+    .handoff { margin-top: 16px; border: 1px solid #b8cabf; background: var(--forest-soft); padding: 18px; display: flex; align-items: center; justify-content: space-between; gap: 18px; }
+    .handoff strong { display: block; font-size: 13px; }
+    .handoff p { margin: 4px 0 0; color: var(--ink-soft); font-size: 11px; }
+    .detail-side { display: grid; gap: 14px; }
+    .side-panel { border: 1px solid var(--line); background: var(--surface); }
+    .side-panel-head { padding: 14px 16px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; gap: 10px; align-items: center; }
+    .side-panel-head h3 { margin: 0; font-size: 12px; }
+    .side-panel-body { padding: 14px 16px 16px; }
+    .side-panel .fact-list li { grid-template-columns: 75px minmax(0, 1fr); gap: 8px; }
+    .scene-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .state-dock {
+      position: fixed; right: 18px; bottom: 18px; z-index: 40;
+      font-family: var(--mono); font-size: 11px;
+    }
+    .state-toggle { min-height: 44px; padding: 0 12px; border: 1px solid #6f7b72; background: #1c2822; color: #d8e4dc; box-shadow: 0 8px 24px rgba(0,0,0,.2); }
+    .state-menu { position: absolute; right: 0; bottom: 44px; width: 190px; padding: 6px; display: none; background: #1c2822; color: #dce6df; border: 1px solid #526158; box-shadow: 0 14px 35px rgba(0,0,0,.25); }
+    .state-menu.open { display: block; }
+    .state-menu button { display: flex; justify-content: space-between; width: 100%; min-height: 35px; padding: 0 8px; border: 0; background: transparent; color: inherit; font: inherit; }
+    .state-menu button:hover { background: rgba(255,255,255,.08); }
+    .state-menu button[aria-current="true"] { color: #f0ad84; }
+    .dialog {
+      width: min(560px, calc(100vw - 28px)); padding: 0; border: 1px solid var(--line-strong);
+      background: var(--surface-strong); color: var(--ink); box-shadow: 0 28px 90px rgba(28, 24, 17, .26);
+    }
+    .dialog::backdrop { background: rgba(17, 21, 18, .5); backdrop-filter: blur(3px); }
+    .dialog-head { padding: 22px 23px 0; }
+    .dialog-head small { color: var(--copper-deep); font-family: var(--mono); font-size: 9px; letter-spacing: .09em; text-transform: uppercase; }
+    .dialog-head h2 { margin: 6px 0 0; font-family: var(--display); font-size: 26px; }
+    .dialog-body { padding: 14px 23px 20px; color: var(--ink-soft); font-size: 12px; line-height: 1.8; }
+    .dialog-note { padding: 12px 13px; background: var(--paper-deep); color: var(--muted); font-size: 10px; }
+    .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; padding: 15px 23px 20px; border-top: 1px solid var(--line); }
+    .dialog-field { display: grid; gap: 6px; margin-top: 14px; }
+    .dialog-field label { color: var(--ink-soft); font-size: 11px; font-weight: 600; }
+    .dialog-field .input { width: 100%; }
+    .dialog-check { display: flex; align-items: flex-start; gap: 9px; margin-top: 12px; color: var(--muted); font-size: 10px; line-height: 1.65; }
+    .dialog-check input { margin-top: 2px; accent-color: var(--forest); }
+    .toast {
+      position: fixed; z-index: 50; left: 50%; bottom: 27px; transform: translate(-50%, 20px);
+      max-width: min(440px, calc(100vw - 32px)); padding: 12px 16px; opacity: 0; pointer-events: none;
+      color: #f4f7f4; background: #1f3028; border: 1px solid #4a5e52; box-shadow: var(--shadow);
+      font-size: 11px; transition: opacity .2s ease, transform .2s ease;
+    }
+    .toast.show { opacity: 1; transform: translate(-50%, 0); }
+    .serving-layout { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(300px, .65fr); gap: 20px; align-items: start; }
+    .chat-panel { border: 1px solid var(--line); background: var(--surface); min-height: 640px; display: flex; flex-direction: column; }
+    .chat-head { display: flex; align-items: center; justify-content: space-between; gap: 15px; padding: 17px 20px; border-bottom: 1px solid var(--line); }
+    .chat-title { display: flex; align-items: center; gap: 12px; }
+    .chat-avatar { width: 35px; height: 35px; display: grid; place-items: center; background: var(--forest); color: #fff; font-family: var(--display); font-size: 18px; }
+    .chat-head h2 { margin: 0; font-size: 13px; }
+    .chat-head p { margin: 3px 0 0; color: var(--muted); font-size: 10px; }
+    .chat-stream { flex: 1; padding: 22px 24px; overflow: auto; min-height: 360px; }
+    .message { display: grid; grid-template-columns: 50px minmax(0, 1fr); gap: 13px; max-width: 700px; padding: 13px 0; border-bottom: 1px solid var(--line); }
+    .message.user { margin-left: auto; grid-template-columns: minmax(0, 1fr) 50px; text-align: right; }
+    .message.user .message-meta { grid-column: 2; grid-row: 1; text-align: right; }
+    .message.user .message-body { grid-column: 1; grid-row: 1; width: min(100%, 560px); justify-self: end; }
+    .message-meta { color: var(--muted); font-family: var(--mono); font-size: 9px; padding-top: 2px; }
+    .message p { margin: 0; padding: 10px 12px; background: var(--surface-strong); border: 1px solid var(--line); font-size: 12px; line-height: 1.75; white-space: pre-wrap; }
+    .message.user p { background: var(--forest); color: #f1f6f2; border-color: var(--forest); text-align: left; }
+    .message.assistant .message-body { grid-column: 2; }
+    .chat-empty { max-width: 570px; margin: 50px auto 0; text-align: center; color: var(--muted); }
+    .chat-empty-mark { width: 54px; height: 54px; display: grid; place-items: center; border: 1px solid var(--line-strong); margin: 0 auto 13px; color: var(--forest); }
+    .chat-empty strong { color: var(--ink); font-family: var(--display); font-size: 22px; }
+    .chat-empty p { margin: 6px auto 0; font-size: 11px; max-width: 430px; }
+    .prompt-chips { display: flex; flex-wrap: wrap; gap: 7px; justify-content: center; margin-top: 16px; }
+    .prompt-chip { min-height: 44px; padding: 0 10px; border: 1px solid var(--line-strong); background: transparent; color: var(--ink-soft); font-size: 10px; }
+    .prompt-chip:hover { background: var(--paper-deep); }
+    .chat-compose { border-top: 1px solid var(--line); padding: 15px 20px 18px; }
+    .chat-compose textarea {
+      width: 100%; min-height: 84px; resize: vertical; padding: 12px; border: 1px solid var(--line-strong);
+      background: var(--surface-strong); color: var(--ink); line-height: 1.6;
+    }
+    .chat-compose textarea:disabled { background: var(--paper-deep); color: var(--muted); }
+    .compose-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 9px; }
+    .compose-row small { color: var(--muted); font-size: 9px; }
+    .serving-side { display: grid; gap: 14px; }
+    .identity-card { background: var(--forest); color: #eef5f0; border: 1px solid var(--forest-deep); }
+    .identity-card .side-panel-head { border-color: rgba(255,255,255,.14); }
+    .identity-card .side-panel-head h3 { color: #fff; }
+    .identity-card .side-panel-body { padding-top: 15px; }
+    .identity-card .fact-list li { color: #d2ded6; }
+    .identity-card .fact-list .fact-key { color: #a4b8ab; }
+    .identity-card .fact-list .fact-value { color: #eef5f0; }
+    .gate-list { display: grid; gap: 9px; margin: 0; padding: 0; list-style: none; }
+    .gate-list li { display: grid; grid-template-columns: 19px 1fr; gap: 8px; align-items: start; font-size: 10px; }
+    .gate-list b { width: 17px; height: 17px; display: grid; place-items: center; border: 1px solid #afcdbb; color: var(--success); font-size: 9px; }
+    .gate-list li.warn b { border-color: #dfc087; color: var(--gold); }
+    .gate-list span { color: var(--ink-soft); }
+    .gate-list small { display: block; color: var(--muted); margin-top: 2px; }
+    .inline-note { color: var(--muted); font-size: 10px; line-height: 1.65; }
+    .demo-banner {
+      display: flex; align-items: center; justify-content: space-between; gap: 13px;
+      margin-bottom: 20px; padding: 11px 14px; border: 1px solid var(--line);
+      color: var(--muted); background: rgba(251,248,240,.65); font-size: 10px;
+    }
+    .demo-banner strong { color: var(--ink); }
+    .demo-banner button { border: 0; background: transparent; color: var(--copper-deep); min-height: 32px; padding: 0 3px; font-size: 10px; }
+    .footer { display: flex; justify-content: space-between; gap: 18px; margin-top: 26px; padding-top: 17px; border-top: 1px solid var(--line); color: var(--muted); font-size: 9px; }
+    @media (max-width: 1120px) {
+      .topbar { padding-inline: 20px; gap: 15px; }
+      .brand { min-width: 150px; }
+      .nav-link { padding-inline: 10px; }
+      .page { padding-inline: 22px; }
+      .overview-grid { grid-template-columns: minmax(0, 1.45fr) minmax(270px, .7fr); }
+      .run-body { grid-template-columns: 1fr; }
+      .run-narrative { border-right: 0; border-bottom: 1px solid var(--line); }
+      .detail-layout, .serving-layout { grid-template-columns: minmax(0, 1fr) 280px; }
+    }
+    @media (max-width: 900px) {
+      .topbar { flex-wrap: wrap; padding-top: 9px; padding-bottom: 0; }
+      .brand { min-width: 0; }
+      .primary-nav { order: 3; width: 100%; overflow-x: auto; }
+      .topbar-meta { margin-left: auto; }
+      .topbar-meta .system-state, .topbar-meta .env-label { display: none; }
+      .hero { grid-template-columns: 1fr; align-items: start; }
+      .hero-actions { justify-content: flex-start; }
+      .overview-grid, .wizard-shell, .detail-layout, .serving-layout { grid-template-columns: 1fr; }
+      .manifest { position: static; }
+      .detail-side, .serving-side { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .error-body { grid-template-columns: 1fr; }
+      .error-copy { border-right: 0; border-bottom: 1px solid #e7cbc4; }
+      .runway { overflow-x: auto; grid-template-columns: repeat(5, minmax(150px, 1fr)); }
+    }
+    @media (max-width: 680px) {
+      .topbar { flex-wrap: wrap; gap: 6px 10px; padding: 7px 15px 0; }
+      .brand-copy small { display: none; }
+      .topbar-meta .user-chip { display: none; }
+      .topbar-meta { gap: 8px; }
+      .primary-nav { order: 3; width: 100%; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; margin-top: 6px; overflow: visible; }
+      .nav-link { min-height: 44px; justify-content: center; padding: 0 5px; border-bottom: 0; font-size: 10px; }
+      .page { padding: 24px 14px 92px; }
+      .breadcrumbs { margin-bottom: 17px; font-size: 9px; }
+      .hero { gap: 18px; margin-bottom: 22px; }
+      .hero h1 { font-size: 38px; }
+      .hero p { font-size: 12px; }
+      .hero-actions { width: 100%; }
+      .hero-actions .button { flex: 1; }
+      .runway { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-left: -14px; margin-right: -14px; border-left: 0; border-right: 0; overflow: visible; }
+      .runway::before { display: none; }
+      .stage { min-height: 82px; padding: 13px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+      .stage:nth-child(2n) { border-right: 0; }
+      .stage:last-child { grid-column: 1 / -1; border-right: 0; border-bottom: 0; }
+      .stage small { display: none; }
+      .current-head { align-items: flex-start; padding: 18px 16px; }
+      .run-title { font-size: 18px; }
+      .metric-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .metric:nth-child(2) { border-right: 0; }
+      .metric:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
+      .run-narrative, .evidence-side { padding: 18px 16px; }
+      .curve-wrap { min-height: 228px; }
+      .section-head { padding: 17px 16px 14px; }
+      .section-head h2 { font-size: 21px; }
+      .queue-tools { width: 100%; }
+      .queue-tools .input { flex: 1 1 190px; }
+      .job-table thead { display: none; }
+      .job-table, .job-table tbody, .job-table tr, .job-table td { display: block; width: 100%; }
+      .job-table tr { padding: 13px 15px; border-bottom: 1px solid var(--line); }
+      .job-table td { padding: 4px 0; border: 0; }
+      .job-table td[data-label]::before { content: attr(data-label); display: inline-block; min-width: 62px; color: var(--muted); font-size: 9px; }
+      .wizard-body { padding: 21px 17px; }
+      .wizard-body h2 { font-size: 25px; }
+      .wizard-steps { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+      .wizard-step { min-height: 54px; justify-content: center; padding: 0 5px; }
+      .wizard-step span { display: none; }
+      .param-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .plan-grid { grid-template-columns: 1fr 1fr; }
+      .detail-head { flex-direction: column; }
+      .detail-actions { justify-content: flex-start; }
+      .detail-title h1 { font-size: 29px; }
+      .fact-banner { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .fact-banner div:nth-child(2) { border-right: 0; }
+      .fact-banner div:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
+      .timeline-row { grid-template-columns: 48px 16px minmax(0, 1fr); }
+      .timeline-row .status { grid-column: 3; justify-self: start; margin-top: -4px; }
+      .timeline { padding: 2px 15px 16px; }
+      .artifact-gate, .handoff { flex-direction: column; align-items: flex-start; padding: 16px; }
+      .artifact-pair { grid-template-columns: 1fr; }
+      .detail-side, .serving-side { grid-template-columns: 1fr; }
+      .serving-layout {} 
+      .chat-stream { padding: 16px; }
+      .chat-compose { padding-inline: 14px; }
+      .message { grid-template-columns: 36px minmax(0, 1fr); }
+      .message.user { grid-template-columns: minmax(0, 1fr) 36px; }
+      .log-line { grid-template-columns: 60px 45px 35px minmax(0, 1fr); padding-inline: 10px; }
+      .log-source { display: none; }
+      .diff-row { grid-template-columns: 1fr; gap: 4px; }
+      .diff-row.head { display: none; }
+      .footer { flex-direction: column; gap: 6px; }
+      .state-dock { right: 10px; bottom: 10px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <div class="state-dock">
+    <div class="state-menu" id="state-menu" aria-label="原型状态切换">
+      <button data-scenario="running">训练中 <span>RUNNING</span></button>
+      <button data-scenario="success">产物成功 <span>SUCCESS</span></button>
+      <button data-scenario="waiting">等待实例 <span>WAITING</span></button>
+      <button data-scenario="loading">加载中 <span>LOADING</span></button>
+      <button data-scenario="empty">空状态 <span>EMPTY</span></button>
+      <button data-scenario="error">失败诊断 <span>ERROR</span></button>
+    </div>
+    <button class="state-toggle" id="state-toggle" aria-expanded="false" aria-controls="state-menu">原型状态 · <span id="state-label">训练中</span></button>
+  </div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <dialog class="dialog" id="action-dialog"></dialog>
+  <script>
+    const icons = {
+      plus: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>',
+      arrow: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5"/></svg>',
+      back: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5m5-5-5 5 5 5"/></svg>',
+      chart: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19V5m0 14h16M7 15l4-5 4 2 5-7"/></svg>',
+      file: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8l4 4v14H6zM14 3v5h4M9 12h6M9 16h4"/></svg>',
+      terminal: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4zM7 9l3 3-3 3M12 15h5"/></svg>',
+      shield: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 5 6v5c0 4.5 2.9 8.2 7 10 4.1-1.8 7-5.5 7-10V6l-7-3zM9 12l2 2 4-4"/></svg>',
+      alert: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 2 21h20L12 3zm0 6v6m0 3h.01"/></svg>',
+      refresh: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 6M20 4v7h-7"/></svg>',
+      down: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v13m-5-5 5 5 5-5M5 21h14"/></svg>',
+      stop: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6h12v12H6z"/></svg>',
+      search: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg>',
+      play: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7L8 5z"/></svg>',
+      check: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>',
+      copy: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 8h11v12H8zM5 16V4h11"/></svg>',
+      menu: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>'
+    };
+
+    const scenarios = ['running', 'success', 'waiting', 'loading', 'empty', 'error'];
+    const scenarioLabels = { running: '训练中', success: '产物成功', waiting: '等待实例', loading: '加载中', empty: '空状态', error: '失败诊断' };
+    const params = new URLSearchParams(location.search);
+    const initialScenario = scenarios.includes(params.get('scenario')) ? params.get('scenario') : 'running';
+    const initialView = ['overview', 'create', 'detail', 'serving'].includes(params.get('view')) ? params.get('view') : 'overview';
+    const state = {
+      view: initialView,
+      scenario: initialScenario,
+      detailTab: params.get('tab') || 'overview',
+      wizardStep: Number(params.get('step') || 1),
+      logQuery: '',
+      logLevel: 'all',
+      selectedRun: 'current',
+      chat: [],
+      sending: false,
+      menuOpen: false,
+      submitted: false
+    };
+
+    const jobs = [
+      { title: '客服意图 LoRA · qwen3', id: '8e024600', attempt: '#7', status: 'running', statusLabel: '训练中', stage: '训练执行', metric: 'step 80 · 0.4362', time: '1 分钟前' },
+      { title: '客服意图 LoRA · 基线复测', id: '5bb29e33', attempt: '#6', status: 'success', statusLabel: '已成功', stage: '产物 2/2', metric: 'eval 0.3389', time: '昨天 18:42' },
+      { title: '意图分类 · 对比 preset', id: 'ce40a491', attempt: '#2', status: 'waiting', statusLabel: '等实例', stage: '待绑定实例', metric: '—', time: '昨天 16:10' },
+      { title: '意图分类 · 运行时诊断', id: 'c27f9844', attempt: '#1', status: 'error', statusLabel: '需处理', stage: '运行时不兼容', metric: 'image mismatch', time: '昨天 15:28' }
+    ];
+
+    const metrics = [
+      { step: 20, epoch: .36, train: .7821, eval: .6632, lr: '2.00e-4' },
+      { step: 40, epoch: .48, train: .6153, eval: .5114, lr: '1.94e-4' },
+      { step: 60, epoch: .71, train: .5148, eval: .4239, lr: '1.82e-4' },
+      { step: 80, epoch: .95, train: .4362, eval: .3218, lr: '1.64e-4' }
+    ];
+
+    const logRows = [
+      { time: '10:28:04', source: 'WORKER', level: 'INFO', text: '正在准备远程工作目录；实例 u-4090-02-7fca 已通过清理授权。' },
+      { time: '10:28:11', source: 'WORKER', level: 'INFO', text: '数据集 v3 已挂载，拆分 split-4f82b9d1 与冻结快照一致。' },
+      { time: '10:28:14', source: 'WORKER', level: 'INFO', text: '基座指纹 Qwen3-0.6B-20261102-r1 与兼容基线一致。' },
+      { time: '10:28:39', source: 'TRAINER', level: 'INFO', text: 'llamafactory training started · epochs=1 · cutoff_len=512 · lora_r=8' },
+      { time: '10:31:56', source: 'TRAINER', level: 'INFO', text: 'step 20/168 · loss 0.7821 · eval_loss 0.6632 · lr 2.00e-4' },
+      { time: '10:32:02', source: 'TRAINER', level: 'INFO', text: 'step 40/168 · loss 0.6153 · eval_loss 0.5114 · lr 1.94e-4' },
+      { time: '10:32:08', source: 'TRAINER', level: 'INFO', text: 'step 60/168 · loss 0.5148 · eval_loss 0.4239 · lr 1.82e-4' },
+      { time: '10:32:12', source: 'TRAINER', level: 'INFO', text: 'step 80/168 · loss 0.4362 · eval_loss 0.3218 · lr 1.64e-4' }
+    ];
+
+    function icon(name) { return icons[name] || ''; }
+    function statusClass(status) {
+      return status === 'success' ? 'success' : status === 'error' ? 'error' : status === 'waiting' ? 'waiting' : status === 'running' ? 'running' : 'idle';
+    }
+    function statusText(status, label) {
+      return `<span class="status ${statusClass(status)}">${label || (status === 'success' ? '已成功' : status === 'error' ? '需处理' : status === 'waiting' ? '等待实例' : status === 'running' ? '训练中' : '未开始')}</span>`;
+    }
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+    }
+    function currentStatus() {
+      return ['loading', 'empty', 'error', 'waiting', 'success'].includes(state.scenario) ? state.scenario : 'running';
+    }
+    function updateUrl() {
+      const q = new URLSearchParams();
+      if (state.view !== 'overview') q.set('view', state.view);
+      if (state.scenario !== 'running') q.set('scenario', state.scenario);
+      if (state.view === 'detail' && state.detailTab !== 'overview') q.set('tab', state.detailTab);
+      history.replaceState(null, '', `${location.pathname}${q.toString() ? '?' + q.toString() : ''}`);
+    }
+    function toast(message) {
+      const node = document.getElementById('toast');
+      node.textContent = message;
+      node.classList.add('show');
+      clearTimeout(window.__toastTimer);
+      window.__toastTimer = setTimeout(() => node.classList.remove('show'), 3200);
+    }
+    function setView(view, options = {}) {
+      if (view === 'serving') state.scenario = 'success';
+      state.view = view;
+      if (options.tab) state.detailTab = options.tab;
+      if (view !== 'detail') state.detailTab = 'overview';
+      state.menuOpen = false;
+      updateUrl();
+      render();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    function setScenario(scenario) {
+      state.scenario = scenario;
+      state.menuOpen = false;
+      if (scenario === 'success') state.view = state.view === 'serving' ? 'serving' : 'overview';
+      updateUrl();
+      render();
+      toast(`已切换到「${scenarioLabels[scenario]}」演示状态`);
+    }
+    function topbar() {
+      const nav = [
+        ['工作台', 'overview'], ['数据集', 'datasets'], ['模型', 'models'], ['计算环境', 'compute'], ['训练', 'training'], ['推理试用', 'serving']
+      ];
+      return `<header class="topbar">
+        <div class="brand"><span class="brand-mark">M</span><span class="brand-copy"><strong>ModelForge</strong><small>RUNWAY / 铸程线</small></span></div>
+        <nav class="primary-nav" aria-label="主导航">
+          ${nav.map(([label, key]) => `<button class="nav-link ${(key === 'training' && ['overview','create','detail'].includes(state.view)) || (key === 'serving' && state.view === 'serving') ? 'active' : ''}" data-nav="${key}" type="button">${label}</button>`).join('')}
+        </nav>
+        <div class="topbar-meta">
+          <span class="system-state"><i></i>控制面正常</span>
+          <span class="env-label mono">个人工作区 · 手动算力</span>
+          <span class="user-chip" aria-label="用户 林">林</span>
+        </div>
+      </header>`;
+    }
+    function pageHeader() {
+      return `<div class="breadcrumbs"><span>ModelForge</span><span class="slash">/</span><span>个人工作空间</span><span class="slash">/</span><span>${state.view === 'serving' ? '推理试用' : state.view === 'create' ? '训练 / 新建' : state.view === 'detail' ? '训练 / 运行详情' : '训练'}</span></div>`;
+    }
+    function hero() {
+      const isServing = state.view === 'serving';
+      return `<section class="hero">
+        <div>
+          <h1>${isServing ? '<span class="hero-line">让模型产物，</span><span class="hero-line">通过一次<em>真实的对话验收</em>。</span>' : '<span class="hero-line">把一次微调，</span><span class="hero-line">做成<em>可验收的投产线</em>。</span>'}</h1>
+          <p>${isServing ? '从已发布的 Best Adapter 发起独立推理实例；会话、证据和回收动作都留在同一条生产记录里。' : '从冻结输入、手动实例、训练执行，到 Best / Final 产物和推理试用，每一个门禁都能被看见、被复核。'}</p>
+        </div>
+        <div class="hero-actions">
+          ${!isServing ? `<button class="button secondary" type="button" data-action="refresh">${icon('refresh')}刷新事实</button><button class="button" type="button" data-action="new-training">${icon('plus')}新建训练</button>` : `<button class="button secondary" type="button" data-action="back-detail">${icon('back')}返回产物</button><button class="button" type="button" data-action="new-training">${icon('plus')}新训练</button>`}
+        </div>
+      </section>`;
+    }
+    function runway() {
+      const active = state.scenario === 'success' ? 4 : state.scenario === 'error' ? 1 : state.scenario === 'waiting' ? 1 : 2;
+      const stages = [
+        ['01', '冻结输入', '数据版本 · 基座指纹'],
+        ['02', '核验实例', '手动创建 · 运行时检查'],
+        ['03', '训练执行', '实时步数 · Loss · 日志'],
+        ['04', '产物验收', 'Best + Final = 2/2'],
+        ['05', '推理试用', '独立实例 · 对话 · 回收']
+      ];
+      return `<section class="runway" aria-label="训练生命周期">
+        ${stages.map(([index, title, sub], i) => {
+          const done = i < active;
+          const isActive = i === active;
+          return `<button type="button" class="stage ${done ? 'done' : ''} ${isActive ? 'active' : ''}" data-action="open-stage" data-stage="${i}">
+            <span class="stage-index"><span>${done ? '✓' : index}</span><span>${done ? 'VERIFIED' : isActive ? (state.scenario === 'success' ? 'READY' : state.scenario === 'waiting' ? 'WAITING' : 'IN PROGRESS') : 'PENDING'}</span></span>
+            <strong>${title}</strong><small>${sub}</small>
+          </button>`;
+        }).join('')}
+      </section>`;
+    }
+    function chartSvg(compact = false) {
+      const h = compact ? 118 : 145;
+      return `<svg class="curve" viewBox="0 0 520 ${h}" role="img" aria-label="训练与验证 Loss 曲线：训练 Loss 从 0.7821 降至 0.4362，验证 Loss 从 0.6632 降至 0.3218">
+        <line class="curve-grid" x1="42" y1="22" x2="500" y2="22"/><line class="curve-grid" x1="42" y1="58" x2="500" y2="58"/>
+        <line class="curve-grid" x1="42" y1="94" x2="500" y2="94"/><line class="curve-grid" x1="42" y1="${h - 23}" x2="500" y2="${h - 23}"/>
+        <text class="curve-axis" x="2" y="26">0.80</text><text class="curve-axis" x="2" y="62">0.60</text><text class="curve-axis" x="2" y="98">0.40</text><text class="curve-axis" x="2" y="${h - 19}">0.20</text>
+        <text class="curve-axis" x="46" y="${h - 7}">20</text><text class="curve-axis" x="178" y="${h - 7}">40</text><text class="curve-axis" x="310" y="${h - 7}">60</text><text class="curve-axis" x="440" y="${h - 7}">80</text>
+        <path class="curve-train" d="M48 42 C95 55, 112 76, 164 88 S236 104, 286 112 S380 120, 488 124"/>
+        <path class="curve-eval" d="M48 88 C92 100, 118 105, 164 109 S236 116, 286 118 S380 121, 488 122"/>
+        <circle class="curve-dot" cx="286" cy="112" r="3.3"/><circle class="curve-dot" cx="286" cy="118" r="3.3"/>
+      </svg>`;
+    }
+    function overviewRunning() {
+      return `${hero()}${runway()}
+        <div class="overview-grid">
+          <section class="panel current-run">
+            <div class="current-head">
+              <div>
+                <div class="run-title-row"><h2 class="run-title">客服意图 LoRA · qwen3</h2>${statusText('running', '训练中')}<span class="tag">ATTEMPT #7</span></div>
+                <p class="run-sub">创建于 11/04 10:24 · 最后更新 10:32:12 · 唯一兼容基线 qwen3-0.6b-rtx4090-cn-bj2-partial</p>
+              </div>
+              <button class="button small secondary" type="button" data-action="open-detail">查看运行详情${icon('arrow')}</button>
+            </div>
+            <div class="metric-strip">
+              <div class="metric"><small>最新 step</small><strong>80 <span style="display:inline;font-size:11px;color:var(--faint)">/ 168</span></strong><span>epoch 0.95</span></div>
+              <div class="metric"><small>Train Loss</small><strong>0.4362</strong><span>较上一点 ↓ 0.0786</span></div>
+              <div class="metric"><small>Eval Loss</small><strong>0.3218</strong><span>当前最佳验证点</span></div>
+              <div class="metric"><small>Learning Rate</small><strong>1.64e-4</strong><span>cosine · 来自 trainer</span></div>
+            </div>
+            <div class="run-body">
+              <div class="run-narrative">
+                <h3>当前阶段</h3>
+                <p>远程训练进程正在执行。指标与日志按真实采样更新；当前接口不提供总步数预测之外的进度承诺。</p>
+                <div class="live-line"><time>10:28:39</time><span>训练进程已启动，基座与数据拆分通过原子校验。</span></div>
+                <div class="live-line"><time>10:31:56</time><span>采集到第一个有效验证点，Eval Loss 0.6632。</span></div>
+                <div class="live-line"><time>10:32:12</time><span>已到 step 80，Product 门禁仍等待训练自然结束。</span></div>
+                <div class="run-actions">
+                  <button class="button" type="button" data-action="open-detail-logs">${icon('terminal')}查看实时日志</button>
+                  <button class="button secondary" type="button" data-action="open-detail-analysis">${icon('chart')}分析指标</button>
+                  <button class="button ghost" type="button" data-action="request-cancel">安全取消</button>
+                </div>
+              </div>
+              <figure class="curve-wrap">
+                <div class="curve-head"><span class="curve-title">训练 / 验证 Loss · 当前 Attempt</span><span class="curve-legend"><span><i class="train"></i>Train</span><span><i class="eval"></i>Eval</span></span></div>
+                ${chartSvg()}
+                <div class="curve-foot"><span>最新采样 10:32:12</span><span>4 个训练点 · 4 个验证点</span></div>
+              </figure>
+            </div>
+          </section>
+          <aside class="panel evidence-side">
+            <div class="side-kicker"><h3>下一步</h3><span>ONLY ONE MOVE</span></div>
+            <div class="side-main">
+              <strong>先让训练跑完<br>再验收产物</strong>
+              <p>当前训练实例由你手动创建。平台不会代购、预留或自动替换实例。失败或取消后仍由同一套清理门禁释放资源。</p>
+              <button class="button" type="button" data-action="open-detail">${icon('arrow')}打开运行详情</button>
+            </div>
+            <div class="side-divider"></div>
+            <div class="side-kicker"><h3>冻结事实</h3><span>MANIFEST</span></div>
+            <ul class="fact-list" style="margin-top:15px">
+              <li><span class="fact-key">数据集</span><span class="fact-value">客服意图训练集 · v3<br><span class="mono">1,116 / 124 样本 · split-4f82b9d1</span></span></li>
+              <li><span class="fact-key">基座</span><span class="fact-value">Qwen3-0.6B<br><span class="mono">Qwen3-0.6B-20261102-r1</span></span></li>
+              <li><span class="fact-key">实例</span><span class="fact-value">RTX 4090 · cn-bj2-02<br><span class="mono">u-4090-02-7fca</span></span></li>
+              <li><span class="fact-key">清理</span><span class="fact-value">已授权平台在成功、失败或取消后回收</span></li>
+            </ul>
+            <div class="side-divider"></div>
+            <div class="side-kicker"><h3>运行边界</h3><span>PARTIAL</span></div>
+            <p class="inline-note" style="margin-top:11px">当前只有 Qwen3-0.6B + 单卡 RTX 4090 + 固定 LLaMA-Factory 运行时组合已验证。目录中可见不代表可训练。</p>
+          </aside>
+        </div>
+        ${queue()}`;
+    }
+    function overviewSuccess() {
+      return `${hero()}${runway()}
+        <div class="overview-grid">
+          <section class="panel current-run">
+            <div class="current-head">
+              <div>
+                <div class="run-title-row"><h2 class="run-title">客服意图 LoRA · qwen3</h2>${statusText('success', '产物可验收')}<span class="tag good">BEST + FINAL 2/2</span></div>
+                <p class="run-sub">Attempt #7 已自然结束 · 实例清理与租约释放均已完成 · 可开始独立推理验收</p>
+              </div>
+              <button class="button small secondary" type="button" data-action="open-artifacts">查看产物证据${icon('arrow')}</button>
+            </div>
+            <div class="metric-strip">
+              <div class="metric"><small>训练步数</small><strong>168</strong><span>exit code 0</span></div>
+              <div class="metric"><small>Best Eval Loss</small><strong>0.3218</strong><span>step 80 · 最佳验证点</span></div>
+              <div class="metric"><small>适配器组</small><strong>2/2</strong><span>MinIO 回读校验通过</span></div>
+              <div class="metric"><small>推理基线</small><strong>vLLM</strong><span>Qwen3-0.6B · 512 ctx</span></div>
+            </div>
+            <div class="run-body">
+              <div class="run-narrative">
+                <h3>产物验收结论</h3>
+                <p>Best 与 Final 作为同一发布门槛，只有两份 Adapter 都完成写入和回读后才允许进入推理。训练结束、产物可用、实例释放是三个独立事实，当前三项都有证据。</p>
+                <div class="live-line"><time>11:08:20</time><span>远程进程退出，退出码 0；训练 outcome 固定为 succeeded。</span></div>
+                <div class="live-line"><time>11:08:41</time><span>Best / Final Adapter 成对写入 MinIO，2/2 回读通过。</span></div>
+                <div class="live-line"><time>11:09:03</time><span>实例已删除，GPU 租约已释放；推理门禁打开。</span></div>
+                <div class="run-actions">
+                  <button class="button" type="button" data-action="open-serving">${icon('play')}启动推理验收</button>
+                  <button class="button secondary" type="button" data-action="open-artifacts">${icon('file')}查看 Best / Final</button>
+                  <button class="button ghost" type="button" data-action="open-detail">再看运行证据</button>
+                </div>
+              </div>
+              <div class="artifact-mini">
+                <div class="artifact-mini-head"><span>RELEASE GATE</span><strong>2 / 2</strong></div>
+                <div class="artifact-mini-row"><span>BEST</span><b>eval 0.3218</b><small>step 80</small></div>
+                <div class="artifact-mini-row"><span>FINAL</span><b>eval 0.3389</b><small>step 168</small></div>
+                <div class="artifact-mini-foot"><span>✓ 基座配对通过</span><span>✓ 文件指纹一致</span></div>
+              </div>
+            </div>
+          </section>
+          <aside class="panel evidence-side">
+            <div class="side-kicker"><h3>下一步</h3><span>READY TO TRIAL</span></div>
+            <div class="side-main" style="border-color:#b9d0c1;background:#f4faf6">
+              <strong>从 Best Adapter<br>发起一次真实对话</strong>
+              <p>平台创建独立推理实例；训练实例已释放，不会与训练共用 GPU。试用结束必须回收实例。</p>
+              <button class="button" type="button" data-action="open-serving">${icon('play')}进入推理验收</button>
+            </div>
+            <div class="side-divider"></div>
+            <div class="side-kicker"><h3>发布证据</h3><span>EVIDENCE</span></div>
+            <ul class="fact-list" style="margin-top:15px">
+              <li><span class="fact-key">Best</span><span class="fact-value mono">adapter-best-01<br>eval 0.3218 · step 80</span></li>
+              <li><span class="fact-key">Final</span><span class="fact-value mono">adapter-final-01<br>eval 0.3389 · step 168</span></li>
+              <li><span class="fact-key">基座指纹</span><span class="fact-value mono">Qwen3-0.6B-20261102-r1</span></li>
+              <li><span class="fact-key">推理基线</span><span class="fact-value">vLLM 0.32.0 · 已实测</span></li>
+            </ul>
+          </aside>
+        </div>
+        ${queue()}`;
+    }
+    function queue() {
+      if (state.scenario === 'empty') return '';
+      const queueJobs = jobs.map((job, index) => {
+        if (index !== 0) return job;
+        if (state.scenario === 'success') return { ...job, status: 'success', statusLabel: '可验收', stage: '产物 2/2', metric: 'eval 0.3218', time: '今天 11:09' };
+        if (state.scenario === 'error') return { ...job, status: 'error', statusLabel: '需处理', stage: '准备失败', metric: 'runtime_incompatible', time: '今天 15:28' };
+        if (state.scenario === 'waiting') return { ...job, status: 'waiting', statusLabel: '等实例', stage: '待绑定实例', metric: '—', time: '今天 11:16' };
+        return job;
+      });
+      return `<section class="panel queue">
+        <div class="section-head">
+          <div><h2>生产队列</h2><p>每次重试都是独立 Attempt；失败、取消和产物证据不覆盖。</p></div>
+          <div class="queue-tools"><input class="input" type="search" placeholder="搜索任务 / ID / 错误码" aria-label="搜索训练任务"><select class="select" aria-label="筛选状态"><option>全部状态</option><option>训练中</option><option>等待实例</option><option>已成功</option></select></div>
+        </div>
+        <div class="table-wrap"><table class="job-table">
+          <thead><tr><th>任务</th><th>Attempt</th><th>状态</th><th>阶段</th><th>最新指标</th><th>更新时间</th><th></th></tr></thead>
+          <tbody>
+            ${queueJobs.map(job => `<tr>
+              <td data-label="任务"><span class="job-title">${job.title}</span><span class="job-id">${job.id}</span></td>
+              <td data-label="Attempt">${job.attempt}</td>
+              <td data-label="状态">${statusText(job.status, job.statusLabel)}</td>
+              <td data-label="阶段">${job.stage}</td>
+              <td data-label="指标" class="mono">${job.metric}</td>
+              <td data-label="更新">${job.time}</td>
+              <td><button class="job-action" type="button" data-action="open-detail">打开${icon('arrow')}</button></td>
+            </tr>`).join('')}
+          </tbody>
+        </table></div>
+      </section>`;
+    }
+    function loadingState() {
+      return `${hero()}${runway()}
+        <section class="panel loading" aria-busy="true">
+          <div class="loading-mark skeleton"></div>
+          <h2>正在核对训练事实</h2>
+          <p>正在读取 Attempt 列表、冻结输入和最新遥测。已有事实不会被零值替代。</p>
+          <div class="loading-lines"><span class="skeleton" style="width:72%"></span><span class="skeleton" style="width:92%"></span><span class="skeleton" style="width:58%"></span></div>
+        </section>`;
+    }
+    function emptyState() {
+      return `${hero()}${runway()}
+        <section class="panel empty">
+          <div class="empty-mark">${icon('play')}</div>
+          <h2>还没有可投产的训练</h2>
+          <p>先准备一份已发布数据集和一个已验证基座。新建训练只会冻结输入并生成任务，不会购买或预留 GPU 实例。</p>
+          <button class="button" type="button" data-action="new-training">${icon('plus')}创建第一条训练</button>
+          <div class="empty-path"><span>01 冻结输入</span><span>→</span><span>02 手动实例</span><span>→</span><span>03 训练执行</span><span>→</span><span>04 推理验收</span></div>
+        </section>`;
+    }
+    function waitingState() {
+      return `${hero()}${runway()}
+        <div class="overview-grid">
+          <section class="panel current-run">
+            <div class="current-head">
+              <div>
+                <div class="run-title-row"><h2 class="run-title">客服意图 LoRA · qwen3</h2>${statusText('waiting', '等待手动实例')}<span class="tag warn">输入已冻结</span></div>
+                <p class="run-sub">新 Task 已创建 · 输入快照已锁定 · 尚未连接 GPU，也未产生费用</p>
+              </div>
+              <button class="button small" type="button" data-action="bind-instance">绑定实例${icon('arrow')}</button>
+            </div>
+            <div class="metric-strip">
+              <div class="metric"><small>输入快照</small><strong>已冻结</strong><span>SHA-256 · 可复核</span></div>
+              <div class="metric"><small>实例核验</small><strong>等待</strong><span>由你手动创建</span></div>
+              <div class="metric"><small>训练执行</small><strong>未开始</strong><span>运行时检查通过后启动</span></div>
+              <div class="metric"><small>当前费用</small><strong>0</strong><span>平台未购买或预留 GPU</span></div>
+            </div>
+            <div class="run-body">
+              <div class="run-narrative">
+                <h3>任务已就绪，下一步只差一个真实实例</h3>
+                <p>请在优云控制台按冻结要求创建 RTX 4090 单卡实例。只有实例 Running、清理授权和运行时检查都通过后，训练才会启动。</p>
+                <div class="live-line"><time>01</time><span>按冻结方案创建实例：RTX 4090 · cn-bj2-02 · compshareImage-1fc8fjody17l。</span></div>
+                <div class="live-line"><time>02</time><span>回来填写实例 ID，并授权平台在成功、失败或取消后停止并删除。</span></div>
+                <div class="live-line"><time>03</time><span>平台执行运行时预检；通过后自动进入 training，不需要再次确认参数。</span></div>
+                <div class="run-actions">
+                  <button class="button" type="button" data-action="bind-instance">${icon('plus')}绑定手动实例</button>
+                  <button class="button secondary" type="button" data-action="open-detail">查看冻结输入</button>
+                </div>
+              </div>
+              <div class="artifact-mini">
+                <div class="artifact-mini-head"><span>RELEASE GATE</span><strong>0 / 2</strong></div>
+                <div class="artifact-mini-row"><span>BEST</span><b>未发布</b><small>等待训练</small></div>
+                <div class="artifact-mini-row"><span>FINAL</span><b>未发布</b><small>等待训练</small></div>
+                <div class="artifact-mini-foot"><span>门禁锁定</span><span>不会提前占用推理 GPU</span></div>
+              </div>
+            </div>
+          </section>
+          <aside class="panel evidence-side">
+            <div class="side-kicker"><h3>下一步</h3><span>ONLY ONE MOVE</span></div>
+            <div class="side-main" style="border-color:#d8c294;background:#fbf7ec">
+              <strong>先创建实例<br>再回来绑定</strong>
+              <p>平台不代购、不预留、也不自动替换手动实例。绑定后会先做运行时检查，不会直接开始训练。</p>
+              <button class="button" type="button" data-action="bind-instance">${icon('arrow')}填写实例 ID</button>
+            </div>
+            <div class="side-divider"></div>
+            <div class="side-kicker"><h3>冻结要求</h3><span>INSTANCE SPEC</span></div>
+            <ul class="fact-list" style="margin-top:15px">
+              <li><span class="fact-key">GPU</span><span class="fact-value">RTX 4090 · 单卡</span></li>
+              <li><span class="fact-key">可用区</span><span class="fact-value mono">cn-bj2-02</span></li>
+              <li><span class="fact-key">镜像</span><span class="fact-value mono">compshareImage-1fc8fjody17l</span></li>
+              <li><span class="fact-key">清理</span><span class="fact-value">绑定前必须明确授权</span></li>
+            </ul>
+            <div class="side-divider"></div>
+            <div class="side-kicker"><h3>计费边界</h3><span>NO SURPRISE</span></div>
+            <p class="inline-note" style="margin-top:11px">实例由你在优云创建，费用也由该实例产生。页面不会把“任务已提交”写成“GPU 已启动”。</p>
+          </aside>
+        </div>`;
+    }
+    function errorState() {
+      return `${hero()}${runway()}
+        <section class="panel error-board">
+          <div class="section-head"><div><div class="eyebrow" style="margin-bottom:5px">RUN FAILURE / 诊断工作台</div><h2>训练未启动：运行时与实例不匹配</h2><p>Attempt #7 在准备阶段终止；没有产生指标或 Adapter，远程实例仍保留。</p></div>${statusText('error', '需要处理')}</div>
+          <div class="error-body">
+            <div class="error-copy">
+              <div class="error-code">runtime_incompatible</div>
+              <h2>不是训练质量问题，<br>是所选手动实例的系统环境不符合已验证基线。</h2>
+              <p>训练进程尚未启动，因此没有 Loss，也不存在可下载产物。先对照镜像与 GPU，再决定重新创建实例还是复用当前输入发起新 Attempt。</p>
+              <div class="diff-list">
+                <div class="diff-row head"><span>字段</span><span>期望值</span><span>实际值</span></div>
+                <div class="diff-row"><span>镜像</span><code>compshareImage-1fc8fjody17l</code><span>img-cuda-12.2-base</span></div>
+                <div class="diff-row"><span>GPU 规格</span><span>RTX 4090</span><code>RTX A5000</code></div>
+                <div class="diff-row"><span>可用区</span><span>cn-bj2-02</span><span>cn-bj2-02</span></div>
+              </div>
+            </div>
+            <div class="error-next">
+              <h3>下一步 · 恢复而不猜测</h3>
+              <ol class="error-steps">
+                <li><b>1</b><div>核对实例规格<span>在优云控制台确认镜像、GPU 型号和可用区。</span></div></li>
+                <li><b>2</b><div>保留证据并安全清理<span>当前实例仍可能计费；先取回诊断日志，再停止并删除。</span></div></li>
+                <li><b>3</b><div>用同一冻结输入新建 Attempt<span>不重新随机数据拆分，也不改动训练参数。</span></div></li>
+              </ol>
+              <div class="run-actions"><button class="button" type="button" data-action="open-detail-logs">${icon('terminal')}查看诊断日志</button><button class="button secondary" type="button" data-action="new-attempt">新建 Attempt</button></div>
+            </div>
+          </div>
+        </section>`;
+    }
+    function overview() {
+      if (state.scenario === 'loading') return loadingState();
+      if (state.scenario === 'empty') return emptyState();
+      if (state.scenario === 'error') return errorState();
+      if (state.scenario === 'waiting') return waitingState();
+      if (state.scenario === 'success') return overviewSuccess();
+      return overviewRunning();
+    }
+    function detailHeader() {
+      return `<div class="detail-head">
+        <div class="detail-title"><button class="back-button" type="button" data-action="back-overview" aria-label="返回训练工作台">${icon('back')}</button><div><div class="eyebrow">RUN DETAIL / ATTEMPT #7</div><h1>客服意图 LoRA · qwen3</h1><p class="mono">8e024600-d9a8-43cf-a159-cde62f6e4a1b · ${state.scenario === 'success' ? '已结束 · 11/04 11:09' : state.scenario === 'error' ? '失败 · 11/04 15:28' : state.scenario === 'waiting' ? '输入已冻结 · 等待手动实例' : '运行中 · 最后同步 10:32:12'}</p></div></div>
+        <div class="detail-actions">${statusText(state.scenario === 'success' ? 'success' : state.scenario === 'error' ? 'error' : state.scenario === 'waiting' ? 'waiting' : 'running', state.scenario === 'success' ? '已成功' : state.scenario === 'error' ? '需要处理' : state.scenario === 'waiting' ? '等待实例' : '训练中')}<button class="button secondary small" type="button" data-action="refresh">${icon('refresh')}刷新</button>${state.scenario === 'success' ? `<button class="button small" type="button" data-action="open-serving">${icon('play')}推理验收</button>` : state.scenario === 'waiting' ? `<button class="button small" type="button" data-action="bind-instance">绑定实例</button>` : `<button class="button danger small" type="button" data-action="request-cancel">${icon('stop')}取消训练</button>`}</div>
+      </div>`;
+    }
+    function detailTabs() {
+      const tabs = [['overview','运行总览'],['analysis','指标分析'],['logs','实时日志'],['artifacts','产物 / 推理']];
+      return `<div class="tabs" role="tablist" aria-label="运行详情页签">${tabs.map(([key,label]) => `<button class="tab ${state.detailTab === key ? 'active' : ''}" role="tab" aria-selected="${state.detailTab === key}" data-action="detail-tab" data-tab="${key}" type="button">${label}</button>`).join('')}</div>`;
+    }
+    function detailOverview() {
+      if (state.scenario === 'waiting') {
+        return `<div class="fact-banner">
+            <div><small>输入快照</small><strong>已冻结</strong></div>
+            <div><small>手动实例</small><strong>尚未绑定</strong></div>
+            <div><small>训练执行</small><strong>未开始</strong></div>
+            <div><small>GPU 费用</small><strong>未产生</strong></div>
+          </div>
+          <section class="timeline-panel"><div class="section-head"><div><h2>阶段时间线</h2><p>任务提交不等于实例已启动；只有绑定与预检通过才进入训练。</p></div><span class="tag warn">1 / 5 已完成</span></div>
+          <div class="timeline">
+            <div class="timeline-row done"><time>11:16:04</time><span class="timeline-pin"></span><div><strong>输入已冻结</strong><p>数据集 v3 · Qwen3-0.6B · split-4f82b9d1 · 参数不可变</p></div><span class="status success">已确认</span></div>
+            <div class="timeline-row active"><time>下一步</time><span class="timeline-pin"></span><div><strong>等待绑定手动实例</strong><p>在优云创建 RTX 4090 单卡实例，并授权平台清理。</p></div><span class="status waiting">等待操作</span></div>
+            <div class="timeline-row"><time>等待中</time><span class="timeline-pin"></span><div><strong>运行时检查与训练启动</strong><p>镜像、GPU、可用区与清理授权全部通过后才会开始。</p></div><span class="status locked">未开始</span></div>
+            <div class="timeline-row"><time>等待中</time><span class="timeline-pin"></span><div><strong>Best / Final 成对发布</strong><p>训练结束后写入 MinIO 并完成回读校验。</p></div><span class="status locked">未开始</span></div>
+            <div class="timeline-row"><time>等待中</time><span class="timeline-pin"></span><div><strong>实例回收与租约释放</strong><p>不把删除请求误写成已释放。</p></div><span class="status locked">未开始</span></div>
+          </div></section>
+          <section class="panel artifact-gate" style="margin-top:16px"><div><h2>产物门禁未打开</h2><p>当前没有 GPU、没有训练进程，也没有部分 Adapter 可发布。</p></div><button class="button" type="button" data-action="bind-instance">绑定实例后继续</button></section>`;
+      }
+      const succeeded = state.scenario === 'success';
+      return `<div class="fact-banner">
+          <div><small>训练执行</small><strong>${succeeded ? '已结束 · exit 0' : state.scenario === 'error' ? '准备失败' : 'training'}</strong></div>
+          <div><small>远程进程</small><strong>${succeeded ? '已退出 · 168 step' : state.scenario === 'error' ? '未启动' : '运行中'}</strong></div>
+          <div><small>产物发布</small><strong>${succeeded ? 'Best + Final 2/2' : state.scenario === 'error' ? '未产生' : '等待训练结束'}</strong></div>
+          <div><small>实例 / 租约</small><strong>${succeeded ? '已释放' : state.scenario === 'error' ? '仍保留 · 需清理' : '运行中 · u-4090-02-7fca'}</strong></div>
+        </div>
+        <section class="timeline-panel"><div class="section-head"><div><h2>阶段时间线</h2><p>每个节点只代表已确认事实；不把“删除请求”误写成“已释放”。</p></div><span class="tag ${succeeded ? 'good' : ''}">${succeeded ? '5 / 5 已完成' : state.scenario === 'error' ? '2 / 5 已终止' : '3 / 5 进行中'}</span></div>
+        <div class="timeline">
+          <div class="timeline-row done"><time>10:24:18</time><span class="timeline-pin"></span><div><strong>输入已冻结</strong><p>数据集 v3 · Qwen3-0.6B · split-4f82b9d1</p></div><span class="status success">已确认</span></div>
+          <div class="timeline-row done"><time>10:27:51</time><span class="timeline-pin"></span><div><strong>实例已绑定并完成运行时检查</strong><p>RTX 4090 · LLaMA-Factory 0.9.5 · 清理授权已记录</p></div><span class="status success">已确认</span></div>
+          <div class="timeline-row ${succeeded ? 'done' : state.scenario === 'error' ? '' : 'active'}"><time>10:28:39</time><span class="timeline-pin"></span><div><strong>${succeeded ? '训练进程已退出' : '训练进程运行中'}</strong><p>${succeeded ? 'exit code 0 · 168 steps · 训练 outcome = succeeded' : 'step 80 / 168 · 远程进程保持连接'}</p></div>${succeeded ? '<span class="status success">已确认</span>' : '<span class="status running">进行中</span>'}</div>
+          <div class="timeline-row ${succeeded ? 'done' : ''}"><time>${succeeded ? '11:08:41' : '等待中'}</time><span class="timeline-pin"></span><div><strong>${succeeded ? 'Best / Final 成对发布' : '产物同步'}</strong><p>${succeeded ? '2/2 已写入 MinIO 并通过回读校验' : '训练自然结束后才会出现'}</p></div>${succeeded ? '<span class="status success">已确认</span>' : '<span class="status locked">未开始</span>'}</div>
+          <div class="timeline-row ${succeeded ? 'done' : ''}"><time>${succeeded ? '11:09:03' : '等待中'}</time><span class="timeline-pin"></span><div><strong>${succeeded ? '实例已删除、租约已释放' : '实例回收与租约'}</strong><p>${succeeded ? '推理 GPU 门禁已打开' : '成功、失败或取消后统一执行'}</p></div>${succeeded ? '<span class="status success">已确认</span>' : '<span class="status locked">未开始</span>'}</div>
+        </div></section>
+        <section class="panel artifact-gate" style="margin-top:16px"><div><h2>${succeeded ? '产物已通过验收，可以进入推理' : '产物尚未发布'}</h2><p>${succeeded ? 'Best + Final 2/2 可用；训练实例已释放。' : '训练中不发布部分 Adapter，也不提前占用推理 GPU。'}</p></div>${succeeded ? `<button class="button" type="button" data-action="open-artifacts">${icon('arrow')}查看发布门禁</button>` : `<span class="status locked">等待训练完成</span>`}</section>`;
+    }
+    function detailAnalysis() {
+      if (state.scenario === 'waiting') return `<div class="artifact-gate"><div><h2>尚无可分析指标</h2><p>训练进程尚未开始，没有 Loss 或 Learning Rate 采样。页面不会提前绘制占位曲线。</p></div><button class="button" type="button" data-action="bind-instance">绑定手动实例</button></div>`;
+      return `<div class="analysis-card"><div class="section-head"><div><h2>训练与验证趋势</h2><p>仅使用当前 Attempt 已上报的真实采样；不对缺失点插值。</p></div><span class="tag">4 个采样点</span></div><div class="analysis-chart"><figure class="curve-wrap"><div class="curve-head"><span class="curve-title">Loss / Step</span><span class="curve-legend"><span><i class="train"></i>Train</span><span><i class="eval"></i>Eval</span></span></div>${chartSvg(false)}<div class="curve-foot"><span>Best eval 0.3218 @ step 80</span><span>Learning rate 1.64e-4</span></div></figure>
+      <table class="metric-table" style="margin-top:16px"><thead><tr><th>Step</th><th>Epoch</th><th>Train Loss</th><th>Eval Loss</th><th>Learning Rate</th></tr></thead><tbody>${metrics.map(row => `<tr><td class="mono">${row.step}</td><td class="mono">${row.epoch.toFixed(2)}</td><td class="mono">${row.train.toFixed(4)}</td><td class="mono">${row.eval.toFixed(4)}</td><td class="mono">${row.lr}</td></tr>`).join('')}</tbody></table></div></div>
+      <div class="detail-side" style="margin-top:16px"><section class="side-panel"><div class="side-panel-head"><h3>指标能力边界</h3><span class="tag warn">部分可用</span></div><div class="side-panel-body"><ul class="fact-list"><li><span class="fact-key">Loss / Eval</span><span class="fact-value">来自 trainer metrics</span></li><li><span class="fact-key">Learning rate</span><span class="fact-value">当前接口已返回</span></li><li><span class="fact-key">实时显存</span><span class="fact-value">未提供，不以曲线冒充</span></li><li><span class="fact-key">梯度范数</span><span class="fact-value">未提供</span></li></ul></div></section></div>`;
+    }
+    function detailLogs() {
+      if (state.scenario === 'waiting') return `<div class="artifact-gate"><div><h2>尚无训练日志</h2><p>实例还未绑定，远程训练进程没有启动。这里不会用示例日志冒充当前运行。</p></div><button class="button" type="button" data-action="bind-instance">绑定手动实例</button></div>`;
+      const query = state.logQuery.toLowerCase();
+      const filtered = logRows.filter(row => (state.logLevel === 'all' || row.level === state.logLevel) && (!query || `${row.time} ${row.source} ${row.text}`.toLowerCase().includes(query)));
+      return `<div class="logs-card"><div class="log-console">
+        <div class="log-toolbar"><label class="sr-only" for="log-search">搜索日志</label><input class="input" id="log-search" type="search" placeholder="搜索日志、错误或 step" value="${escapeHtml(state.logQuery)}" style="flex:1 1 220px"><label class="sr-only" for="log-level">日志级别</label><select class="select" id="log-level"><option value="all" ${state.logLevel === 'all' ? 'selected' : ''}>全部级别</option><option ${state.logLevel === 'ERROR' ? 'selected' : ''}>ERROR</option><option ${state.logLevel === 'INFO' ? 'selected' : ''}>INFO</option></select><button class="button small" type="button" data-action="download-logs">${icon('down')}下载</button></div>
+        <div class="log-lines" role="log" aria-live="off">${filtered.length ? filtered.map(row => `<div class="log-line"><span class="log-time">${row.time}</span><span class="log-source">${row.source}</span><span class="log-level ${row.level === 'ERROR' ? 'error' : ''}">${row.level}</span><span class="log-message">${escapeHtml(row.text)}</span></div>`).join('') : '<div class="log-empty">没有符合当前筛选条件的日志。</div>'}</div>
+      </div></div>`;
+    }
+    function detailArtifacts() {
+      const ready = state.scenario === 'success';
+      return `<div class="artifact-gate"><div><h2>${ready ? 'Best / Final · 2 / 2 可用' : 'Best / Final · 尚未发布'}</h2><p>${ready ? '训练实例已释放，基座与 Adapter 指纹配对通过。' : '产物只在训练成功且两份 Adapter 都完成回读校验后一起开放。'}</p></div>${ready ? '<span class="status success">RELEASE GATE OPEN</span>' : '<span class="status locked">RELEASE GATE LOCKED</span>'}</div>
+      <div class="artifact-pair">
+        ${ready ? artifactCard('best', 'BEST ADAPTER', '验证集最优', '0.3218', 'step 80', 'adapter-best-01', false) : artifactCard('best', 'BEST ADAPTER', '等待训练结束', '—', '—', '尚未生成', true)}
+        ${ready ? artifactCard('final', 'FINAL ADAPTER', '最终保存点', '0.3389', 'step 168', 'adapter-final-01', false) : artifactCard('final', 'FINAL ADAPTER', '等待训练结束', '—', '—', '尚未生成', true)}
+      </div>
+      ${ready ? `<section class="handoff"><div><strong>下一步 · 从 Best Adapter 发起推理验收</strong><p>只会创建独立推理实例，不接管训练实例；完成后必须停止并回收。</p></div><button class="button" type="button" data-action="open-serving">${icon('play')}启动推理验收</button></section>` : `<section class="panel" style="margin-top:16px;padding:18px;color:var(--muted);font-size:11px">训练仍在进行。取消或失败不会发布部分产物，也不会提前打开推理门禁。</section>`}`;
+    }
+    function artifactCard(kind, role, subtitle, value, step, id, locked) {
+      return `<article class="artifact-card ${kind}"><div class="artifact-head"><div><span class="artifact-role">${role}</span><strong>${subtitle}</strong></div><span class="status ${locked ? 'locked' : 'success'}">${locked ? '未发布' : '可用'}</span></div><div class="artifact-body"><div class="artifact-metric"><b>${value}</b><span>${locked ? '等待训练结束' : 'eval loss'}</span></div><div class="artifact-facts"><div><span>训练位置</span><span class="mono">${step}</span></div><div><span>Adapter</span><span class="mono">${id}</span></div><div><span>基座指纹</span><span class="mono">Qwen3-0.6B-20261102-r1</span></div><div><span>文件校验</span><span>${locked ? '尚未产生' : 'manifest + SHA-256 通过'}</span></div></div></div><div class="artifact-actions"><button class="button small ${locked ? 'secondary' : ''}" type="button" ${locked ? 'disabled' : 'data-action="download-artifact"'}>${icon('down')}下载 Adapter 包</button><button class="button small secondary" type="button" ${locked ? 'disabled' : `data-action="${kind === 'best' ? 'open-serving' : 'download-artifact'}"`}>${kind === 'best' ? '用于推理试用' : '校验基座配对'}</button></div></article>`;
+    }
+    function detailSide() {
+      const resourceStatus = state.scenario === 'success' ? '<span class="status success">已释放</span>' : state.scenario === 'error' ? '<span class="status error">待清理</span>' : state.scenario === 'waiting' ? '<span class="status waiting">未建立</span>' : '<span class="status running">使用中</span>';
+      return `<aside class="detail-side">
+        <section class="side-panel"><div class="side-panel-head"><h3>冻结输入</h3><span class="mono" style="font-size:9px;color:var(--muted)">SHA-256</span></div><div class="side-panel-body"><ul class="fact-list"><li><span class="fact-key">数据集</span><span class="fact-value">客服意图训练集 v3</span></li><li><span class="fact-key">拆分</span><span class="fact-value">1,116 train / 124 val<br><span class="mono">split-4f82b9d1</span></span></li><li><span class="fact-key">基座</span><span class="fact-value">Qwen3-0.6B<br><span class="mono">20261102-r1</span></span></li><li><span class="fact-key">参数</span><span class="fact-value">1 epoch · LR 0.0002 · r=8<br>cutoff 512 · seed 42</span></li><li><span class="fact-key">实例</span><span class="fact-value">RTX 4090 · cn-bj2-02</span></li></ul><button class="button ghost small" type="button" data-action="copy-manifest" style="margin-top:9px">${icon('copy')}复制完整快照</button></div></section>
+        <section class="side-panel"><div class="side-panel-head"><h3>资源与清理</h3>${resourceStatus}</div><div class="side-panel-body"><ul class="fact-list"><li><span class="fact-key">实例 ID</span><span class="fact-value mono">${state.scenario === 'waiting' ? '尚未绑定' : 'u-4090-02-7fca'}</span></li><li><span class="fact-key">租约</span><span class="fact-value mono">${state.scenario === 'waiting' ? '尚未建立' : 'lease-7f2a-4b91'}</span></li><li><span class="fact-key">授权</span><span class="fact-value">${state.scenario === 'waiting' ? '绑定实例时确认' : '已确认平台可停止并删除'}</span></li><li><span class="fact-key">推理门禁</span><span class="fact-value">${state.scenario === 'success' ? '已打开' : '关闭'}</span></li></ul></div></section>
+        <section class="side-panel"><div class="side-panel-head"><h3>数据新鲜度</h3><span class="tag good">实时</span></div><div class="side-panel-body"><p class="inline-note">最后成功同步 10:32:12。详情每 2.5 秒轮询；失败时保留上一份事实并标记过期，不会将其伪装为实时。</p><button class="button ghost small" type="button" data-action="refresh">${icon('refresh')}重新同步</button></div></section>
+      </aside>`;
+    }
+    function detail() {
+      let content = detailOverview();
+      if (state.detailTab === 'analysis') content = detailAnalysis();
+      if (state.detailTab === 'logs') content = detailLogs();
+      if (state.detailTab === 'artifacts') content = detailArtifacts();
+      return `${pageHeader()}${detailHeader()}${detailTabs()}<div class="detail-layout"><div class="detail-main">${content}</div>${detailSide()}</div>`;
+    }
+    function stepper() {
+      const labels = ['选择输入','核验实例','锁定参数','确认冻结'];
+      return `<div class="wizard-steps">${labels.map((label, i) => `<button class="wizard-step ${state.wizardStep === i + 1 ? 'active' : ''} ${state.wizardStep > i + 1 ? 'done' : ''}" type="button" data-action="wizard-jump" data-step="${i + 1}"><b>0${i + 1}</b><span>${label}</span></button>`).join('')}</div>`;
+    }
+    function wizardInput() {
+      return `<div class="error-summary ${state.formError ? 'show' : ''}" id="form-error" role="alert" tabindex="-1"><strong>还有需要完成的内容</strong><p>${state.formError || ''}</p></div>
+        <div class="field ${state.formError === '请先为本次训练命名。' ? 'invalid' : ''}" id="task-name-field"><label for="task-name">训练名称</label><input class="input wide" id="task-name" value="${escapeHtml(state.taskName || '客服意图 LoRA · 实验 08')}" placeholder="例如：客服意图 LoRA · 实验 08"><small>仅描述本次训练目标；提交后不能修改。</small><span class="field-error">请先为本次训练命名。</span></div>
+        <div class="choice-grid">
+          <article class="choice-card selected"><span class="choice-radio"></span><div><div class="choice-title">客服意图训练集 · v3 <span class="tag good">已发布</span></div><p class="choice-meta">SFT · 1,240 条 · 训练 1,116 / 验证 124 · 固定拆分 split-4f82b9d1<br>最后校验 11/03 14:08 · 数据哈希 8b4fce91…b0d0f8e7</p></div><button class="button ghost small" type="button">查看数据</button></article>
+          <article class="choice-card selected"><span class="choice-radio"></span><div><div class="choice-title">Qwen3-0.6B <span class="tag good">唯一兼容基座</span></div><p class="choice-meta">来源：平台托管 · 架构 qwen3 · 指纹 Qwen3-0.6B-20261102-r1<br>与当前训练和推理基线完全匹配</p></div><button class="button ghost small" type="button">查看指纹</button></article>
+        </div>`;
+    }
+    function wizardPlan() {
+      return `<div class="boundary">${icon('shield')}<div><strong>已验证训练方案 · 不可逐项拼装</strong><br>当前产品只支持这一组经过实测的运行时组合。界面中的目录可见项不等于可训练；如需更换硬件，必须先产生新的兼容基线。</div></div>
+        <div class="plan-card" style="margin-top:15px"><div class="plan-top"><div><strong>qwen3-0.6b-rtx4090-cn-bj2-partial</strong><p class="choice-meta" style="margin-top:5px">运行时 LlamaFactory 0.9.5 · CUDA 12.4 · 状态 partial</p></div><span class="tag warn">PARTIAL</span></div><div class="plan-grid"><div><small>地域 / 可用区</small><span>cn-bj2 / cn-bj2-02</span></div><div><small>GPU</small><span>单卡 RTX 4090</span></div><div><small>CPU / 内存</small><span>12 核 / 64 GB</span></div><div><small>系统盘</small><span>100 GB CLOUD_SSD</span></div><div><small>镜像</small><span class="mono">compshareImage-1fc8fjody17l</span></div><div><small>计费</small><span>后付费 · 由你手动创建实例</span></div></div></div>
+        <div class="boundary" style="margin-top:15px;border-left-color:var(--gold);background:var(--gold-soft)">${icon('alert')}<div><strong>下一步仍是手动算力</strong><br>提交后只生成任务和实例要求。你需要在优云控制台创建收费实例，再回到 Attempt 详情填写实例 ID 并授权清理。</div></div>`;
+    }
+    function wizardParams() {
+      const fields = [
+        ['Epochs','1','locked'],['Learning rate','0.0002','locked'],['Cutoff length','512','locked'],
+        ['Batch size','1','locked'],['Gradient accumulation','1','locked'],['LoRA rank','8','locked'],
+        ['LoRA alpha','16','locked'],['Scheduler','cosine','locked'],['Warmup ratio','0','locked'],
+        ['Template','qwen3_nothink','locked'],['Seed','42','editable'],['有效 Batch','1','locked']
+      ];
+      return `<p>除 seed 外，其余参数与当前兼容基线严格绑定。锁定值以只读摘要呈现，避免“看似可调、提交后才失败”。</p><div class="param-grid">${fields.map(([label,value,kind]) => `<div class="param-cell ${kind}"><small><span>${label}</span><span>${kind === 'locked' ? '' : '可调整'}</span></small><strong>${value}</strong></div>`).join('')}</div><div class="boundary" style="margin-top:16px">${icon('shield')}<div>seed 只影响训练随机性。已发布数据版本的训练 / 验证拆分已经冻结，重试不会重新随机拆分。</div></div>`;
+    }
+    function wizardConfirm() {
+      return `<div class="boundary">${icon('shield')}<div><strong>确认后创建 Task 和 Attempt #1</strong><br>输入快照将被冻结并计算 SHA-256。此动作不会购买、创建或预留 GPU，也不会立即开始训练。</div></div>
+        <div class="plan-card" style="margin-top:15px"><div class="plan-top"><div><strong>客服意图 LoRA · 实验 08</strong><p class="choice-meta" style="margin-top:5px">待提交 · 手动实例边界已确认</p></div><span class="tag">NEW TASK</span></div><div class="plan-grid"><div><small>数据版本</small><span>客服意图训练集 v3</span></div><div><small>基座</small><span>Qwen3-0.6B</span></div><div><small>训练方式</small><span>SFT + LoRA</span></div><div><small>拆分</small><span>1,116 / 124 · 固定</span></div><div><small>实例要求</small><span>RTX 4090 · 单卡</span></div><div><small>预计实例</small><span>由你创建 · 平台不代购</span></div></div></div>
+        <div class="boundary" style="margin-top:15px;border-left-color:var(--info);background:var(--info-soft)">${icon('alert')}<div>提交后进入 <strong>waiting_instance</strong>。只有在实例 Running、清理授权和运行时检查都通过后，训练才会启动。</div></div>`;
+    }
+    function manifest() {
+      const rows = [
+        ['任务名称', state.taskName || '客服意图 LoRA · 实验 08'],
+        ['数据', '客服意图训练集 · v3'],
+        ['拆分', '1,116 / 124 · 10%'],
+        ['基座', 'Qwen3-0.6B'],
+        ['训练方式', 'SFT + LoRA'],
+        ['方案', 'qwen3-0.6b-rtx4090-cn-bj2-partial'],
+        ['实例', 'RTX 4090 · 单卡'],
+        ['参数', '1 epoch · LR 2e-4 · r=8'],
+        ['清理', '手动创建并授权回收']
+      ];
+      return `<aside class="manifest"><div class="manifest-head"><small>IMMUTABLE AFTER SUBMIT</small><strong>本次冻结清单</strong></div><div class="manifest-body">${rows.map(([key,value]) => `<div class="manifest-row"><span>${key}</span><strong>${escapeHtml(value)}</strong></div>`).join('')}<div class="manifest-foot">提交后这些输入不可编辑。修改任何一项都必须新建 Task。</div></div></aside>`;
+    }
+    function wizardContent() {
+      if (state.wizardStep === 1) return wizardInput();
+      if (state.wizardStep === 2) return wizardPlan();
+      if (state.wizardStep === 3) return wizardParams();
+      return wizardConfirm();
+    }
+    function createView() {
+      const titles = ['先确定这次训练要证明什么','确认这组运行时可执行','把参数变成可复核的冻结值','最后检查一次边界'];
+      const descriptions = ['选择已发布数据集与已验证基座；下一步不会让你重新猜测兼容性。','目录只作为证据来源，不作为自由拼装器。','本轮只需确认锁定项和 seed；不需要再次填写重复字段。','提交只会生成任务与实例要求，不会产生 GPU 费用。'];
+      return `${pageHeader()}<section class="hero" style="margin-bottom:22px"><div><div class="eyebrow">NEW TRAINING / RUNWAY 01</div><h1>先冻结，再开始。</h1><p>把输入、实例要求、参数和清理授权一次说清。之后每个阶段只展示已确认事实。</p></div><div class="hero-actions"><button class="button secondary" type="button" data-action="back-overview">${icon('back')}返回队列</button></div></section>
+        ${stepper()}<div class="wizard-shell"><section class="wizard-main"><div class="wizard-body"><div class="wizard-kicker">STEP 0${state.wizardStep} / 04</div><h2>${titles[state.wizardStep - 1]}</h2><p>${descriptions[state.wizardStep - 1]}</p>${wizardContent()}</div><div class="wizard-foot"><small>${state.wizardStep === 4 ? '提交前请确认手动实例边界' : '输入会持续显示在右侧冻结清单'}</small><div class="run-actions" style="margin:0"><button class="button secondary" type="button" data-action="wizard-back" ${state.wizardStep === 1 ? 'disabled' : ''}>上一步</button>${state.wizardStep < 4 ? `<button class="button" type="button" data-action="wizard-next">下一步${icon('arrow')}</button>` : `<button class="button" type="button" data-action="wizard-submit">${icon('plus')}创建并冻结</button>`}</div></div></section>${manifest()}</div>`;
+    }
+    function servingView() {
+      if (state.scenario === 'loading') return `${pageHeader()}<section class="panel loading" aria-busy="true"><div class="loading-mark skeleton"></div><h2>正在创建独立推理实例</h2><p>已选择 Best Adapter。正在核对基座指纹、模型长度和实例清理授权。</p></section>`;
+      if (state.scenario === 'error') return `${pageHeader()}<section class="panel error-board"><div class="section-head"><div><div class="eyebrow">INFERENCE / BLOCKED</div><h2>推理实例未就绪</h2><p>Best Adapter 仍可用，但当前实例健康检查失败，未进入 ready 状态。</p></div>${statusText('error','需要处理')}</div><div class="error-copy"><div class="error-code">vllm_model_load_failed</div><h2>模型加载未完成，<br>没有发出任何推理请求。</h2><p>先保留实例与加载日志，检查基座路径与 Adapter 指纹；修复后重新加载，或停止实例并释放租约。</p><div class="run-actions"><button class="button" type="button" data-action="retry-inference">${icon('refresh')}重新检查实例</button><button class="button danger" type="button" data-action="stop-inference">结束并回收</button></div></div></section>`;
+      return `${pageHeader()}${hero()}<div class="demo-banner"><span><strong>独立推理实例</strong> · 不占用训练 GPU · 会话仅保存在当前页面</span><span>trial fdb5a28c · 已由 Best Adapter 建立</span></div>
+        <div class="serving-layout">
+          <section class="chat-panel">
+            <div class="chat-head"><div class="chat-title"><span class="chat-avatar">M</span><div><h2>推理验收 · Best Adapter</h2><p>客服意图 LoRA · Qwen3-0.6B · vLLM 0.32.0</p></div></div>${statusText('success','服务就绪')}</div>
+            <div class="chat-stream" id="chat-stream" aria-live="polite">
+              ${state.chat.length ? state.chat.map((message, index) => `<article class="message ${message.role}"><span class="message-meta">${message.role === 'user' ? 'YOU' : 'MODEL'}</span><div class="message-body"><p>${escapeHtml(message.content)}</p></div></article>`).join('') : `<div class="chat-empty"><div class="chat-empty-mark">${icon('play')}</div><strong>用真实问题验收这次训练</strong><p>不要只看 Loss。检查意图识别、边界拒答和客服语气是否满足固定测试问题。</p><div class="prompt-chips"><button class="prompt-chip" type="button" data-prompt="用户说：我要退款，但已经超过七天。请判断意图并给出下一步。">退款意图 · 超过七天</button><button class="prompt-chip" type="button" data-prompt="用户说：转人工。不要解释。请只返回意图标签。">转人工 · 指令约束</button><button class="prompt-chip" type="button" data-prompt="用户发来一段情绪激烈的投诉，询问我是否可以提供补偿。">投诉 · 情绪与边界</button></div></div>`}
+            </div>
+            <div class="chat-compose"><label class="sr-only" for="chat-input">输入试用问题</label><textarea id="chat-input" rows="3" placeholder="输入一个真实客服问题，例如：订单还没发货，我要取消，可以吗？" ${state.chat.length ? '' : ''}></textarea><div class="compose-row"><small>max 512 tokens · temperature 0.7 · 会话不会持久化</small><button class="button" type="button" data-action="send-chat" ${state.sending ? 'disabled' : ''}>${state.sending ? '生成中…' : '发送并记录'}${icon('arrow')}</button></div></div>
+          </section>
+          <aside class="serving-side">
+            <section class="side-panel identity-card"><div class="side-panel-head"><h3>本次验收对象</h3><span class="tag" style="color:#d8e5dc;border-color:#688175">BEST</span></div><div class="side-panel-body"><ul class="fact-list"><li><span class="fact-key">Adapter</span><span class="fact-value mono">adapter-best-01</span></li><li><span class="fact-key">来源</span><span class="fact-value mono">Attempt #7 · step 80</span></li><li><span class="fact-key">基座</span><span class="fact-value mono">Qwen3-0.6B-20261102-r1</span></li><li><span class="fact-key">实例</span><span class="fact-value mono">u-4090-11-c2a1</span></li><li><span class="fact-key">回收</span><span class="fact-value">空闲 15 分钟或手动结束</span></li></ul></div></section>
+            <section class="side-panel"><div class="side-panel-head"><h3>验收清单</h3><span class="tag warn">3 / 4</span></div><div class="side-panel-body"><ul class="gate-list"><li><b>✓</b><span>服务健康检查通过<small>ready · vLLM 端口响应</small></span></li><li><b>✓</b><span>基座与 Adapter 指纹配对<small>20261102-r1 · best-fingerprint</small></span></li><li><b>✓</b><span>训练实例已释放<small>GPU 门禁已在 11:09 打开</small></span></li><li class="warn"><b>4</b><span>完成至少 3 个固定问题<small>当前 0 / 3，完成后才能判定验收</small></span></li></ul></div></section>
+            <section class="side-panel"><div class="side-panel-head"><h3>安全结束</h3><span class="status running">计费中</span></div><div class="side-panel-body"><p class="inline-note">结束试用会停止 vLLM、删除独立实例并确认租约释放。会话记录不会被写入正式数据。</p><button class="button danger small" type="button" data-action="stop-inference" style="width:100%;margin-top:11px">${icon('stop')}结束试用并回收实例</button></div></section>
+          </aside>
+        </div>`;
+    }
+    function render() {
+      const view = state.view === 'overview' ? overview() : state.view === 'create' ? createView() : state.view === 'detail' ? detail() : servingView();
+      document.getElementById('app').innerHTML = `<div>${topbar()}<main class="page">${view}<footer class="footer"><span>ModelForge · 个人本机工作台 · 原型不连接训练 API</span><span>当前组合：Qwen3-0.6B · RTX 4090 · 固定运行时 · 基线 partial</span></footer></main></div>`;
+      const label = document.getElementById('state-label');
+      if (label) label.textContent = scenarioLabels[state.scenario];
+      document.querySelectorAll('#state-menu button').forEach(button => button.setAttribute('aria-current', String(button.dataset.scenario === state.scenario)));
+      const menu = document.getElementById('state-menu');
+      if (menu) menu.classList.toggle('open', state.menuOpen);
+      const toggle = document.getElementById('state-toggle');
+      if (toggle) toggle.setAttribute('aria-expanded', String(state.menuOpen));
+      if (state.detailTab === 'logs' && state.view === 'detail') {
+        const input = document.getElementById('log-search');
+        input?.addEventListener('input', (event) => { state.logQuery = event.target.value; render(); document.getElementById('log-search')?.focus(); });
+        const level = document.getElementById('log-level');
+        level?.addEventListener('change', (event) => { state.logLevel = event.target.value; render(); });
+      }
+      const chat = document.getElementById('chat-input');
+      chat?.addEventListener('input', (event) => { state.chatDraft = event.target.value; });
+      if (state.chatDraft) chat.value = state.chatDraft;
+      const taskName = document.getElementById('task-name');
+      taskName?.addEventListener('input', (event) => { state.taskName = event.target.value; });
+    }
+    function openDialog(type) {
+      const dialog = document.getElementById('action-dialog');
+      let content = '';
+      if (type === 'cancel') {
+        content = `<div class="dialog-head"><small>DANGER / CONTROLLED STOP</small><h2>请求取消这次训练？</h2></div><div class="dialog-body"><p>请求取消不等于训练已停止。平台会依次等待远程进程退出、停止并删除实例、确认租约释放。</p><div class="dialog-note">当前 step 80。取消不会发布部分 Adapter；已产生日志和指标仍会保留。</div></div><div class="dialog-actions"><button class="button secondary" type="button" data-action="close-dialog">继续训练</button><button class="button danger" type="button" data-action="confirm-cancel">请求取消</button></div>`;
+      } else if (type === 'submit') {
+        content = `<div class="dialog-head"><small>MANUAL COMPUTE / ACKNOWLEDGE</small><h2>创建任务与冻结输入？</h2></div><div class="dialog-body"><p>平台将创建新的 Task 和 Attempt，并固定数据版本、基座指纹、参数与实例要求。不会购买、创建或预留 GPU。</p><div class="dialog-note">提交后进入 waiting_instance。你需要在优云手动创建实例，再返回绑定实例 ID。</div></div><div class="dialog-actions"><button class="button secondary" type="button" data-action="close-dialog">再检查一下</button><button class="button" type="button" data-action="confirm-submit">创建并冻结</button></div>`;
+      } else if (type === 'bind') {
+        content = `<div class="dialog-head"><small>MANUAL INSTANCE / BIND</small><h2>绑定手动创建的训练实例</h2></div><div class="dialog-body"><p>确认实例已 Running，且镜像、GPU 与可用区符合冻结要求。绑定后先执行运行时预检，通过后才启动训练。</p><div class="dialog-field"><label for="bind-instance">实例 ID</label><input class="input" id="bind-instance" placeholder="例如：u-4090-02-7fca"></div><label class="dialog-check"><input type="checkbox" id="bind-ack">我拥有此实例，并授权平台在训练成功、失败或取消后停止并删除。</label><div class="dialog-note">平台不会代为购买实例。原型不会调用真实云接口。</div></div><div class="dialog-actions"><button class="button secondary" type="button" data-action="close-dialog">取消</button><button class="button" type="button" data-action="confirm-bind">核验并绑定</button></div>`;
+      } else {
+        content = `<div class="dialog-head"><small>RESOURCE CLEANUP</small><h2>结束 Infer #fdb5a28c？</h2></div><div class="dialog-body"><p>停止生成服务、删除独立推理实例，并确认 GPU 租约释放。页面会话会立即失效，但本次验收证据仍可查看。</p><div class="dialog-note">此动作可能影响正在生成的回答。确认后不提供“恢复同一实例”操作。</div></div><div class="dialog-actions"><button class="button secondary" type="button" data-action="close-dialog">保持运行</button><button class="button danger" type="button" data-action="confirm-stop-inference">结束并回收</button></div>`;
+      }
+      dialog.innerHTML = content;
+      dialog.showModal();
+    }
+    function closeDialog() { document.getElementById('action-dialog')?.close(); }
+    async function sendChat(text) {
+      if (!text.trim() || state.sending) return;
+      state.chat = [...state.chat, { role: 'user', content: text.trim() }, { role: 'assistant', content: '' }];
+      state.sending = true;
+      state.chatDraft = '';
+      render();
+      const full = '判断：退款申请（超过七天）。\n\n下一步：先确认订单状态和商品是否已签收，再告知用户需要人工审核退款资格；不要直接承诺退款或补偿。建议回复：“我理解您想尽快处理退款。已超过七天，我先为您核对订单与签收状态，随后转交售后专员审核，请在 24 小时内留意处理结果。”';
+      let cursor = 0;
+      await new Promise(resolve => {
+        const timer = setInterval(() => {
+          cursor += Math.max(2, Math.ceil(full.length / 26));
+          state.chat[state.chat.length - 1].content = full.slice(0, cursor);
+          const stream = document.getElementById('chat-stream');
+          if (stream) {
+            const last = stream.querySelector('.message.assistant:last-child p');
+            if (last) last.textContent = state.chat[state.chat.length - 1].content;
+          }
+          if (cursor >= full.length) {
+            clearInterval(timer);
+            state.sending = false;
+            render();
+            resolve();
+          }
+        }, 55);
+      });
+    }
+    document.addEventListener('click', (event) => {
+      const nav = event.target.closest('[data-nav]');
+      if (nav) {
+        const key = nav.dataset.nav;
+        if (key === 'training') setView('overview');
+        else if (key === 'serving') setView('serving');
+        else toast('原型仅覆盖本轮「推理训练」范围；其他模块保持现状。');
+        return;
+      }
+      const prompt = event.target.closest('[data-prompt]');
+      if (prompt) { void sendChat(prompt.dataset.prompt); return; }
+      const actionNode = event.target.closest('[data-action]');
+      if (!actionNode) return;
+      const action = actionNode.dataset.action;
+      if (action === 'refresh') { toast('已刷新训练事实：没有覆盖最后成功快照。'); return; }
+      if (action === 'new-training') { state.wizardStep = 1; setView('create'); return; }
+      if (action === 'bind-instance') { openDialog('bind'); return; }
+      if (action === 'back-overview') { setView('overview'); return; }
+      if (action === 'open-detail') { setView('detail', { tab: 'overview' }); return; }
+      if (action === 'open-detail-logs') { setView('detail', { tab: 'logs' }); return; }
+      if (action === 'open-detail-analysis') { setView('detail', { tab: 'analysis' }); return; }
+      if (action === 'open-artifacts') { state.scenario = 'success'; state.detailTab = 'artifacts'; setView('detail'); return; }
+      if (action === 'open-serving') { state.scenario = 'success'; state.view = 'serving'; updateUrl(); render(); window.scrollTo({top:0,behavior:'smooth'}); return; }
+      if (action === 'back-detail') { setView('detail', { tab: 'artifacts' }); return; }
+      if (action === 'detail-tab') { state.detailTab = actionNode.dataset.tab; updateUrl(); render(); window.scrollTo({top:0,behavior:'smooth'}); return; }
+      if (action === 'wizard-next') {
+        if (state.wizardStep === 1) {
+          const name = document.getElementById('task-name')?.value.trim();
+          state.taskName = name || '';
+          if (!name) {
+            state.formError = '请先为本次训练命名。';
+            render();
+            setTimeout(() => document.getElementById('form-error')?.focus(), 20);
+            return;
+          }
+          state.formError = '';
+        }
+        state.wizardStep = Math.min(4, state.wizardStep + 1);
+        render(); window.scrollTo({top:0,behavior:'smooth'}); return;
+      }
+      if (action === 'wizard-back') { state.wizardStep = Math.max(1, state.wizardStep - 1); render(); return; }
+      if (action === 'wizard-jump') { state.wizardStep = Number(actionNode.dataset.step); render(); return; }
+      if (action === 'wizard-submit') { openDialog('submit'); return; }
+      if (action === 'request-cancel') { openDialog('cancel'); return; }
+      if (action === 'confirm-cancel') { closeDialog(); state.scenario = 'loading'; render(); setTimeout(() => { state.scenario = 'error'; render(); toast('取消请求已记录，等待进程退出与资源回收确认。'); }, 1200); return; }
+      if (action === 'confirm-submit') { closeDialog(); const button = document.querySelector('[data-action="wizard-submit"]'); if (button) button.disabled = true; state.scenario = 'loading'; updateUrl(); render(); toast('正在冻结输入并创建 Attempt…'); setTimeout(() => { state.submitted = true; state.wizardStep = 1; state.scenario = 'waiting'; setView('overview'); toast('任务已冻结，进入等待手动实例；平台没有购买 GPU。'); }, 1200); return; }
+      if (action === 'confirm-bind') {
+        const id = document.getElementById('bind-instance')?.value.trim();
+        const ack = document.getElementById('bind-ack')?.checked;
+        if (!id || !ack) {
+          toast('请填写实例 ID，并确认清理授权。');
+          return;
+        }
+        closeDialog();
+        state.scenario = 'loading';
+        updateUrl();
+        render();
+        toast('正在核验实例与运行时…');
+        setTimeout(() => { state.scenario = 'running'; updateUrl(); render(); toast('运行时检查通过，训练已启动。'); }, 1000);
+        return;
+      }
+      if (action === 'back-overview') { setView('overview'); return; }
+      if (action === 'close-dialog') { closeDialog(); return; }
+      if (action === 'open-stage') { const stage = Number(actionNode.dataset.stage); if (stage === 4) { state.scenario = 'success'; } setView('detail', { tab: stage === 4 ? 'artifacts' : stage === 3 ? 'logs' : 'overview' }); return; }
+      if (action === 'download-artifact') { toast('原型：Adapter 包校验通过，下载不会连接 MinIO。'); return; }
+      if (action === 'copy-manifest') { navigator.clipboard?.writeText('客服意图训练集 v3 · Qwen3-0.6B · split-4f82b9d1').catch(() => {}); toast('完整冻结快照已复制。'); return; }
+      if (action === 'download-logs') { toast('原型：日志下载已模拟，没有读取远程文件。'); return; }
+      if (action === 'new-attempt') { toast('已保留同一冻结输入；原型不创建真实 Attempt。'); return; }
+      if (action === 'stop-inference') { openDialog('stop'); return; }
+      if (action === 'confirm-stop-inference') { closeDialog(); toast('结束指令已记录：等待服务停止、实例删除和租约释放确认。'); return; }
+      if (action === 'retry-inference') { state.scenario = 'loading'; render(); setTimeout(() => { state.scenario = 'running'; render(); toast('实例未通过健康检查，当前仍是 blocked；请查看日志。'); }, 800); return; }
+      if (action === 'send-chat') { const value = document.getElementById('chat-input')?.value || state.chatDraft || ''; void sendChat(value); return; }
+    });
+    document.getElementById('state-toggle').addEventListener('click', () => { state.menuOpen = !state.menuOpen; render(); });
+    document.querySelectorAll('#state-menu button').forEach(button => button.addEventListener('click', () => setScenario(button.dataset.scenario)));
+    render();
+  </script>
+</body>
+</html>

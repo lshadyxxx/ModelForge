@@ -1,0 +1,55 @@
+{
+  "visible": true,
+  "className": "mf-select__popover mf-select--dark",
+  "rect": {
+    "left": 535,
+    "top": 424,
+    "width": 240,
+    "height": 262
+  },
+  "background": "rgb(17, 27, 43)",
+  "stateTypography": {
+    "fontSize": "11px",
+    "minHeight": "20px"
+  },
+  "options": [
+    {
+      "text": "全部级别已选",
+      "height": 40,
+      "active": true,
+      "selected": true
+    },
+    {
+      "text": "ERROR",
+      "height": 40,
+      "active": false,
+      "selected": false
+    },
+    {
+      "text": "WARN",
+      "height": 40,
+      "active": false,
+      "selected": false
+    },
+    {
+      "text": "INFO",
+      "height": 40,
+      "active": false,
+      "selected": false
+    },
+    {
+      "text": "DEBUG",
+      "height": 40,
+      "active": false,
+      "selected": false
+    },
+    {
+      "text": "其他",
+      "height": 40,
+      "active": false,
+      "selected": false
+    }
+  ],
+  "overflow": false,
+  "errors": []
+}

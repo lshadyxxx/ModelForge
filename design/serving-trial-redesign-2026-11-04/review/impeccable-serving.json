@@ -1,0 +1,57 @@
+[
+  {
+    "antipattern": "first-viewport-column-overflow",
+    "name": "One column stretches the first viewport",
+    "description": "A multi-column opening section lets one column run far past the fold while its sibling fits in a single viewport, so the short column floats in dead space and the fold falls deep inside one section. Balance the columns, cap the tall one, or let the long content flow below the opening row.",
+    "severity": "warning",
+    "category": "quality",
+    "file": "http://127.0.0.1:4322/",
+    "line": 0,
+    "snippet": "div.baseline opens the page with one column running 364% of the viewport tall while a sibling fits in 64% — the fold falls deep inside the section",
+    "selector": "div.baseline"
+  },
+  {
+    "antipattern": "icon-tile-stack",
+    "name": "Icon tile stacked above heading",
+    "description": "A small rounded-square icon container above a heading is the universal AI feature-card template — every generator outputs this exact shape. Try a side-by-side icon and heading, or let the icon sit in flow without its own container.",
+    "severity": "warning",
+    "category": "slop",
+    "file": "http://127.0.0.1:4322/trial-workbench.html?scenario=ready",
+    "line": 0,
+    "snippet": "50x50px icon tile above h3 \"从一条真实业务问题开始\"",
+    "selector": "h3"
+  },
+  {
+    "antipattern": "repeated-container-text",
+    "name": "Same text repeated inside one container",
+    "description": "The same literal text rendered three or more times in structurally different spots inside a single card or panel is redundant messaging — usually a status or label wired into every slot of a template. Say it once, in the slot where it matters most.",
+    "severity": "warning",
+    "category": "quality",
+    "file": "http://127.0.0.1:4322/trial-workbench.html?scenario=ready",
+    "line": 0,
+    "snippet": "\"fdb5a28c\" rendered 3× in distinct spots inside section.v1-desk",
+    "selector": "body"
+  },
+  {
+    "antipattern": "nested-cards",
+    "name": "Nested cards",
+    "description": "Cards inside cards create visual noise and excessive depth. Flatten the hierarchy — use spacing, typography, and dividers instead of nesting containers.",
+    "severity": "warning",
+    "category": "slop",
+    "file": "http://127.0.0.1:4322/trial-workbench.html?scenario=ready",
+    "line": 0,
+    "snippet": "Card inside card",
+    "selector": "form.v1-composer"
+  },
+  {
+    "antipattern": "nested-cards",
+    "name": "Nested cards",
+    "description": "Cards inside cards create visual noise and excessive depth. Flatten the hierarchy — use spacing, typography, and dividers instead of nesting containers.",
+    "severity": "warning",
+    "category": "slop",
+    "file": "http://127.0.0.1:4322/trial-workbench.html?scenario=ready",
+    "line": 0,
+    "snippet": "Card inside card",
+    "selector": "div.v1-idle"
+  }
+]

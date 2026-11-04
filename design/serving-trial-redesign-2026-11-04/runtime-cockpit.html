@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <link rel="icon" href="data:,">
+  <title>运行驾驶舱 · 推理试用 | ModelForge</title>
+  <link rel="stylesheet" href="assets/serving-demo.css">
+</head>
+<body class="v3-root">
+  <a class="sr-only" href="#cockpit-main">跳到主要内容</a>
+  <div class="v3-shell">
+    <header class="v3-topbar">
+      <div class="v3-brand-group">
+        <div class="v3-brand"><div class="v3-brand-mark">M</div><div><strong>ModelForge</strong><small>RUNTIME CONTROL</small></div></div>
+        <nav class="v3-nav" aria-label="产品模块">
+          <a href="#workspace" data-sandbox-action="原型只覆盖「推理试用」">工作台</a>
+          <a href="#datasets" data-sandbox-action="原型只覆盖「推理试用」">数据集</a>
+          <a href="#models" data-sandbox-action="原型只覆盖「推理试用」">模型</a>
+          <a href="#resources" data-sandbox-action="原型只覆盖「推理试用」">计算环境</a>
+          <a href="#training" data-sandbox-action="原型只覆盖「推理试用」">训练</a>
+          <a href="#serving" aria-current="page">推理试用</a>
+        </nav>
+      </div>
+      <div class="v3-top-right">
+        <span class="v3-local"><span class="status-dot" data-state="ready"></span>LOCAL CONTROL</span>
+        <span class="v3-clock">2026-11-04 · ASIA/SHANGHAI</span>
+        <span class="prototype-mark desktop-only">交互原型 · 模拟数据</span>
+        <button class="btn btn-secondary context-trigger" type="button" data-open-context><span class="icon" data-icon="panel"></span><span>运行事实</span></button>
+        <button class="btn btn-secondary mobile-queue-trigger" type="button" data-open-queue aria-label="打开试用队列"><span class="icon" data-icon="list"></span></button>
+        <button class="btn btn-primary" type="button" data-open-create><span class="icon" data-icon="plus"></span><span>新建试用</span></button>
+      </div>
+    </header>
+
+    <section class="v3-lifecycle" aria-label="试用生命周期">
+      <div class="v3-title-block"><h1>推理试用 · 运行控制</h1><p>一个试用只允许一个活动请求；状态、实例和回收都从同一份运行事实读取。</p></div>
+      <ol class="v3-track" data-stage-track>
+        <li data-stage-index="0">排队</li>
+        <li data-stage-index="1">等待实例</li>
+        <li data-stage-index="2">准备推理</li>
+        <li data-stage-index="3">可试用</li>
+        <li data-stage-index="4">停止回收</li>
+        <li data-stage-index="5">已结束</li>
+      </ol>
+      <div class="v3-life-actions">
+        <span class="badge" data-current-badge data-tone="ready">可试用</span>
+        <button class="btn btn-danger desktop-only" type="button" data-request-stop><span class="icon" data-icon="stop" data-size="sm"></span>结束并回收</button>
+      </div>
+    </section>
+
+    <main id="cockpit-main">
+      <section class="v3-stage" data-view="workspace" aria-label="推理试用运行驾驶舱">
+        <aside class="v3-queue" aria-label="试用运行队列">
+          <header class="v3-column-head"><h2>运行队列</h2><span data-trial-count>3 / 200</span></header>
+          <ul class="v3-trial-list" data-trial-list>
+            <li class="v3-trial" data-trial-id="fdb5a28c">
+              <button type="button" data-select-trial="fdb5a28c" aria-current="true">
+                <span class="v3-trial-top"><strong>fdb5a28c</strong><span data-trial-state>可试用</span></span>
+                <span class="v3-trial-mid">Best · A#7 · adapter-best-01</span>
+                <span class="v3-trial-bottom"><span class="code">u-4090-11-c2a1</span><span class="meter"><i style="width:100%"></i></span></span>
+              </button>
+            </li>
+            <li class="v3-trial" data-trial-id="77c4e8a2">
+              <button type="button" data-select-trial="77c4e8a2" aria-current="false">
+                <span class="v3-trial-top"><strong>77c4e8a2</strong><span data-trial-state>等待实例</span></span>
+                <span class="v3-trial-mid">Final · A#6 · adapter-final-01</span>
+                <span class="v3-trial-bottom"><span class="code">实例待关联</span><span class="meter"><i style="width:25%"></i></span></span>
+              </button>
+            </li>
+            <li class="v3-trial" data-trial-id="5ae019bd">
+              <button type="button" data-select-trial="5ae019bd" aria-current="false">
+                <span class="v3-trial-top"><strong>5ae019bd</strong><span data-trial-state>需处理</span></span>
+                <span class="v3-trial-mid">Best · A#4 · adapter-best-04</span>
+                <span class="v3-trial-bottom"><span class="code">runtime_exited</span><span class="meter"><i style="width:100%;background:var(--danger)"></i></span></span>
+              </button>
+            </li>
+          </ul>
+          <footer class="v3-queue-foot" data-empty-trial-list hidden>没有试用记录。新建后运行事实会出现在这里。</footer>
+          <footer class="v3-queue-foot" data-trial-list>请求活跃时不会触发 15 分钟空闲回收。页面会话不写入数据库。</footer>
+        </aside>
+
+        <section class="v3-console" data-chat-scope aria-label="当前试用对话">
+          <header class="v3-console-head">
+            <div class="v3-console-title">
+              <h2><span data-current-base>Qwen3-0.6B</span> / <span data-current-short-id>fdb5a28c</span></h2>
+              <p><span data-current-adapter>Best · A#7 · adapter-best-01</span> · request <span data-current-request>idle</span></p>
+            </div>
+            <div class="v3-console-status"><span class="status-dot" data-state="ready"></span><span class="badge" data-current-badge data-tone="ready">可试用</span></div>
+          </header>
+
+          <div class="v3-transcript" data-chat-scroll>
+            <div class="v3-transcript-inner">
+              <div class="v3-system-line">SESSION / PAGE-ONLY · STOPPED OUTPUT NEVER BECOMES CONTEXT</div>
+              <div data-chat-log role="log" aria-live="polite" aria-label="运行对话"></div>
+              <div class="v3-empty-chat" data-empty-chat>
+                <h3>系统就绪，等待一条业务输入</h3>
+                <p>输出适合验收，不适合作为正式 Serving 的调用记录。关注 Adapter 是否按预期回答，以及结束后实例是否真的回收。</p>
+                <div class="prompt-list" style="justify-content:center">
+                  <button class="prompt-chip" type="button" data-prompt="我们有一个 7 天无理由退款政策。用户已经拆封，但说商品与描述不符。请给出一段既解释规则、又避免直接承诺退款的客服回复。">退款边界</button>
+                  <button class="prompt-chip" type="button" data-prompt="把下面这段产品说明压缩成 3 条要点，每条不超过 24 个字：支持多轮对话、保留最近十轮上下文、可在回答中引用知识库片段。">压缩要点</button>
+                  <button class="prompt-chip" type="button" data-prompt="用户说“先别退”，但前面已经确认商品破损。请判断用户意图，并给客服一句下一步追问。">意图澄清</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="v3-composer-wrap">
+            <form class="v3-composer" onsubmit="return false">
+              <label class="sr-only" for="v3-chat-input">输入测试问题</label>
+              <textarea id="v3-chat-input" data-chat-input rows="2" placeholder="输入问题；Ctrl / ⌘ + Enter 发送"></textarea>
+              <div class="v3-composer-bar">
+                <span>MAX <span data-current-max-tokens>2048</span> TOK · TEMP 0.7 · TOP_P 0.9</span>
+                <div style="display:flex;gap:5px">
+                  <button class="btn btn-danger" type="button" data-stream-only data-cancel-generation hidden><span class="icon" data-icon="stop" data-size="sm"></span>停止生成</button>
+                  <button class="btn btn-quiet" type="button" data-clear-session aria-label="清空页面会话"><span class="icon" data-icon="refresh" data-size="sm"></span></button>
+                  <button class="btn btn-primary" type="submit" data-composer-submit><span class="icon" data-icon="arrow" data-size="sm"></span>发送</button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </section>
+
+        <aside class="v3-context" aria-label="运行事实">
+          <header class="v3-context-head"><h2>运行事实</h2><p>只展示后端已确认的字段；未上报的数据不补造。</p></header>
+          <section class="v3-context-section">
+            <h3>对象指纹</h3>
+            <dl class="v3-facts">
+              <div><dt>BASE</dt><dd data-current-base-fingerprint>Qwen3-0.6B-20261102-r1</dd></div>
+              <div><dt>ADAPTER</dt><dd data-current-adapter-fingerprint>best-fingerprint</dd></div>
+              <div><dt>ATTEMPT</dt><dd data-current-attempt>A#7</dd></div>
+              <div><dt>EVAL LOSS</dt><dd data-current-eval-loss>0.3218</dd></div>
+            </dl>
+          </section>
+          <section class="v3-context-section">
+            <h3>实例与运行时</h3>
+            <dl class="v3-facts">
+              <div><dt>INSTANCE</dt><dd data-current-instance>u-4090-11-c2a1</dd></div>
+              <div><dt>GPU</dt><dd data-current-gpu>RTX 4090 · 1 卡</dd></div>
+              <div><dt>RUNTIME</dt><dd data-current-runtime>vLLM · lock-20261102</dd></div>
+            </dl>
+          </section>
+          <section class="v3-context-section">
+            <h3>配置上限</h3>
+            <div class="v3-resource">
+              <div class="v3-resource-row"><span>模型长度</span><span class="bar"><i style="width:100%"></i></span><strong>4096</strong></div>
+              <div class="v3-resource-row"><span>最大生成</span><span class="bar"><i style="width:50%"></i></span><strong><span data-current-max-tokens>2048</span></strong></div>
+            </div>
+            <div class="v3-idle" style="margin-top:11px"><strong><span data-idle-clock>14:32</span><span data-idle-label>空闲后自动回收</span></strong><p>无活动请求且空闲 15 分钟后，Worker 才会请求停止。</p></div>
+          </section>
+          <section class="v3-context-section">
+            <h3>就绪门禁</h3>
+            <ul class="v3-gate-list">
+              <li><span class="icon" data-icon="check" data-size="sm"></span>基座指纹一致</li>
+              <li><span class="icon" data-icon="check" data-size="sm"></span>Adapter 生成探针通过</li>
+              <li><span class="icon" data-icon="check" data-size="sm"></span>请求状态 idle</li>
+            </ul>
+          </section>
+          <div class="v3-actions">
+            <button class="btn btn-secondary" type="button" data-clear-session>清空页面会话</button>
+            <button class="btn btn-danger" type="button" data-request-stop>结束试用并回收</button>
+          </div>
+        </aside>
+      </section>
+
+      <section class="v3-empty-main" data-view="empty" hidden>
+        <div class="v3-empty-card">
+          <div class="v3-empty-icon"><span class="icon" data-icon="monitor" data-size="lg"></span></div>
+          <h2>运行队列为空</h2>
+          <p>先创建一个独立推理试用。运行驾驶舱会把 Adapter、实例、租约和结束回执放在同一条可追溯链路上。</p>
+          <div class="v3-spec-table"><div><span>PRE-FLIGHT</span><strong>无活动 GPU 租约</strong></div><div><span>REQUIRED</span><strong>已同步 Best / Final Adapter</strong></div><div><span>MANUAL</span><strong>实例由你在优云创建</strong></div></div>
+          <button class="btn btn-primary" type="button" data-open-create><span class="icon" data-icon="plus"></span>新建试用</button>
+        </div>
+      </section>
+
+      <section class="v3-state-main" data-view="waiting" hidden>
+        <div class="v3-state-card">
+          <div class="v3-state-icon"><span class="icon" data-icon="monitor" data-size="lg"></span></div>
+          <span class="badge" data-current-badge data-tone="waiting">等待手动创建实例</span>
+          <h2 style="margin-top:10px">WAITING / 实例尚未关联</h2>
+          <p>该试用已占用租约，但尚未绑定实例。复制下面的事实到优云控制台，创建完成后返回关联实例 ID。</p>
+          <div class="v3-spec-table">
+            <div><span>INSTANCE</span><strong>RTX 4090 × 1</strong></div>
+            <div><span>REGION</span><strong>cn-bj-02 / 后付费</strong></div>
+            <div><span>RESOURCES</span><strong>32C / 128 GiB / 100 GB SSD</strong></div>
+            <div><span>IMAGE</span><strong>ModelForge vLLM 2026.11</strong></div>
+          </div>
+          <div class="v3-state-actions">
+            <button class="btn btn-primary" type="button" data-open-bind><span class="icon" data-icon="arrow"></span>关联已创建实例</button>
+            <button class="btn btn-secondary" type="button" data-copy data-copy-target=".v3-state-card .v3-spec-table"><span class="icon" data-icon="copy"></span>复制要求</button>
+            <button class="btn btn-quiet" type="button" data-request-stop>取消试用</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="v3-state-main" data-view="preparing" hidden>
+        <div class="v3-state-card">
+          <div class="v3-state-icon"><span class="icon" data-icon="refresh" data-size="lg"></span></div>
+          <span class="badge" data-current-badge data-tone="preparing">准备推理</span>
+          <h2 style="margin-top:10px">PREPARING / 服务尚未开放</h2>
+          <p>实例已关联。平台正在核对运行时、恢复 Adapter 并等待健康探针；在 ready 之前输入保持禁用。</p>
+          <div class="loading-bar" aria-label="准备进度"></div>
+          <ul class="v3-stage-events">
+            <li data-state="done">instance_bound · u-4090-11-c2a1</li>
+            <li data-state="done">runtime_lock_match · lock-20261102</li>
+            <li data-state="active">adapter_restore · best-fingerprint</li>
+            <li data-state="">generation_probe · pending</li>
+          </ul>
+          <div class="v3-state-actions"><button class="btn btn-danger" type="button" data-request-stop>停止并回收</button><button class="btn btn-secondary" type="button" data-sandbox-action="准备事件流未在本原型中展开">查看事件</button></div>
+        </div>
+      </section>
+
+      <section class="v3-state-main" data-view="blocked" hidden>
+        <div class="v3-state-card">
+          <div class="v3-state-icon" style="border-color:var(--danger-border);background:var(--danger-soft);color:var(--danger)"><span class="icon" data-icon="alert" data-size="lg"></span></div>
+          <span class="badge" data-current-badge data-tone="blocked">需要处理</span>
+          <h2 style="margin-top:10px">BLOCKED / 推理进程异常退出</h2>
+          <p>进程已退出，但实例与租约仍被保留。必须显式选择重试或回收，不能把这个状态当成成功结束。</p>
+          <div class="v3-spec-table">
+            <div><span>ERROR</span><strong class="code" data-current-error style="color:var(--danger)">runtime_exited</strong></div>
+            <div><span>INSTANCE</span><strong data-current-instance>u-4090-08-4d21</strong></div>
+            <div><span>LEASE</span><strong style="color:var(--warning)">RETAINED</strong></div>
+            <div><span>REQUEST</span><strong>NONE / NOT RUNNING</strong></div>
+          </div>
+          <div class="notice" data-tone="warning" style="margin-bottom:17px"><span class="icon" data-icon="alert"></span><p><strong>资源仍在占用。</strong>先处理实例和租约，再决定是否用同一 Adapter 重试。</p></div>
+          <div class="v3-state-actions"><button class="btn btn-primary" type="button" data-retry-trial><span class="icon" data-icon="refresh"></span>重新准备</button><button class="btn btn-danger" type="button" data-request-stop>结束并回收</button></div>
+        </div>
+      </section>
+
+      <section class="v3-state-main" data-view="stopping" hidden>
+        <div class="v3-state-card">
+          <div class="v3-state-icon" style="border-color:var(--warning-border);background:var(--warning-soft);color:var(--warning)"><span class="icon" data-icon="clock" data-size="lg"></span></div>
+          <span class="badge" data-current-badge data-tone="stopping">停止并回收中</span>
+          <h2 style="margin-top:10px">STOPPING / 等待最终回执</h2>
+          <p>停止请求已经记录。驾驶舱会持续显示每个阶段的确认情况，直到实例和租约都已释放。</p>
+          <ul class="v3-stage-events">
+            <li data-state="done">stop_requested · 已记录</li>
+            <li data-state="done">request_drained · idle</li>
+            <li data-state="active">process_exit · waiting</li>
+            <li data-state="">cleanup_reconcile · pending</li>
+            <li data-state="">lease_release · pending</li>
+          </ul>
+          <div class="notice" data-tone="info"><span class="icon" data-icon="clock"></span><p>通常需要 20–60 秒。刷新后仍应能通过试用 ID 找回同一状态。</p></div>
+        </div>
+      </section>
+
+      <section class="v3-state-main" data-view="stopped" hidden>
+        <div class="v3-state-card">
+          <div class="v3-state-icon" style="border-color:var(--success-border);background:var(--success-soft);color:var(--success)"><span class="icon" data-icon="check" data-size="lg"></span></div>
+          <span class="badge" data-current-badge data-tone="stopped">已结束</span>
+          <h2 style="margin-top:10px">CLOSED / 实例与租约均已回收</h2>
+          <p>试用正式结束。页面会话仍暂存在当前标签页，刷新后会清空；对象指纹与回收回执保留在试用记录中。</p>
+          <div class="v3-cleanup-table">
+            <div><span>process_exit</span><strong>CONFIRMED</strong></div>
+            <div><span>process_group_exit</span><strong>CONFIRMED</strong></div>
+            <div><span>instance_cleanup</span><strong>CONFIRMED</strong></div>
+            <div><span>lease_release</span><strong>CONFIRMED</strong></div>
+          </div>
+          <div class="v3-state-actions"><button class="btn btn-primary" type="button" data-create-again><span class="icon" data-icon="plus"></span>创建下一次试用</button><button class="btn btn-secondary" type="button" data-sandbox-action="原型未实现证据导出">导出本轮证据</button></div>
+        </div>
+      </section>
+
+      <section class="v3-loading-main" data-view="loading" aria-label="正在读取运行事实">
+        <div class="v3-loading-col"><div class="skeleton v3-loading-line" style="height:52px"></div><div class="skeleton v3-loading-line" style="height:52px"></div><div class="skeleton v3-loading-line" style="height:52px"></div></div>
+        <div class="v3-loading-col"><div class="skeleton v3-loading-line"></div><div class="skeleton v3-loading-line"></div><div class="skeleton v3-loading-line"></div><div class="skeleton" style="height:120px;margin-top:23px"></div></div>
+        <div class="v3-loading-col"><div class="skeleton v3-loading-line"></div><div class="skeleton v3-loading-line"></div><div class="skeleton v3-loading-line"></div></div>
+      </section>
+    </main>
+  </div>
+
+  <dialog class="dialog" id="create-dialog" aria-labelledby="create-title">
+    <form class="dialog-shell" onsubmit="return false">
+      <header class="dialog-head"><div><ol class="steps" aria-label="创建步骤"><li aria-current="step"><span class="step-number">1</span>Adapter</li><li><span class="step-number">2</span>实例</li><li><span class="step-number">3</span>关联</li></ol><h2 id="create-title" style="margin-top:10px">新建推理试用</h2><p>冻结 Adapter、基座与单卡实例要求；平台不调用云创建接口。</p></div><button class="icon-button" type="button" data-close-dialog aria-label="关闭"><span class="icon" data-icon="close"></span></button></header>
+      <div class="dialog-body">
+        <fieldset style="border:0;padding:0;margin:0"><legend class="field-label" style="margin-bottom:9px">选择 Adapter</legend><div style="display:grid;gap:8px">
+          <label class="adapter-option"><input type="radio" name="adapter-choice" value="best-a7"><span><strong>Best · A#7</strong><small>adapter-best-01 · Qwen3-0.6B · eval loss 0.3218</small></span><span class="metric">推荐</span></label>
+          <label class="adapter-option"><input type="radio" name="adapter-choice" value="final-a7"><span><strong>Final · A#7</strong><small>adapter-final-01 · Qwen3-0.6B · eval loss 0.3389</small></span><span class="metric">可验收</span></label>
+          <label class="adapter-option"><input type="radio" name="adapter-choice" value="best-a4" disabled><span><strong>Best · A#4</strong><small>当前推理运行时未支持</small></span><span class="metric">未支持</span></label>
+        </div></fieldset>
+        <p class="inline-error" data-create-error role="alert" hidden></p>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:22px"><div><strong style="font-size:13px">预检与实例要求</strong><p class="field-note">使用最后一次成功推理的 RTX 4090 模板。</p></div><span class="badge" data-tone="success">已验证</span></div>
+        <dl class="preset-summary"><div><dt class="summary-label">GPU</dt><dd class="summary-value">RTX 4090 × 1</dd></div><div><dt class="summary-label">资源</dt><dd class="summary-value">32C / 128 GiB</dd></div><div><dt class="summary-label">空闲回收</dt><dd class="summary-value">15 分钟</dd></div></dl>
+        <details style="margin-top:12px"><summary>展开技术配置</summary><div class="form-grid" style="margin-top:12px"><label class="field"><span class="field-label">地域 / 可用区</span><input class="input" value="cn-bj-02"></label><label class="field"><span class="field-label">运行镜像</span><input class="input" value="ModelForge vLLM 2026.11"></label><label class="field"><span class="field-label">系统盘</span><input class="input" value="100 GB CLOUD_SSD"></label><label class="field"><span class="field-label">计费方式</span><input class="input" value="后付费"></label></div></details>
+        <div class="notice" data-tone="warning" style="margin-top:16px"><span class="icon" data-icon="alert"></span><p><strong>手动创建收费资源。</strong>创建记录后，平台会生成一份可复制的实例要求，并等待你关联实际实例 ID。</p></div>
+      </div>
+      <footer class="dialog-foot"><span class="foot-note">原型不创建 GPU、不连接后端。</span><button class="btn btn-secondary" type="button" data-close-dialog>取消</button><button class="btn btn-primary" type="button" data-submit-create>创建并等待实例</button></footer>
+    </form>
+  </dialog>
+
+  <dialog class="dialog" data-size="small" id="bind-dialog" aria-labelledby="bind-title">
+    <form class="dialog-shell" onsubmit="return false">
+      <header class="dialog-head"><div><h2 id="bind-title">绑定手动创建实例</h2><p>实例必须处于 Running，并独立于训练任务。平台会核对运行时 lock 与清理授权。</p></div><button class="icon-button" type="button" data-close-dialog aria-label="关闭"><span class="icon" data-icon="close"></span></button></header>
+      <div class="dialog-body"><label class="field"><span class="field-label">实例 ID</span><input class="input" data-bind-input placeholder="u-4090-xx-xxxx" autocomplete="off"></label><label class="check-row" style="margin-top:15px"><input type="checkbox" data-bind-ack><span>我拥有此实例，授权平台在试用结束、失败或取消后停止并删除它。</span></label><p class="inline-error" data-bind-error role="alert" hidden></p><div class="notice" data-tone="info" style="margin-top:16px"><span class="icon" data-icon="shield"></span><p>关联成功后只进入准备阶段；健康探针未通过时不会接受对话请求。</p></div></div>
+      <footer class="dialog-foot"><button class="btn btn-secondary" type="button" data-close-dialog>稍后</button><button class="btn btn-primary" type="button" data-submit-bind>核对并关联</button></footer>
+    </form>
+  </dialog>
+
+  <dialog class="dialog" data-size="small" id="stop-dialog" aria-labelledby="stop-title">
+    <div class="dialog-shell">
+      <header class="dialog-head"><div><h2 id="stop-title">结束试用并释放资源？</h2><p>请求会先停止生成，再等待进程组退出和实例回收；页面会持续显示中间态。</p></div><button class="icon-button" type="button" data-close-dialog aria-label="关闭"><span class="icon" data-icon="close"></span></button></header>
+      <div class="dialog-body"><div class="v3-spec-table"><div><span>TRIAL</span><strong data-current-id>fdb5a28c</strong></div><div><span>INSTANCE</span><strong data-current-instance>u-4090-11-c2a1</strong></div><div><span>SESSION</span><strong>NOT PERSISTED</strong></div></div><div class="notice" data-tone="danger"><span class="icon" data-icon="alert"></span><p><strong>不要在回收完成前新建试用。</strong>活动 GPU 租约可能阻止下一次创建。</p></div></div>
+      <footer class="dialog-foot"><button class="btn btn-secondary" type="button" data-close-dialog>继续试用</button><button class="btn btn-danger" type="button" data-confirm-stop>确认结束并回收</button></footer>
+    </div>
+  </dialog>
+
+  <dialog class="v3-mobile-sheet" id="mobile-queue-dialog" aria-labelledby="mobile-queue-title">
+    <div class="mobile-sheet-head"><h2 id="mobile-queue-title">运行队列</h2><button class="icon-button" type="button" data-close-dialog aria-label="关闭"><span class="icon" data-icon="close"></span></button></div>
+    <div class="mobile-sheet-body"><ul class="v1-trial-list" data-mobile-trials></ul><button class="btn btn-primary" type="button" data-open-create style="width:100%;margin-top:12px"><span class="icon" data-icon="plus"></span>新建试用</button></div>
+  </dialog>
+
+  <dialog class="v3-mobile-sheet" id="mobile-context-dialog" aria-labelledby="mobile-context-title">
+    <div class="mobile-sheet-head"><h2 id="mobile-context-title">运行事实</h2><button class="icon-button" type="button" data-close-dialog aria-label="关闭"><span class="icon" data-icon="close"></span></button></div>
+    <div class="mobile-sheet-body">
+      <div class="v3-context-section"><h3>对象指纹</h3><dl class="v3-facts"><div><dt>BASE</dt><dd data-current-base-fingerprint>Qwen3-0.6B-20261102-r1</dd></div><div><dt>ADAPTER</dt><dd data-current-adapter-fingerprint>best-fingerprint</dd></div></dl></div>
+      <div class="v3-context-section"><h3>实例与回收</h3><dl class="v3-facts"><div><dt>INSTANCE</dt><dd data-current-instance>u-4090-11-c2a1</dd></div><div><dt>IDLE</dt><dd><span data-idle-clock>14:32</span></dd></div></dl></div>
+      <div class="v3-actions"><button class="btn btn-secondary" type="button" data-clear-session>清空页面会话</button><button class="btn btn-danger" type="button" data-request-stop>结束试用并回收</button></div>
+    </div>
+  </dialog>
+
+  <div class="toast-region" aria-live="polite" aria-atomic="true"></div>
+  <div class="state-dock" aria-label="原型状态预览">
+    <div class="state-panel" data-state-panel hidden>
+      <p>切换真实流程中的关键状态；交互原型不会访问后端。</p>
+      <div class="state-grid">
+        <button type="button" data-scenario-button="empty">空状态</button><button type="button" data-scenario-button="loading">加载中</button><button type="button" data-scenario-button="create">创建</button><button type="button" data-scenario-button="waiting">等待实例</button><button type="button" data-scenario-button="preparing">准备中</button><button type="button" data-scenario-button="ready">可试用</button><button type="button" data-scenario-button="streaming">流式生成</button><button type="button" data-scenario-button="blocked">失败</button><button type="button" data-scenario-button="stopping">回收中</button><button type="button" data-scenario-button="stopped">成功回收</button>
+      </div>
+    </div>
+    <button class="state-toggle" type="button" data-state-toggle aria-expanded="false"><span class="icon" data-icon="spark" data-size="sm"></span>演示状态</button>
+  </div>
+  <script src="assets/serving-readable.js"></script>
+  <script src="assets/serving-demo.js"></script>
+</body>
+</html>

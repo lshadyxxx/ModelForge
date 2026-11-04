@@ -1,0 +1,140 @@
+{
+  "adapter": {
+    "rect": {
+      "left": 334,
+      "top": 309,
+      "width": 772,
+      "height": 305
+    },
+    "style": {
+      "background": "rgb(255, 255, 255)",
+      "border": "1px solid rgb(204, 213, 225)",
+      "radius": "8px",
+      "shadow": "rgba(23, 32, 51, 0.18) 0px 18px 48px 0px, rgba(23, 32, 51, 0.08) 0px 3px 10px 0px"
+    },
+    "options": [
+      {
+        "text": "Final · Attempt 03c13388eval loss 0.2147834300994873 · 94db72a0b844",
+        "disabled": false,
+        "active": true,
+        "height": 49
+      },
+      {
+        "text": "Best · Attempt 03c13388eval loss 0.2147834300994873 · 7e1ace20567e",
+        "disabled": false,
+        "active": false,
+        "height": 49
+      },
+      {
+        "text": "Final · Attempt fbbe9980Adapter 绑定的是旧版兼容基线",
+        "disabled": true,
+        "active": false,
+        "height": 49
+      },
+      {
+        "text": "Best · Attempt fbbe9980Adapter 绑定的是旧版兼容基线",
+        "disabled": true,
+        "active": false,
+        "height": 49
+      },
+      {
+        "text": "Final · Attempt 02504b93eval loss 0.2147834300994873 · 083cdd5a74c8",
+        "disabled": false,
+        "active": false,
+        "height": 49
+      },
+      {
+        "text": "Best · Attempt 02504b93eval loss 0.2147834300994873 · 780954de2485",
+        "disabled": false,
+        "active": false,
+        "height": 49
+      }
+    ]
+  },
+  "platform": {
+    "rect": {
+      "left": 347,
+      "top": 557,
+      "width": 368,
+      "height": 120
+    },
+    "style": {
+      "background": "rgb(255, 255, 255)",
+      "border": "1px solid rgb(204, 213, 225)",
+      "radius": "8px",
+      "shadow": "rgba(23, 32, 51, 0.18) 0px 18px 48px 0px, rgba(23, 32, 51, 0.08) 0px 3px 10px 0px"
+    },
+    "options": [
+      {
+        "text": "Auto",
+        "disabled": false,
+        "active": true,
+        "height": 36
+      },
+      {
+        "text": "Intel/Auto",
+        "disabled": false,
+        "active": false,
+        "height": 36
+      },
+      {
+        "text": "Amd/Auto",
+        "disabled": false,
+        "active": false,
+        "height": 36
+      }
+    ]
+  },
+  "mobile": {
+    "rect": {
+      "left": 25,
+      "top": 260,
+      "width": 340,
+      "height": 305
+    },
+    "style": {
+      "background": "rgb(255, 255, 255)",
+      "border": "1px solid rgb(204, 213, 225)",
+      "radius": "8px",
+      "shadow": "rgba(23, 32, 51, 0.18) 0px 18px 48px 0px, rgba(23, 32, 51, 0.08) 0px 3px 10px 0px"
+    },
+    "options": [
+      {
+        "text": "Final · Attempt 03c13388eval loss 0.2147834300994873 · 94db72a0b844",
+        "disabled": false,
+        "active": true,
+        "height": 49
+      },
+      {
+        "text": "Best · Attempt 03c13388eval loss 0.2147834300994873 · 7e1ace20567e",
+        "disabled": false,
+        "active": false,
+        "height": 49
+      },
+      {
+        "text": "Final · Attempt fbbe9980Adapter 绑定的是旧版兼容基线",
+        "disabled": true,
+        "active": false,
+        "height": 49
+      },
+      {
+        "text": "Best · Attempt fbbe9980Adapter 绑定的是旧版兼容基线",
+        "disabled": true,
+        "active": false,
+        "height": 49
+      },
+      {
+        "text": "Final · Attempt 02504b93eval loss 0.2147834300994873 · 083cdd5a74c8",
+        "disabled": false,
+        "active": false,
+        "height": 49
+      },
+      {
+        "text": "Best · Attempt 02504b93eval loss 0.2147834300994873 · 780954de2485",
+        "disabled": false,
+        "active": false,
+        "height": 49
+      }
+    ]
+  }
+}

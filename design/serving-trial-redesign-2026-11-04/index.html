@@ -1,0 +1,519 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <link rel="icon" href="data:,">
+  <title>推理试用 · UI/UX 设计评审 | ModelForge</title>
+  <style>
+    :root {
+      --ink: #172033;
+      --muted: #5f6b7d;
+      --soft: #edf1f6;
+      --line: #dce3ec;
+      --surface: #fff;
+      --blue: #245ad0;
+      --blue-soft: #eaf1ff;
+      --coral: #bf5a3b;
+      --violet: #574cc4;
+      --cyan: #167286;
+      --green: #176c54;
+      --font: "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+      --display: Bahnschrift, "Segoe UI", "Microsoft YaHei", sans-serif;
+      --mono: "Cascadia Mono", Consolas, monospace;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: #f4f6f9;
+      font-family: var(--font);
+      font-size: 15px;
+      line-height: 1.65;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: inherit; }
+    button, a { -webkit-tap-highlight-color: transparent; }
+    :focus-visible { outline: 3px solid #7295e8; outline-offset: 3px; }
+    ::selection { color: #173976; background: #d9e5ff; }
+    .skip {
+      position: fixed;
+      top: -80px;
+      left: 16px;
+      z-index: 20;
+      padding: 10px 13px;
+      border-radius: 6px;
+      background: #fff;
+      color: var(--ink);
+    }
+    .skip:focus { top: 12px; }
+    .shell { width: min(1500px, calc(100% - 48px)); margin: 0 auto; }
+    .topbar {
+      min-height: 66px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(255, 255, 255, .88);
+      backdrop-filter: blur(12px);
+    }
+    .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+    .brand-mark {
+      width: 34px;
+      height: 36px;
+      display: grid;
+      place-items: center;
+      border-radius: 7px;
+      background: var(--blue);
+      color: #fff;
+      font-family: var(--display);
+      font-size: 22px;
+      font-weight: 700;
+    }
+    .brand strong { display: block; font-family: var(--display); font-size: 17px; letter-spacing: -.02em; }
+    .brand small { display: block; margin-top: -1px; color: var(--muted); font-size: 10px; letter-spacing: .06em; }
+    .top-nav { display: flex; align-items: center; gap: 19px; color: var(--muted); font-size: 12px; }
+    .top-nav a { text-decoration: none; }
+    .top-nav a:hover { color: var(--ink); }
+    .top-meta { color: var(--muted); font-family: var(--mono); font-size: 10px; }
+    header.hero { padding: 58px 0 38px; }
+    .hero-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(300px, .75fr); align-items: end; gap: 48px; }
+    h1 {
+      max-width: 14ch;
+      margin: 0;
+      font-family: var(--display);
+      font-size: clamp(40px, 5vw, 72px);
+      font-weight: 680;
+      line-height: 1.02;
+      letter-spacing: -.04em;
+      text-wrap: balance;
+    }
+    .hero-copy {
+      max-width: 58ch;
+      margin: 0 0 6px;
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1.8;
+    }
+    .decision-strip {
+      display: grid;
+      grid-template-columns: 170px minmax(0, 1fr) 240px;
+      margin: 18px 0 0;
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      background: rgba(255, 255, 255, .64);
+    }
+    .decision-strip > div { padding: 18px 20px; }
+    .decision-strip > div + div { border-left: 1px solid var(--line); }
+    .decision-strip span { display: block; margin-bottom: 3px; color: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: .08em; }
+    .decision-strip strong { display: block; font-size: 13px; line-height: 1.55; }
+    .decision-strip .recommend { background: var(--blue); color: #fff; }
+    .decision-strip .recommend span { color: #e1eaff; }
+    main { padding: 0 0 56px; }
+    section { padding: 48px 0 0; }
+    .section-head {
+      display: grid;
+      grid-template-columns: minmax(0, 1.1fr) minmax(300px, .9fr);
+      align-items: end;
+      gap: 42px;
+      margin-bottom: 22px;
+    }
+    h2 {
+      margin: 0;
+      font-family: var(--display);
+      font-size: clamp(26px, 3vw, 40px);
+      line-height: 1.1;
+      letter-spacing: -.03em;
+    }
+    .section-head p { max-width: 62ch; margin: 0; color: var(--muted); font-size: 13px; line-height: 1.75; }
+    .baseline {
+      display: grid;
+      grid-template-columns: minmax(0, 1.3fr) minmax(320px, .7fr);
+      gap: 26px;
+      align-items: start;
+    }
+    .shot {
+      margin: 0;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fff;
+    }
+    .shot img { width: 100%; height: auto; display: block; }
+    .shot figcaption {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 9px 12px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 10px;
+    }
+    .baseline-mobile { width: min(220px, 100%); margin-top: 16px; }
+    .diagnosis {
+      padding: 22px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fff;
+    }
+    .diagnosis h3 { margin: 0 0 13px; font-size: 16px; }
+    .diagnosis ol { margin: 0; padding: 0; list-style: none; counter-reset: issue; }
+    .diagnosis li { position: relative; padding: 12px 0 12px 35px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; line-height: 1.65; counter-increment: issue; }
+    .diagnosis li:first-child { border-top: 0; }
+    .diagnosis li::before {
+      position: absolute;
+      top: 13px;
+      left: 0;
+      width: 23px;
+      height: 23px;
+      display: grid;
+      place-items: center;
+      border: 1px solid #cbd7ea;
+      border-radius: 5px;
+      color: var(--blue);
+      font-family: var(--mono);
+      font-size: 9px;
+      content: counter(issue, decimal-leading-zero);
+    }
+    .diagnosis strong { color: var(--ink); }
+    .direction {
+      --scheme: var(--blue);
+      --scheme-soft: var(--blue-soft);
+      border-top: 3px solid var(--scheme);
+      background: #fff;
+      padding: 25px 26px 26px;
+    }
+    .direction + .direction { margin-top: 24px; }
+    .direction.f2 { --scheme: var(--violet); --scheme-soft: #efecff; }
+    .direction.f3 { --scheme: var(--cyan); --scheme-soft: #e7f6f8; }
+    .direction-head {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 26px;
+      align-items: start;
+      margin-bottom: 20px;
+    }
+    .direction-title { display: flex; align-items: flex-start; gap: 15px; }
+    .direction-index {
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      flex: 0 0 auto;
+      border: 1px solid color-mix(in srgb, var(--scheme) 42%, white);
+      border-radius: 50%;
+      background: var(--scheme-soft);
+      color: var(--scheme);
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .direction h3 { margin: 0; font-family: var(--display); font-size: 27px; line-height: 1.15; letter-spacing: -.03em; }
+    .direction h3 small { margin-left: 8px; color: var(--muted); font-family: var(--font); font-size: 11px; font-weight: 500; letter-spacing: 0; }
+    .direction-description { max-width: 80ch; margin: 9px 0 0; color: var(--muted); font-size: 13px; line-height: 1.75; }
+    .direction-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+    .button {
+      min-height: 42px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 8px 14px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+      color: var(--ink);
+      font-size: 12px;
+      font-weight: 650;
+      text-decoration: none;
+    }
+    .button:hover { border-color: #b8c3d2; background: #f8fafc; }
+    .button.primary { border-color: var(--scheme); background: var(--scheme); color: #fff; }
+    .button.primary:hover { filter: brightness(.95); }
+    .direction-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(300px, .85fr); gap: 22px; }
+    .direction-shots { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    .direction-shots .shot:first-child { grid-column: 1 / -1; }
+    .direction-notes { display: grid; align-content: start; gap: 10px; }
+    .note-block { padding: 14px 15px; border: 1px solid var(--line); border-radius: 8px; background: #fbfcfe; }
+    .note-block strong { display: block; margin-bottom: 4px; font-size: 12px; }
+    .note-block p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.65; }
+    .note-block.good { background: var(--scheme-soft); border-color: color-mix(in srgb, var(--scheme) 22%, white); }
+    .note-block.warn { background: #fffaf2; border-color: #eed8b7; }
+    .score-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      padding: 9px 0;
+      border-bottom: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 11px;
+    }
+    .score-row b { color: var(--scheme); font-family: var(--mono); font-size: 12px; }
+    .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+    table { width: 100%; min-width: 840px; border-collapse: collapse; text-align: left; }
+    th, td { padding: 13px 16px; border-top: 1px solid var(--line); font-size: 12px; }
+    thead th { border-top: 0; background: #f7f9fc; color: var(--muted); font-size: 10px; letter-spacing: .05em; }
+    th:not(:first-child) { text-align: center; }
+    td:not(:first-child) { text-align: center; font-family: var(--mono); }
+    tr.recommended td { background: #f2f6ff; font-weight: 700; }
+    tr.recommended td:first-child { color: var(--blue); }
+    .decision {
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(320px, .8fr);
+      gap: 0;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      overflow: hidden;
+      background: #fff;
+    }
+    .decision-main { padding: 26px; }
+    .decision-main h3 { margin: 0 0 8px; font-family: var(--display); font-size: 27px; letter-spacing: -.03em; }
+    .decision-main > p { max-width: 64ch; margin: 0 0 18px; color: var(--muted); font-size: 13px; }
+    .decision-points { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+    .decision-points li { position: relative; padding-left: 22px; color: var(--muted); font-size: 12px; }
+    .decision-points li::before { position: absolute; top: .62em; left: 0; width: 8px; height: 8px; border: 2px solid var(--blue); border-radius: 50%; content: ""; }
+    .decision-side {
+      display: grid;
+      align-content: center;
+      gap: 15px;
+      padding: 26px;
+      background: #18243a;
+      color: #fff;
+    }
+    .decision-side span { color: #aebdd2; font-size: 10px; font-weight: 700; letter-spacing: .08em; }
+    .decision-side strong { font-family: var(--display); font-size: 22px; line-height: 1.25; letter-spacing: -.02em; }
+    .decision-side p { margin: 0; color: #c0cada; font-size: 12px; }
+    .next-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+    .next-step { padding: 18px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+    .next-step b { display: block; margin-bottom: 5px; color: var(--blue); font-family: var(--mono); font-size: 10px; }
+    .next-step h3 { margin: 0 0 6px; font-size: 14px; }
+    .next-step p { margin: 0; color: var(--muted); font-size: 12px; }
+    footer {
+      margin: 48px 0 0;
+      padding: 20px 0 30px;
+      border-top: 1px solid var(--line);
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+      color: var(--muted);
+      font-size: 10px;
+    }
+    @media (max-width: 1000px) {
+      .hero-grid, .section-head, .baseline, .decision, .direction-grid { grid-template-columns: 1fr; }
+      .hero-grid { gap: 22px; }
+      .decision-strip { grid-template-columns: 130px 1fr; }
+      .decision-strip > div:last-child { grid-column: 1 / -1; border-top: 1px solid var(--line); border-left: 0; }
+      .direction-head { grid-template-columns: 1fr; }
+      .direction-actions { justify-content: flex-start; }
+      .next-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 640px) {
+      .shell { width: min(100% - 24px, 1500px); }
+      .top-nav { display: none; }
+      .top-meta { max-width: 120px; text-align: right; line-height: 1.45; }
+      header.hero { padding: 36px 0 25px; }
+      h1 { font-size: 43px; }
+      .hero-copy { font-size: 14px; }
+      .decision-strip { grid-template-columns: 1fr; }
+      .decision-strip > div + div { border-top: 1px solid var(--line); border-left: 0; }
+      .decision-strip .recommend { grid-column: auto; }
+      section { padding-top: 34px; }
+      .section-head { gap: 10px; }
+      .direction { padding: 19px 15px 18px; }
+      .direction h3 { font-size: 23px; }
+      .direction h3 small { display: block; margin: 5px 0 0; }
+      .direction-shots { grid-template-columns: 1fr; }
+      .direction-shots .shot:first-child { grid-column: auto; }
+      .baseline-mobile { width: 60%; }
+      .diagnosis { padding: 17px; }
+      .decision-main, .decision-side { padding: 20px; }
+      footer { flex-direction: column; gap: 5px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip" href="#review-main">跳到主要内容</a>
+  <div class="topbar">
+    <div class="shell" style="display:flex;align-items:center;justify-content:space-between;gap:24px;width:min(1500px,calc(100% - 48px));margin:0 auto">
+      <a class="brand" href="index.html"><span class="brand-mark">M</span><span><strong>ModelForge</strong><small>推理试用 · 设计评审</small></span></a>
+      <nav class="top-nav" aria-label="评审页导航"><a href="#baseline">现状</a><a href="#directions">方向</a><a href="#comparison">对比</a><a href="#decision">决策</a></nav>
+      <span class="top-meta">SERVING REVIEW<br>2026-11-04</span>
+    </div>
+  </div>
+
+  <header class="hero shell">
+    <div class="hero-grid">
+      <h1>把「对话验收」放回推理试用首页。</h1>
+      <p class="hero-copy">这次不是换颜色。真实页面把 11 个实例字段和创建按钮放在首屏，把已经可用的 Trial 和对话压到 1000px 以下；390px 下要到约 2000px 才看到会话。三套方向围绕同一个问题：怎样让用户一眼知道当前是哪一个 Adapter、服务是否能用、下一步是继续对话还是回收资源。</p>
+    </div>
+    <div class="decision-strip">
+      <div><span>评审范围</span><strong>仅 Serving / #serving<br>不改训练工作台</strong></div>
+      <div><span>现状证据</span><strong>基于 Serving.tsx、serving use_cases 与真实 1440 / 390 截图；桌面整页高 2010px，移动端高 3086px。</strong></div>
+      <div class="recommend"><span>推荐落地</span><strong>F1 合并试用工作台：会话主视图 + 准备/回收门禁 + 可折叠运行事实。</strong></div>
+    </div>
+  </header>
+
+  <main class="shell" id="review-main">
+    <section id="baseline">
+      <div class="section-head">
+        <h2>现状不是“表单不好看”，而是任务顺序错了。</h2>
+        <p>选中试用只改变组件状态，页面不切视图、不更新 URL，也不把焦点带到详情。创建表单、记录表、当前试用、聊天和回收操作全部纵向堆叠，首屏被手动实例配置占满。</p>
+      </div>
+      <div class="baseline">
+        <div>
+          <figure class="shot">
+            <img src="review/baseline/serving-detail-1440.png" alt="真实 ModelForge 推理试用桌面页面，创建表单位于当前试用之前">
+            <figcaption><span>真实页面 · 1440px 整页</span><span>当前试用从首屏以下开始</span></figcaption>
+          </figure>
+          <figure class="shot baseline-mobile">
+            <img src="review/baseline/serving-overview-390.png" alt="真实 ModelForge 推理试用 390px 页面，纵向流程极长">
+            <figcaption><span>真实页面 · 390px</span><span>整页 3086px</span></figcaption>
+          </figure>
+        </div>
+        <aside class="diagnosis">
+          <h3>真实代码与截图共同确认的问题</h3>
+          <ol>
+            <li><strong>创建压过主任务。</strong>11 项实例字段常驻首屏，已有 ready Trial 也要先越过约 700px 表单。</li>
+            <li><strong>记录难以识别。</strong>列表只有 8 位 ID、状态、实例；没有 Adapter、基座、最近活动和回收时间。</li>
+            <li><strong>详情不是工作区。</strong>Trial 无深链，刷新丢失选择；聊天只是第三个面板，位于记录表之后。</li>
+            <li><strong>状态被拆成三套。</strong>生命周期、`request_state` 和 `stop_requested` 没有合成一个用户可执行状态。</li>
+            <li><strong>错误不可行动。</strong>顶部错误横幅与底部操作相距很远，原始错误码没有中文解释和恢复路径。</li>
+            <li><strong>危险操作没有中间态。</strong>结束并回收是一键提交，没有确认、进程退出或租约释放回执。</li>
+            <li><strong>移动端表格横向溢出。</strong>记录表最小宽度 560px；打开操作需要横向滚动，聊天和回收按钮位于极深页面。</li>
+          </ol>
+        </aside>
+      </div>
+    </section>
+
+    <section id="directions">
+      <div class="section-head">
+        <h2>三种不同的工作方式，不是三套皮肤。</h2>
+        <p>F1 先把日常高频路径放到主视图；F2 把“用固定问题判断 Adapter”强化为验收入口；F3 把生命周期和资源回执做成驾驶舱。三者共用同一个真实业务模型、手动实例边界和页面会话约束。</p>
+      </div>
+
+      <article class="direction f1">
+        <div class="direction-head">
+          <div class="direction-title">
+            <span class="direction-index">F1</span>
+            <div><h3>F1 · 试用工作台 <small>Recommended / merged</small></h3><p class="direction-description">左队列、中会话、右运行事实。新建试用降为右侧抽屉；等待实例、准备、失败、回收中、已结束都替换同一工作区，而不是继续向下追加面板。保留现有冷白 + 钴蓝产品壳层，并把 F2 的验收意识与 F3 的状态回执收敛进右侧检查器。</p></div>
+          </div>
+          <div class="direction-actions"><a class="button" href="trial-workbench.html?scenario=ready" target="_blank" rel="noreferrer">打开可交互原型</a><a class="button primary" href="trial-workbench.html?scenario=streaming" target="_blank" rel="noreferrer">查看流式对话</a></div>
+        </div>
+        <div class="direction-grid">
+          <div class="direction-shots">
+            <figure class="shot"><img src="review/showcase/f1-workbench-ready-1440.png" alt="F1 试用工作台可对话状态"><figcaption><span>可试用 · 会话即主视图</span><span>1440</span></figcaption></figure>
+            <figure class="shot"><img src="review/showcase/f1-workbench-streaming-1440.png" alt="F1 试用工作台流式生成状态"><figcaption><span>流式输出 + 停止生成</span><span>1440</span></figcaption></figure>
+            <figure class="shot"><img src="review/showcase/f1-workbench-mobile-ready-390.png" alt="F1 试用工作台移动端"><figcaption><span>移动端会话</span><span>390</span></figcaption></figure>
+          </div>
+          <div class="direction-notes">
+            <div class="note-block good"><strong>为什么推荐它落地</strong><p>最贴合现有路由和后端合同：单活跃 Trial、手动实例、页内会话都不需要改服务。首屏从资源表单变成当前试用，移动端把历史和运行详情收到抽屉。</p></div>
+            <div class="note-block"><strong>核心流程</strong><p>选择 Trial → 读状态 → 固定问题对话 → 停止生成 → 确认结束 → 看进程/实例/租约回收回执。</p></div>
+            <div class="note-block warn"><strong>代价</strong><p>视觉差异度低于 F2/F3，需要靠对象指纹、回收计时和门禁检查器避免沦为普通聊天工具。</p></div>
+            <div><div class="score-row"><span>首屏任务效率</span><b>5 / 5</b></div><div class="score-row"><span>现有系统迁移成本</span><b>低–中</b></div><div class="score-row"><span>移动端稳定性</span><b>5 / 5</b></div><div class="score-row"><span>Serving 专注度</span><b>5 / 5</b></div></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="direction f2">
+        <div class="direction-head">
+          <div class="direction-title">
+            <span class="direction-index">F2</span>
+            <div><h3>F2 · 对话验收实验室 <small>Quality-first</small></h3><p class="direction-description">以固定问题集和验收判断为中心：三个业务边界问题、可标记「有用 / 偏题 / 不安全」的回答、右侧证据记录。视觉上转向淡紫纸面、衬线标题和更安静的记录感，表达“这是产品验收，不是普通聊天”。</p></div>
+          </div>
+          <div class="direction-actions"><a class="button" href="conversation-lab.html?scenario=ready" target="_blank" rel="noreferrer">打开可交互原型</a><a class="button primary" href="conversation-lab.html?scenario=streaming" target="_blank" rel="noreferrer">查看流式回答</a></div>
+        </div>
+        <div class="direction-grid">
+          <div class="direction-shots">
+            <figure class="shot"><img src="review/showcase/f2-lab-ready-1440.png" alt="F2 对话验收实验室可试用状态"><figcaption><span>固定问题集 + 证据栏</span><span>1440</span></figcaption></figure>
+            <figure class="shot"><img src="review/showcase/f2-lab-streaming-1440.png" alt="F2 对话验收实验室流式输出"><figcaption><span>流式回答 · 验收标记</span><span>1440</span></figcaption></figure>
+            <figure class="shot"><img src="review/showcase/f2-lab-mobile-ready-390.png" alt="F2 对话验收实验室移动端"><figcaption><span>移动端固定问题</span><span>390</span></figcaption></figure>
+          </div>
+          <div class="direction-notes">
+            <div class="note-block good"><strong>最强的地方</strong><p>直接服务 Serving 的目的：判断 Adapter 的回答是否可用，而不是被动地“聊两句”。固定问题让多次试用具备可比性。</p></div>
+            <div class="note-block"><strong>核心流程</strong><p>选择 Adapter → 确认固定问题 → 生成并标记回答 → 记录偏题原因 → 结束并回收。</p></div>
+            <div class="note-block warn"><strong>代价</strong><p>主观验收记录需要新的持久化合同；当前后端明确会话不落库，因此原型中的“标记与备注”只能作为页面内演示，不能冒充已实现能力。</p></div>
+            <div><div class="score-row"><span>Serving 专注度</span><b>5 / 5</b></div><div class="score-row"><span>质量验收表达</span><b>5 / 5</b></div><div class="score-row"><span>现有系统迁移成本</span><b>中</b></div><div class="score-row"><span>移动端稳定性</span><b>4.5 / 5</b></div></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="direction f3">
+        <div class="direction-head">
+          <div class="direction-title">
+            <span class="direction-index">F3</span>
+            <div><h3>F3 · 运行驾驶舱 <small>Operations-first</small></h3><p class="direction-description">从 queued 到 stopped 的生命周期成为页头主结构，试用队列、对话和运行事实同屏。深色 graphite + cyan 只强化实例、请求和回收事实，不使用训练指标或伪造吞吐数据。</p></div>
+          </div>
+          <div class="direction-actions"><a class="button" href="runtime-cockpit.html?scenario=ready" target="_blank" rel="noreferrer">打开可交互原型</a><a class="button primary" href="runtime-cockpit.html?scenario=blocked" target="_blank" rel="noreferrer">查看失败态</a></div>
+        </div>
+        <div class="direction-grid">
+          <div class="direction-shots">
+            <figure class="shot"><img src="review/showcase/f3-cockpit-ready-1440.png" alt="F3 运行驾驶舱可试用状态"><figcaption><span>生命周期 + 运行事实</span><span>1440</span></figcaption></figure>
+            <figure class="shot"><img src="review/showcase/f3-cockpit-waiting-1440.png" alt="F3 运行驾驶舱等待实例状态"><figcaption><span>等待手动实例</span><span>1440</span></figcaption></figure>
+            <figure class="shot"><img src="review/showcase/f3-cockpit-mobile-ready-390.png" alt="F3 运行驾驶舱移动端"><figcaption><span>移动端运行控制</span><span>390</span></figcaption></figure>
+          </div>
+          <div class="direction-notes">
+            <div class="note-block good"><strong>最强的地方</strong><p>资源安全和状态诚实度最高。用户能明确区分“请求已记录 / 进程已退出 / 实例已回收 / 租约已释放”。</p></div>
+            <div class="note-block"><strong>核心流程</strong><p>读生命周期 → 处理等待或失败 → 进入当前对话 → 停止 → 查看逐阶段回收回执。</p></div>
+            <div class="note-block warn"><strong>代价</strong><p>深色壳层与当前产品割裂，长时间阅读输出更累；如果没有真实 telemetry，就只能显示配置上限和生命周期，不能补造性能指标。</p></div>
+            <div><div class="score-row"><span>状态与资源可信度</span><b>5 / 5</b></div><div class="score-row"><span>视觉差异化</span><b>5 / 5</b></div><div class="score-row"><span>现有系统迁移成本</span><b>高</b></div><div class="score-row"><span>移动端稳定性</span><b>4 / 5</b></div></div>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <section id="comparison">
+      <div class="section-head"><h2>取舍</h2><p>评分以 Serving 的真实任务为准，不以视觉冲击力为准。迁移成本分数越高表示越容易落地。</p></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>方向</th><th>首屏效率</th><th>Serving 专注</th><th>状态/回收可信</th><th>视觉差异</th><th>移动端</th><th>迁移成本</th><th>主要风险</th></tr></thead>
+          <tbody>
+            <tr class="recommended"><td>F1 试用工作台</td><td>5</td><td>5</td><td>4.5</td><td>3.5</td><td>5</td><td>低–中</td><td>像普通聊天工具</td></tr>
+            <tr><td>F2 对话验收实验室</td><td>4.5</td><td>5</td><td>4</td><td>4.5</td><td>4.5</td><td>中</td><td>验收证据缺少持久化合同</td></tr>
+            <tr><td>F3 运行驾驶舱</td><td>4</td><td>4</td><td>5</td><td>5</td><td>4</td><td>高</td><td>深色割裂、信息密度高</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="decision">
+      <div class="section-head"><h2>最终建议：以 F1 合并落地，F2 做验收子流，F3 做高级运行视图。</h2><p>这不是三选一后丢弃两套。F1 是当前 API、路由与设计系统下最稳的主路径；F2 的固定问题和主观标记应成为未来验收子流程；F3 的生命周期回执应被吸收为 F1 的准备/回收状态，而不是默认深色主页。</p></div>
+      <div class="decision">
+        <div class="decision-main">
+          <h3>下一轮只做四件事</h3>
+          <ul class="decision-points">
+            <li>把创建试用移到右上抽屉；主页面改为“试用队列 + 当前试用会话 + 可折叠运行事实”。</li>
+            <li>把 `state / request_state / stop_requested` 合成一个用户状态和一组可执行动作；错误在动作附近解释与恢复。</li>
+            <li>等待实例改为“配置摘要 → 复制到云控制台 → 粘贴实例 ID”的三步门禁，原始 JSON 退到技术详情。</li>
+            <li>结束试用加入确认与中间态；只有 Worker 回执才显示进程退出、实例清理与租约释放。</li>
+          </ul>
+        </div>
+        <aside class="decision-side">
+          <span>RECOMMENDED DIRECTION</span>
+          <strong>F1 试用工作台<br>吸收 F2 的验收问题 + F3 的回收回执</strong>
+          <p>先把首屏从“采购式表单”换成“当前 Trial 对话”；不要在没有真实 telemetry 的情况下把深色监控屏做成默认首页。</p>
+          <a class="button primary" style="background:#fff;border-color:#fff;color:#18243a;justify-self:start" href="trial-workbench.html?scenario=ready" target="_blank" rel="noreferrer">打开推荐原型</a>
+        </aside>
+      </div>
+    </section>
+
+    <section id="next">
+      <div class="section-head"><h2>原型已经覆盖的状态</h2><p>每套原型都可切换空、加载、创建、等待实例、准备中、可试用、流式生成、失败、回收中和成功回收，并支持桌面与移动端。</p></div>
+      <div class="next-grid">
+        <article class="next-step"><b>FLOW 01</b><h3>创建与等待</h3><p>Adapter 校验、预设实例摘要、复制要求、绑定实例 ID 与授权清理。</p></article>
+        <article class="next-step"><b>FLOW 02</b><h3>验收与停止</h3><p>固定业务问题、流式输出、停止生成、保留部分输出、清空会话。</p></article>
+        <article class="next-step"><b>FLOW 03</b><h3>失败与回收</h3><p>阻断错误恢复、结束确认、回收中、进程/实例/租约成功回执。</p></article>
+      </div>
+    </section>
+
+    <footer><span>ModelForge · Serving UI/UX 探索 · 2026-11-04 · 仅设计原型，不接后端、不修改正式业务逻辑。</span><span>真实截图 + 本地可交互 HTML</span></footer>
+  </main>
+  <script src="assets/serving-readable.js"></script>
+</body>
+</html>

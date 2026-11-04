@@ -1,0 +1,231 @@
+{
+  "adapter": {
+    "parent": {
+      "tag": "dialog",
+      "open": true,
+      "className": "serving-dialog serving-create-dialog"
+    },
+    "rect": {
+      "left": 334,
+      "top": 309,
+      "width": 772,
+      "height": 325,
+      "right": 1106,
+      "bottom": 633
+    },
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "horizontallyContained": true,
+    "style": {
+      "background": "rgb(255, 255, 255)",
+      "border": "1px solid rgb(204, 213, 225)",
+      "radius": "8px",
+      "shadow": "rgba(23, 32, 51, 0.18) 0px 18px 48px 0px, rgba(23, 32, 51, 0.08) 0px 3px 10px 0px"
+    },
+    "stateTypography": {
+      "fontSize": "11px",
+      "minHeight": "20px"
+    },
+    "options": [
+      {
+        "text": "Final · Attempt 03c13388eval loss 0.2147834300994873 · 94db72a0b844",
+        "disabled": false,
+        "active": true,
+        "selected": false,
+        "height": 50
+      },
+      {
+        "text": "Best · Attempt 03c13388eval loss 0.2147834300994873 · 7e1ace20567e",
+        "disabled": false,
+        "active": false,
+        "selected": false,
+        "height": 50
+      },
+      {
+        "text": "Final · Attempt fbbe9980Adapter 绑定的是旧版兼容基线不可选",
+        "disabled": true,
+        "active": false,
+        "selected": false,
+        "height": 50
+      },
+      {
+        "text": "Best · Attempt fbbe9980Adapter 绑定的是旧版兼容基线不可选",
+        "disabled": true,
+        "active": false,
+        "selected": false,
+        "height": 50
+      },
+      {
+        "text": "Final · Attempt 02504b93eval loss 0.2147834300994873 · 083cdd5a74c8",
+        "disabled": false,
+        "active": false,
+        "selected": false,
+        "height": 50
+      },
+      {
+        "text": "Best · Attempt 02504b93eval loss 0.2147834300994873 · 780954de2485",
+        "disabled": false,
+        "active": false,
+        "selected": false,
+        "height": 50
+      }
+    ]
+  },
+  "platform": {
+    "parent": {
+      "tag": "dialog",
+      "open": true,
+      "className": "serving-dialog serving-create-dialog"
+    },
+    "rect": {
+      "left": 347,
+      "top": 541,
+      "width": 368,
+      "height": 136,
+      "right": 715,
+      "bottom": 677
+    },
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "horizontallyContained": true,
+    "style": {
+      "background": "rgb(255, 255, 255)",
+      "border": "1px solid rgb(204, 213, 225)",
+      "radius": "8px",
+      "shadow": "rgba(23, 32, 51, 0.18) 0px 18px 48px 0px, rgba(23, 32, 51, 0.08) 0px 3px 10px 0px"
+    },
+    "stateTypography": {
+      "fontSize": "11px",
+      "minHeight": "20px"
+    },
+    "options": [
+      {
+        "text": "Auto已选",
+        "disabled": false,
+        "active": true,
+        "selected": true,
+        "height": 40
+      },
+      {
+        "text": "Intel/Auto",
+        "disabled": false,
+        "active": false,
+        "selected": false,
+        "height": 40
+      },
+      {
+        "text": "Amd/Auto",
+        "disabled": false,
+        "active": false,
+        "selected": false,
+        "height": 40
+      }
+    ]
+  },
+  "mobileAdapter": {
+    "parent": {
+      "tag": "dialog",
+      "open": true,
+      "className": "serving-dialog serving-create-dialog"
+    },
+    "rect": {
+      "left": 25,
+      "top": 260,
+      "width": 340,
+      "height": 339,
+      "right": 365,
+      "bottom": 599
+    },
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "horizontallyContained": true,
+    "style": {
+      "background": "rgb(255, 255, 255)",
+      "border": "1px solid rgb(204, 213, 225)",
+      "radius": "8px",
+      "shadow": "rgba(23, 32, 51, 0.18) 0px 18px 48px 0px, rgba(23, 32, 51, 0.08) 0px 3px 10px 0px"
+    },
+    "stateTypography": {
+      "fontSize": "11px",
+      "minHeight": "20px"
+    },
+    "options": [
+      {
+        "text": "Final · Attempt 03c13388eval loss 0.2147834300994873 · 94db72a0b844已选",
+        "disabled": false,
+        "active": true,
+        "selected": true,
+        "height": 65
+      },
+      {
+        "text": "Best · Attempt 03c13388eval loss 0.2147834300994873 · 7e1ace20567e",
+        "disabled": false,
+        "active": false,
+        "selected": false,
+        "height": 50
+      },
+      {
+        "text": "Final · Attempt fbbe9980Adapter 绑定的是旧版兼容基线不可选",
+        "disabled": true,
+        "active": false,
+        "selected": false,
+        "height": 50
+      },
+      {
+        "text": "Best · Attempt fbbe9980Adapter 绑定的是旧版兼容基线不可选",
+        "disabled": true,
+        "active": false,
+        "selected": false,
+        "height": 50
+      },
+      {
+        "text": "Final · Attempt 02504b93eval loss 0.2147834300994873 · 083cdd5a74c8",
+        "disabled": false,
+        "active": false,
+        "selected": false,
+        "height": 50
+      },
+      {
+        "text": "Best · Attempt 02504b93eval loss 0.2147834300994873 · 780954de2485",
+        "disabled": false,
+        "active": false,
+        "selected": false,
+        "height": 50
+      }
+    ]
+  },
+  "overflow": {
+    "documentWidth": 390,
+    "viewportWidth": 390,
+    "overflow": false
+  },
+  "keyboard": {
+    "start": {
+      "active": "Final · Attempt 03c13388eval loss 0.2147834300994873 · 94db72a0b844"
+    },
+    "afterFirstArrow": {
+      "active": "Best · Attempt 03c13388eval loss 0.2147834300994873 · 7e1ace20567e",
+      "activeElement": "mf-select__trigger"
+    },
+    "afterSecondArrow": {
+      "active": "Final · Attempt 02504b93eval loss 0.2147834300994873 · 083cdd5a74c8"
+    },
+    "afterEscape": {
+      "activeElement": "已同步 Adapter",
+      "expanded": "false"
+    },
+    "afterEnter": {
+      "triggerText": "Final · Attempt 03c13388",
+      "focusReturned": true,
+      "expanded": "false"
+    }
+  },
+  "consoleErrors": [],
+  "pageErrors": []
+}

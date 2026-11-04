@@ -36,7 +36,7 @@ def create(body:CreateTrial,request:Request):return Serving(request.app.state.re
 def listing(request:Request):return Serving(request.app.state.resources).list()
 
 @router.get('/trials/{identifier}')
-def detail(identifier:uuid.UUID,request:Request):return Serving(request.app.state.resources).get(identifier)
+def detail(identifier:uuid.UUID,request:Request):return Serving(request.app.state.resources).get_with_lifecycle(identifier)
 
 @router.post('/trials/{identifier}/stop')
 def stop(identifier:uuid.UUID,request:Request):return Serving(request.app.state.resources).stop(identifier)

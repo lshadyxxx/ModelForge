@@ -1,0 +1,821 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <link rel="icon" href="data:,">
+  <script src="prototype-readable.js" defer></script>
+  <title>信号舱 · ModelForge 推理训练重设计</title>
+  <style>
+    :root {
+      --void: #070a0d;
+      --deep: #0a0f13;
+      --surface: #0d1419;
+      --surface-2: #111a20;
+      --surface-3: #162229;
+      --line: #22313a;
+      --line-soft: #19262e;
+      --text: #e6eef2;
+      --text-soft: #b5c3ca;
+      --muted: #7c909b;
+      --faint: #8ba0aa;
+      --signal: #6fe2c6;
+      --signal-soft: rgba(111, 226, 198, .12);
+      --blue: #7ab5ff;
+      --blue-soft: rgba(122, 181, 255, .11);
+      --amber: #f0bd68;
+      --amber-soft: rgba(240, 189, 104, .11);
+      --coral: #f17b7b;
+      --coral-soft: rgba(241, 123, 123, .11);
+      --violet: #b9a4ff;
+      --mono: "Cascadia Code", "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+      --sans: "Bahnschrift", "Segoe UI", "Microsoft YaHei UI", "PingFang SC", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      min-width: 320px;
+      color: var(--text);
+      background:
+        linear-gradient(rgba(111, 226, 198, .017) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(111, 226, 198, .017) 1px, transparent 1px),
+        var(--void);
+      background-size: 36px 36px, 36px 36px, auto;
+      font-family: var(--sans);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+    button, input, select, textarea { font: inherit; }
+    button { cursor: pointer; }
+    button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+    .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+    .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; }
+    .topbar {
+      height: 54px; display: flex; align-items: center; gap: 22px;
+      padding: 0 16px; background: rgba(8, 12, 15, .98);
+      border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 25;
+    }
+    .brand { display: flex; align-items: center; gap: 10px; min-width: 214px; }
+    .brand-mark {
+      width: 27px; height: 27px; display: grid; place-items: center;
+      color: var(--signal); border: 1px solid #446459; background: #0b1713;
+      font-family: var(--mono); font-size: 11px; letter-spacing: -.04em;
+    }
+    .brand strong { display: block; font-size: 13px; font-weight: 600; letter-spacing: .01em; }
+    .brand small { display: block; color: var(--muted); font-family: var(--mono); font-size: 8px; letter-spacing: .12em; text-transform: uppercase; }
+    .crumb { display: flex; align-items: center; gap: 8px; min-width: 0; color: var(--muted); font-family: var(--mono); font-size: 9px; }
+    .crumb b { color: var(--text-soft); font-weight: 500; }
+    .top-actions { margin-left: auto; display: flex; align-items: center; gap: 9px; }
+    .top-status { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); font-family: var(--mono); font-size: 9px; }
+    .top-status i { width: 8px; height: 8px; border-radius: 50%; background: var(--signal); border: 1px solid rgba(111,226,198,.52); }
+    .scenario-select {
+      min-height: 34px; padding: 0 8px; border: 1px solid #32434c; background: #0e171c;
+      color: var(--text-soft); font-family: var(--mono); font-size: 9px;
+    }
+    .console {
+      min-height: calc(100dvh - 54px);
+      display: grid; grid-template-columns: 58px 284px minmax(0, 1fr) 292px;
+    }
+    .rail {
+      border-right: 1px solid var(--line); background: var(--deep);
+      display: flex; flex-direction: column; align-items: center; padding: 13px 8px;
+    }
+    .rail-mark { width: 34px; height: 34px; display: grid; place-items: center; border: 1px solid var(--line); color: var(--signal); margin-bottom: 22px; }
+    .rail-nav { display: grid; gap: 8px; }
+    .rail-btn {
+      position: relative; width: 40px; height: 40px; display: grid; place-items: center;
+      border: 1px solid transparent; background: transparent; color: var(--muted);
+    }
+    .rail-btn:hover { color: var(--text); background: var(--surface-2); border-color: var(--line); }
+    .rail-btn.active { color: var(--signal); border-color: #426458; background: var(--signal-soft); }
+    .rail-btn.active::before { content: ""; position: absolute; left: -9px; top: 10px; bottom: 10px; width: 2px; background: var(--signal); }
+    .rail-foot { margin-top: auto; color: var(--faint); font-family: var(--mono); font-size: 8px; writing-mode: vertical-rl; letter-spacing: .12em; }
+    .icon { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+    .run-list { background: #0a1014; border-right: 1px solid var(--line); min-width: 0; display: flex; flex-direction: column; }
+    .run-list-head { padding: 18px 16px 13px; border-bottom: 1px solid var(--line); }
+    .run-list-title { display: flex; align-items: center; justify-content: space-between; gap: 9px; }
+    .run-list-title h1, .run-list-title h2 { margin: 0; font-size: 17px; font-weight: 550; letter-spacing: -.01em; }
+    .primary-button {
+      min-height: 40px; display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+      border: 1px solid var(--signal); background: var(--signal); color: #06251c;
+      font-weight: 650; font-size: 10px; padding: 0 12px; border-radius: 1px;
+    }
+    .primary-button:hover { background: #9bf3dd; border-color: #9bf3dd; }
+    .secondary-button {
+      min-height: 40px; display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+      border: 1px solid #344750; background: transparent; color: var(--text-soft);
+      font-size: 10px; font-weight: 500; padding: 0 12px; border-radius: 1px;
+    }
+    .secondary-button:hover { border-color: #5a737f; background: var(--surface-2); color: var(--text); }
+    .danger-button { border-color: #603536; color: var(--coral); background: transparent; min-height: 40px; padding: 0 12px; font-size: 10px; }
+    .danger-button:hover { background: var(--coral-soft); border-color: var(--coral); }
+    button:disabled { opacity: .42; cursor: not-allowed; }
+    .run-search { margin-top: 13px; position: relative; }
+    .run-search .icon { position: absolute; left: 9px; top: 10px; width: 14px; height: 14px; color: var(--faint); }
+    .run-search input { width: 100%; min-height: 35px; padding: 0 9px 0 30px; border: 1px solid var(--line); background: var(--void); color: var(--text-soft); font-size: 10px; }
+    .run-search input::placeholder { color: var(--faint); }
+    .run-filter { display: flex; gap: 2px; margin-top: 9px; }
+    .filter-btn { min-height: 40px; border: 1px solid transparent; background: transparent; color: var(--muted); padding: 0 8px; font-family: var(--mono); font-size: 8px; }
+    .filter-btn:hover { color: var(--text); }
+    .filter-btn.active { border-color: var(--line); background: var(--surface-2); color: var(--signal); }
+    .run-scroll { flex: 1; overflow: auto; padding: 10px 10px 18px; }
+    .run-item {
+      width: 100%; text-align: left; border: 1px solid transparent; background: transparent;
+      border-left: 2px solid transparent; color: var(--text); padding: 12px 11px 11px; margin-bottom: 4px;
+    }
+    .run-item:hover { background: var(--surface); border-color: var(--line-soft); border-left-color: #415c66; }
+    .run-item.selected { background: var(--surface-2); border-color: var(--line); border-left-color: var(--signal); }
+    .run-item-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 7px; }
+    .run-item h2 { margin: 0; font-size: 11px; font-weight: 550; line-height: 1.35; }
+    .run-item p { margin: 5px 0 0; color: var(--muted); font-family: var(--mono); font-size: 8px; }
+    .state-chip { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); font-family: var(--mono); font-size: 8px; white-space: nowrap; }
+    .state-chip::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+    .state-chip.running { color: var(--signal); }
+    .state-chip.success { color: #88d4a0; }
+    .state-chip.error { color: var(--coral); }
+    .state-chip.waiting { color: var(--amber); }
+    .state-chip.loading { color: var(--blue); }
+    .run-meta { display: flex; justify-content: space-between; gap: 8px; align-items: center; margin-top: 10px; color: var(--faint); font-family: var(--mono); font-size: 8px; }
+    .sparkline { width: 74px; height: 20px; overflow: visible; }
+    .sparkline path { fill: none; stroke: var(--signal); stroke-width: 1.3; }
+    .sparkline .dim { stroke: var(--faint); stroke-dasharray: 2 2; }
+    .run-list-foot { min-height: 40px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; border-top: 1px solid var(--line); color: var(--faint); font-family: var(--mono); font-size: 8px; }
+    .run-empty { padding: 34px 18px; color: var(--muted); text-align: center; border-bottom: 1px solid var(--line); }
+    .run-empty strong { display: block; color: var(--text-soft); font-size: 12px; font-weight: 500; }
+    .run-empty p { margin: 6px 0 0; font-size: 9px; line-height: 1.7; }
+    .main { min-width: 0; background: rgba(7, 10, 13, .78); overflow: auto; }
+    .workspace-head { padding: 24px 27px 0; border-bottom: 1px solid var(--line); }
+    .eyebrow { color: var(--signal); font-family: var(--mono); font-size: 8px; letter-spacing: .14em; text-transform: uppercase; }
+    .workspace-title-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; margin-top: 8px; }
+    .workspace-head h1 { margin: 0; font-size: clamp(24px, 2.2vw, 34px); font-weight: 500; letter-spacing: -.035em; line-height: 1.15; }
+    .workspace-head p { margin: 6px 0 0; color: var(--muted); font-family: var(--mono); font-size: 9px; }
+    .workspace-actions { display: flex; gap: 7px; flex-wrap: wrap; justify-content: flex-end; }
+    .tabs { display: flex; gap: 1px; margin-top: 20px; overflow-x: auto; }
+    .tab {
+      min-height: 44px; border: 0; border-bottom: 1px solid transparent; background: transparent;
+      color: var(--muted); padding: 0 14px; font-size: 10px; white-space: nowrap;
+    }
+    .tab:hover { color: var(--text); background: rgba(255,255,255,.025); }
+    .tab.active { color: var(--signal); border-bottom-color: var(--signal); }
+    .main-body { padding: 20px 26px 35px; }
+    .metric-line { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+    .signal-metric { min-width: 0; padding: 15px 15px 14px 0; border-right: 1px solid var(--line); }
+    .signal-metric:last-child { border-right: 0; padding-right: 0; }
+    .signal-metric small { display: block; color: var(--muted); font-family: var(--mono); font-size: 8px; text-transform: uppercase; letter-spacing: .07em; }
+    .signal-metric strong { display: block; margin-top: 7px; font-family: var(--mono); font-size: clamp(18px, 2vw, 26px); font-weight: 400; letter-spacing: -.04em; }
+    .signal-metric span { display: block; margin-top: 4px; color: var(--faint); font-family: var(--mono); font-size: 8px; }
+    .chart-panel { border-bottom: 1px solid var(--line); padding: 19px 0 14px; }
+    .chart-head { display: flex; justify-content: space-between; align-items: center; gap: 15px; }
+    .chart-head h2 { margin: 0; font-size: 12px; font-weight: 500; }
+    .chart-head p { margin: 3px 0 0; color: var(--muted); font-family: var(--mono); font-size: 8px; }
+    .range-row { display: flex; align-items: center; gap: 3px; }
+    .range-btn { min-width: 44px; min-height: 44px; border: 1px solid transparent; background: transparent; color: var(--faint); font-family: var(--mono); font-size: 8px; padding: 0 7px; }
+    .range-btn:hover { color: var(--text-soft); }
+    .range-btn.active { border-color: var(--line); color: var(--signal); background: var(--surface-2); }
+    .chart-svg-wrap { position: relative; margin-top: 15px; }
+    .big-chart { width: 100%; height: 260px; display: block; overflow: visible; }
+    .chart-grid { stroke: rgba(166, 192, 202, .10); stroke-width: 1; }
+    .chart-axis { fill: var(--faint); font-family: var(--mono); font-size: 8px; }
+    .train-line { fill: none; stroke: var(--signal); stroke-width: 1.8; }
+    .eval-line { fill: none; stroke: var(--amber); stroke-width: 1.4; stroke-dasharray: 5 4; }
+    .chart-area { fill: url(#lossFill); }
+    .chart-dot { fill: var(--void); stroke: var(--signal); stroke-width: 1.5; }
+    .chart-dot.eval { stroke: var(--amber); }
+    .chart-marker-line { stroke: rgba(111,226,198,.28); stroke-width: 1; stroke-dasharray: 2 4; }
+    .chart-tooltip { position: absolute; top: 16px; right: 14px; border: 1px solid #36524a; background: #0a1714; padding: 9px 11px; color: var(--text-soft); font-family: var(--mono); font-size: 8px; line-height: 1.7; }
+    .chart-legend { display: flex; gap: 16px; align-items: center; color: var(--muted); font-family: var(--mono); font-size: 8px; margin-top: 7px; }
+    .chart-legend i { display: inline-block; width: 15px; height: 1.5px; background: var(--signal); margin-right: 6px; vertical-align: middle; }
+    .chart-legend .eval i { background: var(--amber); }
+    .panel-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(240px, .85fr); gap: 0; margin-top: 18px; border-top: 1px solid var(--line); }
+    .event-panel { padding: 17px 20px 10px 0; border-right: 1px solid var(--line); }
+    .mini-panel { padding: 17px 0 10px 20px; }
+    .panel-title { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .panel-title h2 { margin: 0; font-size: 12px; font-weight: 500; }
+    .panel-title span { color: var(--faint); font-family: var(--mono); font-size: 8px; }
+    .event { display: grid; grid-template-columns: 66px 10px minmax(0, 1fr); gap: 9px; padding: 9px 0; border-bottom: 1px solid var(--line-soft); font-size: 10px; }
+    .event time { color: var(--faint); font-family: var(--mono); font-size: 8px; }
+    .event i { width: 5px; height: 5px; border-radius: 50%; background: var(--signal); margin-top: 5px; }
+    .event.warn i { background: var(--amber); }
+    .event strong { display: block; color: var(--text-soft); font-weight: 500; }
+    .event p { margin: 2px 0 0; color: var(--muted); font-size: 9px; }
+    .gate-list { list-style: none; margin: 10px 0 0; padding: 0; display: grid; }
+    .gate-list li { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; gap: 8px; align-items: start; padding: 10px 0; border-bottom: 1px solid var(--line-soft); font-size: 9px; }
+    .gate-list b { width: 15px; height: 15px; display: grid; place-items: center; border: 1px solid #41635a; color: var(--signal); font-family: var(--mono); font-size: 8px; }
+    .gate-list li.wait b { border-color: #5c4d34; color: var(--amber); }
+    .gate-list li.block b { border-color: #614243; color: var(--coral); }
+    .gate-list strong { display: block; color: var(--text-soft); font-weight: 500; }
+    .gate-list small { display: block; color: var(--faint); margin-top: 2px; }
+    .gate-list em { color: var(--faint); font-style: normal; font-family: var(--mono); font-size: 8px; }
+    .inspector { background: #0a1014; border-left: 1px solid var(--line); overflow: auto; }
+    .inspector-head { padding: 18px 17px 14px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
+    .inspector-head h2 { margin: 0; font-size: 12px; font-weight: 500; }
+    .inspector-head p { margin: 3px 0 0; color: var(--faint); font-family: var(--mono); font-size: 8px; }
+    .pulse-box { width: 28px; height: 28px; border: 1px solid #3f695a; display: grid; place-items: center; color: var(--signal); background: var(--signal-soft); }
+    .pulse-box .icon { width: 14px; height: 14px; }
+    .inspector-section { padding: 16px 17px; border-bottom: 1px solid var(--line); }
+    .inspector-section h3 { margin: 0 0 12px; color: var(--text-soft); font-family: var(--mono); font-size: 8px; letter-spacing: .1em; text-transform: uppercase; }
+    .fact-row { display: grid; grid-template-columns: 78px minmax(0, 1fr); gap: 8px; padding: 7px 0; font-size: 9px; }
+    .fact-row span { color: var(--muted); }
+    .fact-row strong { color: var(--text-soft); font-family: var(--mono); font-size: 8px; font-weight: 400; overflow-wrap: anywhere; }
+    .next-box { margin: 0; padding: 14px; border: 1px solid #37554b; background: linear-gradient(145deg, rgba(111,226,198,.08), rgba(111,226,198,.02)); }
+    .next-box > span { color: var(--signal); font-family: var(--mono); font-size: 8px; letter-spacing: .1em; }
+    .next-box strong { display: block; margin-top: 7px; font-size: 14px; font-weight: 500; }
+    .next-box p { margin: 6px 0 0; color: var(--muted); font-size: 9px; line-height: 1.7; }
+    .next-box button { width: 100%; margin-top: 12px; }
+    .boundary { color: var(--muted); font-size: 9px; line-height: 1.7; }
+    .boundary strong { color: var(--amber); font-weight: 500; }
+    .logs-panel { border: 1px solid var(--line); background: #06090b; }
+    .logs-toolbar { display: flex; gap: 7px; flex-wrap: wrap; padding: 10px; background: var(--surface-2); border-bottom: 1px solid var(--line); }
+    .logs-toolbar input, .logs-toolbar select { min-height: 32px; padding: 0 8px; border: 1px solid #34454f; background: #080c0f; color: var(--text-soft); font-family: var(--mono); font-size: 9px; }
+    .logs-toolbar input { flex: 1 1 200px; }
+    .logs-body { min-height: 460px; padding: 11px 0; font-family: var(--mono); font-size: 9px; line-height: 1.8; }
+    .log-row { display: grid; grid-template-columns: 63px 55px 42px minmax(0, 1fr); gap: 7px; padding: 3px 10px; }
+    .log-row:hover { background: rgba(255,255,255,.025); }
+    .log-row .time { color: var(--faint); }
+    .log-row .level { color: var(--signal); }
+    .log-row .source { color: var(--blue); }
+    .log-row p { margin: 0; color: #a7b7be; overflow-wrap: anywhere; }
+    .log-empty { padding: 48px 12px; text-align: center; color: var(--faint); }
+    .artifacts-top { border: 1px solid #37554c; background: var(--surface-2); padding: 18px; display: flex; align-items: center; justify-content: space-between; gap: 18px; }
+    .artifacts-top h2 { margin: 0; font-size: 17px; font-weight: 500; }
+    .artifacts-top p { margin: 4px 0 0; color: var(--muted); font-size: 9px; }
+    .gate-big { font-family: var(--mono); font-size: 32px; color: var(--signal); letter-spacing: -.04em; }
+    .artifact-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
+    .artifact { border: 1px solid var(--line); background: var(--surface); padding: 17px; }
+    .artifact.best { border-top: 2px solid var(--signal); }
+    .artifact.final { border-top: 2px solid var(--amber); }
+    .artifact-head { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
+    .artifact-role { color: var(--faint); font-family: var(--mono); font-size: 8px; letter-spacing: .1em; }
+    .artifact h3 { margin: 4px 0 0; font-size: 18px; font-weight: 500; }
+    .artifact-value { margin: 16px 0 3px; font-family: var(--mono); font-size: 27px; letter-spacing: -.04em; }
+    .artifact-value small { color: var(--muted); font-size: 8px; letter-spacing: 0; }
+    .artifact dl { display: grid; grid-template-columns: 70px minmax(0, 1fr); gap: 6px 8px; margin: 14px 0 0; font-size: 8px; }
+    .artifact dt { color: var(--muted); }
+    .artifact dd { margin: 0; color: var(--text-soft); font-family: var(--mono); overflow-wrap: anywhere; }
+    .artifact .secondary-button { width: 100%; margin-top: 14px; }
+    .handoff { margin-top: 12px; padding: 17px; border: 1px solid #37554c; background: var(--signal-soft); display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+    .handoff strong { display: block; font-size: 12px; font-weight: 500; }
+    .handoff p { margin: 4px 0 0; color: var(--muted); font-size: 9px; }
+    .empty-view { border: 1px solid var(--line); background: var(--surface); min-height: 590px; display: grid; place-items: center; text-align: center; padding: 40px 20px; }
+    .empty-icon { width: 52px; height: 52px; display: grid; place-items: center; margin: 0 auto 15px; border: 1px solid #3c514a; color: var(--signal); }
+    .empty-view h2 { margin: 0; font-size: 21px; font-weight: 500; }
+    .empty-view p { max-width: 430px; margin: 8px auto 0; color: var(--muted); font-size: 10px; line-height: 1.8; }
+    .empty-view .primary-button { margin-top: 16px; }
+    .loading-view { min-height: 590px; display: grid; place-items: center; border: 1px solid var(--line); background: var(--surface); }
+    .loader { text-align: center; }
+    .loader-bars { display: flex; gap: 5px; justify-content: center; margin-bottom: 16px; }
+    .loader-bars span { width: 4px; height: 24px; background: var(--signal); animation: pulse 1.1s ease-in-out infinite; }
+    .loader-bars span:nth-child(2) { animation-delay: .12s; }
+    .loader-bars span:nth-child(3) { animation-delay: .24s; }
+    .loader-bars span:nth-child(4) { animation-delay: .36s; }
+    @keyframes pulse { 0%, 100% { transform: scaleY(.35); opacity: .3; } 50% { transform: scaleY(1); opacity: 1; } }
+    .loader strong { font-size: 13px; font-weight: 500; }
+    .loader p { color: var(--muted); font-family: var(--mono); font-size: 8px; margin: 4px 0 0; }
+    .error-view { border: 1px solid #623b3c; background: var(--surface); }
+    .error-head { padding: 20px; border-bottom: 1px solid #623b3c; background: var(--coral-soft); display: flex; justify-content: space-between; gap: 15px; }
+    .error-head .eyebrow { color: var(--coral); }
+    .error-head h2 { margin: 7px 0 0; font-size: 22px; font-weight: 500; }
+    .error-head p { margin: 5px 0 0; color: var(--muted); font-size: 10px; }
+    .error-layout { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(250px, .8fr); gap: 0; }
+    .error-detail { padding: 20px; border-right: 1px solid var(--line); }
+    .error-code { color: var(--coral); font-family: var(--mono); font-size: 9px; }
+    .error-detail h3 { margin: 8px 0 7px; font-size: 20px; font-weight: 500; line-height: 1.3; }
+    .error-detail > p { margin: 0; color: var(--muted); font-size: 10px; line-height: 1.8; }
+    .diff-grid { margin-top: 16px; border: 1px solid var(--line); }
+    .diff-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; padding: 9px 10px; border-bottom: 1px solid var(--line-soft); font-family: var(--mono); font-size: 8px; }
+    .diff-row:last-child { border-bottom: 0; }
+    .diff-row.head { background: var(--surface-2); color: var(--muted); }
+    .diff-row .bad { color: var(--coral); }
+    .error-steps { padding: 20px; }
+    .error-steps h3 { margin: 0 0 13px; font-size: 11px; font-weight: 500; }
+    .error-step { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 9px; padding: 10px 0; border-bottom: 1px solid var(--line-soft); font-size: 9px; }
+    .error-step b { width: 18px; height: 18px; display: grid; place-items: center; border: 1px solid #5e4041; color: var(--coral); font-family: var(--mono); font-size: 8px; font-weight: 400; }
+    .error-step span { color: var(--muted); display: block; margin-top: 2px; line-height: 1.6; }
+    .waiting-view { border: 1px solid var(--line); background: var(--surface); }
+    .waiting-head { padding: 20px; border-bottom: 1px solid var(--line); background: var(--amber-soft); display: flex; justify-content: space-between; gap: 16px; }
+    .waiting-head .eyebrow { color: var(--amber); }
+    .waiting-head h2 { margin: 7px 0 0; font-size: 22px; font-weight: 500; }
+    .waiting-head p { margin: 5px 0 0; color: var(--muted); font-size: 10px; }
+    .waiting-layout { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(250px, .8fr); }
+    .waiting-main { padding: 20px; border-right: 1px solid var(--line); }
+    .waiting-main h3 { margin: 0 0 7px; font-size: 20px; font-weight: 500; line-height: 1.3; }
+    .waiting-main > p { margin: 0; color: var(--muted); font-size: 10px; line-height: 1.8; }
+    .manual-steps { margin: 16px 0 0; border: 1px solid var(--line); }
+    .manual-step { display: grid; grid-template-columns: 25px minmax(0, 1fr); gap: 10px; padding: 12px; border-bottom: 1px solid var(--line-soft); font-size: 9px; }
+    .manual-step:last-child { border-bottom: 0; }
+    .manual-step b { width: 21px; height: 21px; display: grid; place-items: center; border: 1px solid #705b31; color: var(--amber); font-family: var(--mono); font-size: 8px; font-weight: 400; }
+    .manual-step strong { display: block; color: var(--text-soft); font-weight: 500; }
+    .manual-step span { display: block; margin-top: 3px; color: var(--muted); line-height: 1.65; }
+    .waiting-side { padding: 20px; }
+    .waiting-side h3 { margin: 0 0 12px; color: var(--muted); font-family: var(--mono); font-size: 8px; letter-spacing: .1em; }
+    .waiting-side .drawer-summary { background: var(--surface-2); margin-bottom: 12px; }
+    .waiting-side .primary-button { width: 100%; }
+    .drawer-layer { position: fixed; inset: 0; z-index: 35; display: none; background: rgba(0,0,0,.55); }
+    .drawer-layer.open { display: block; }
+    .drawer {
+      position: absolute; top: 0; right: 0; bottom: 0; width: min(720px, 100%);
+      background: #0a1014; border-left: 1px solid var(--line); display: flex; flex-direction: column;
+      box-shadow: -24px 0 80px rgba(0,0,0,.36);
+    }
+    .drawer-head { padding: 22px 23px 16px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; gap: 15px; }
+    .drawer-head h2 { margin: 5px 0 0; font-size: 24px; font-weight: 500; letter-spacing: -.02em; }
+    .drawer-head p { margin: 4px 0 0; color: var(--muted); font-size: 9px; }
+    .close-button { width: 40px; height: 40px; display: grid; place-items: center; border: 1px solid var(--line); background: transparent; color: var(--muted); }
+    .close-button:hover { color: var(--text); background: var(--surface-2); }
+    .drawer-progress { display: grid; grid-template-columns: repeat(4, 1fr); border-bottom: 1px solid var(--line); }
+    .drawer-step { min-height: 46px; display: flex; align-items: center; justify-content: center; gap: 6px; border: 0; border-right: 1px solid var(--line); background: transparent; color: var(--muted); font-family: var(--mono); font-size: 8px; }
+    .drawer-step:last-child { border-right: 0; }
+    .drawer-step.active { color: var(--signal); background: var(--signal-soft); }
+    .drawer-step.done { color: #88d4a0; }
+    .drawer-body { padding: 23px; overflow: auto; flex: 1; }
+    .drawer-body h3 { margin: 0; font-size: 16px; font-weight: 500; }
+    .drawer-body > p { margin: 5px 0 18px; color: var(--muted); font-size: 9px; }
+    .form-field { display: grid; gap: 6px; margin-bottom: 15px; }
+    .form-field label { color: var(--text-soft); font-size: 9px; }
+    .form-field input, .form-field select, .form-field textarea { width: 100%; min-height: 39px; border: 1px solid #344650; background: #070b0e; color: var(--text); padding: 0 9px; font-size: 10px; }
+    .form-field textarea { padding: 9px; min-height: 72px; resize: vertical; line-height: 1.6; }
+    .choice { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; gap: 9px; padding: 13px; border: 1px solid var(--line); margin-bottom: 8px; background: var(--surface); }
+    .choice.selected { border-color: #40675a; box-shadow: inset 2px 0 0 var(--signal); }
+    .radio { width: 13px; height: 13px; border: 1px solid #536b75; border-radius: 50%; margin-top: 2px; }
+    .choice.selected .radio { border-color: var(--signal); box-shadow: inset 0 0 0 3px #0d1419, inset 0 0 0 8px var(--signal); }
+    .choice strong { display: block; font-size: 10px; font-weight: 500; }
+    .choice p { margin: 4px 0 0; color: var(--muted); font-size: 8px; line-height: 1.7; }
+    .tag { display: inline-flex; align-items: center; height: 20px; padding: 0 6px; border: 1px solid var(--line); color: var(--muted); font-family: var(--mono); font-size: 7px; }
+    .tag.good { border-color: #3e6658; color: var(--signal); background: var(--signal-soft); }
+    .tag.warn { border-color: #64502e; color: var(--amber); background: var(--amber-soft); }
+    .drawer-summary { border: 1px solid var(--line); background: var(--surface); padding: 15px; }
+    .drawer-summary-row { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--line-soft); font-family: var(--mono); font-size: 8px; }
+    .drawer-summary-row:last-child { border-bottom: 0; }
+    .drawer-summary-row span { color: var(--muted); }
+    .drawer-summary-row strong { color: var(--text-soft); font-weight: 400; text-align: right; }
+    .drawer-note { margin-top: 12px; padding: 11px; border-left: 2px solid var(--amber); background: var(--amber-soft); color: var(--muted); font-size: 8px; line-height: 1.7; }
+    .drawer-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 13px 23px; border-top: 1px solid var(--line); }
+    .drawer-foot small { color: var(--faint); font-family: var(--mono); font-size: 8px; }
+    .chat-wrap { border: 1px solid var(--line); background: var(--surface); min-height: 610px; display: flex; flex-direction: column; }
+    .chat-header { display: flex; justify-content: space-between; align-items: center; padding: 15px 18px; border-bottom: 1px solid var(--line); }
+    .chat-id { display: flex; align-items: center; gap: 10px; }
+    .chat-glyph { width: 30px; height: 30px; border: 1px solid #3c6356; display: grid; place-items: center; color: var(--signal); background: var(--signal-soft); font-family: var(--mono); font-size: 10px; }
+    .chat-header h2 { margin: 0; font-size: 12px; font-weight: 500; }
+    .chat-header p { margin: 2px 0 0; color: var(--muted); font-family: var(--mono); font-size: 8px; }
+    .chat-body { flex: 1; padding: 18px; overflow: auto; min-height: 300px; }
+    .chat-welcome { max-width: 440px; margin: 48px auto 0; text-align: center; color: var(--muted); }
+    .chat-welcome .icon { width: 28px; height: 28px; margin: 0 auto 12px; color: var(--signal); }
+    .chat-welcome strong { display: block; color: var(--text); font-size: 15px; font-weight: 500; }
+    .chat-welcome p { margin: 6px 0 0; font-size: 9px; line-height: 1.8; }
+    .prompt-list { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-top: 14px; }
+    .prompt { min-height: 40px; border: 1px solid var(--line); background: #0a1014; color: var(--text-soft); font-size: 8px; padding: 0 8px; }
+    .prompt:hover { border-color: #49656f; background: var(--surface-2); }
+    .message { display: grid; grid-template-columns: 46px minmax(0, 1fr); gap: 9px; max-width: 720px; padding: 10px 0; border-bottom: 1px solid var(--line-soft); }
+    .message.user { margin-left: auto; grid-template-columns: minmax(0, 1fr) 46px; }
+    .message.user span { grid-column: 2; grid-row: 1; text-align: right; }
+    .message.user p { grid-column: 1; grid-row: 1; width: min(100%, 520px); justify-self: end; }
+    .message span { color: var(--faint); font-family: var(--mono); font-size: 7px; padding-top: 4px; }
+    .message p { margin: 0; padding: 9px 11px; border: 1px solid var(--line); background: #0a1014; color: #c7d3d9; font-size: 10px; line-height: 1.75; white-space: pre-wrap; }
+    .message.user p { background: #10251f; border-color: #35584c; color: #e4f1eb; }
+    .composer { padding: 13px 15px; border-top: 1px solid var(--line); }
+    .composer textarea { width: 100%; min-height: 70px; resize: vertical; border: 1px solid #34464f; background: #070b0e; color: var(--text); padding: 9px; font-size: 10px; line-height: 1.6; }
+    .composer-row { display: flex; justify-content: space-between; gap: 12px; align-items: center; margin-top: 8px; }
+    .composer-row small { color: var(--faint); font-family: var(--mono); font-size: 7px; }
+    .toast { position: fixed; left: 50%; bottom: 24px; z-index: 60; transform: translate(-50%, 12px); opacity: 0; pointer-events: none; border: 1px solid #3d5c52; background: #0c1915; color: var(--text); padding: 10px 14px; font-size: 9px; transition: .2s ease; }
+    .toast.show { opacity: 1; transform: translate(-50%, 0); }
+    .dialog { width: min(520px, calc(100vw - 24px)); padding: 0; border: 1px solid #4a5e67; background: #0b1216; color: var(--text); }
+    .dialog::backdrop { background: rgba(0,0,0,.66); }
+    .dialog-head { padding: 20px 21px 0; }
+    .dialog-head small { color: var(--amber); font-family: var(--mono); font-size: 8px; letter-spacing: .1em; }
+    .dialog-head h2 { margin: 7px 0 0; font-size: 22px; font-weight: 500; }
+    .dialog-body { padding: 12px 21px 18px; color: var(--text-soft); font-size: 10px; line-height: 1.8; }
+    .dialog-note { margin-top: 12px; padding: 11px; border-left: 2px solid var(--amber); background: var(--amber-soft); color: var(--muted); font-size: 9px; }
+    .dialog-field { display: grid; gap: 6px; margin-top: 14px; }
+    .dialog-field label { color: var(--text-soft); font-size: 9px; }
+    .dialog-field input { min-height: 40px; border: 1px solid var(--line); background: #0a1014; color: var(--text); padding: 0 9px; }
+    .dialog-check { display: flex; align-items: flex-start; gap: 8px; margin-top: 11px; color: var(--muted); font-size: 9px; line-height: 1.65; }
+    .dialog-check input { margin-top: 2px; accent-color: var(--signal); }
+    .dialog-actions { padding: 12px 21px 18px; display: flex; justify-content: flex-end; gap: 7px; border-top: 1px solid var(--line); }
+    @media (max-width: 1240px) {
+      .console { grid-template-columns: 54px 258px minmax(0, 1fr); }
+      .inspector { grid-column: 2 / 4; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-left: 0; border-top: 1px solid var(--line); }
+      .inspector-head { grid-column: 1 / 4; }
+      .inspector-section { border-right: 1px solid var(--line); border-bottom: 0; }
+      .inspector-section:last-child { border-right: 0; }
+    }
+    @media (max-width: 940px) {
+      .topbar { flex-wrap: wrap; height: auto; min-height: 54px; padding-block: 6px; }
+      .crumb { order: 4; width: 100%; }
+      .brand { min-width: 0; }
+      .console { grid-template-columns: 50px minmax(0, 1fr); }
+      .run-list { display: none; }
+      .inspector { grid-column: 2; }
+      .main-body { padding-inline: 18px; }
+    }
+    @media (max-width: 620px) {
+      .rail { display: none; }
+      .console { display: block; }
+      .top-actions .top-status { display: none; }
+      .scenario-select { max-width: 118px; }
+      .main { overflow: visible; }
+      .workspace-head { padding: 17px 14px 0; }
+      .workspace-title-row { flex-direction: column; }
+      .workspace-actions { justify-content: flex-start; }
+      .workspace-head h1 { font-size: 25px; }
+      .main-body { padding: 15px 14px 30px; }
+      .metric-line { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .signal-metric:nth-child(2) { border-right: 0; }
+      .signal-metric:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
+      .big-chart { height: 205px; }
+      .chart-tooltip { display: none; }
+      .panel-grid { grid-template-columns: 1fr; }
+      .event-panel { border-right: 0; border-bottom: 1px solid var(--line); padding-right: 0; }
+      .mini-panel { padding-left: 0; }
+      .inspector { display: block; }
+      .inspector-head { display: flex; }
+      .inspector-section { border-right: 0; border-bottom: 1px solid var(--line); }
+      .artifact-grid, .error-layout { grid-template-columns: 1fr; }
+      .waiting-layout { grid-template-columns: 1fr; }
+      .waiting-main { border-right: 0; border-bottom: 1px solid var(--line); }
+      .error-detail { border-right: 0; border-bottom: 1px solid var(--line); }
+      .handoff, .artifacts-top { flex-direction: column; align-items: flex-start; }
+      .drawer { width: 100%; }
+      .drawer-body { padding: 18px; }
+      .chat-header { align-items: flex-start; }
+      .chat-body { padding: 12px; }
+      .message { grid-template-columns: 34px minmax(0, 1fr); }
+      .message.user { grid-template-columns: minmax(0, 1fr) 34px; }
+      .composer-row { align-items: stretch; flex-direction: column; }
+      .composer-row .primary-button { width: 100%; }
+      .log-row { grid-template-columns: 55px 40px minmax(0, 1fr); padding-inline: 8px; }
+      .log-row .source { display: none; }
+      .primary-button, .secondary-button, .danger-button { min-height: 44px; }
+      .toast { width: calc(100vw - 24px); text-align: center; }
+    }
+    .scenario-select { min-height: 40px; }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <dialog class="dialog" id="action-dialog"></dialog>
+  <script>
+    const icons = {
+      grid: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/></svg>',
+      pulse: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h4l2-6 4 12 2-6h6"/></svg>',
+      train: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18l6-6 4 3 6-10M14 5h6v6"/></svg>',
+      serving: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14v13H9l-4 3V5zM8 9h8M8 13h5"/></svg>',
+      data: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v16H5zM8 8h8M8 12h8M8 16h5"/></svg>',
+      model: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5-9 5-9-5 9-5zM3 12l9 5 9-5M3 16l9 5 9-5"/></svg>',
+      search: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg>',
+      plus: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>',
+      arrow: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5"/></svg>',
+      refresh: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 6M20 4v7h-7"/></svg>',
+      external: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M9 5H4v15h15v-5"/></svg>',
+      terminal: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4zM7 9l3 3-3 3M12 15h5"/></svg>',
+      download: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v13m-5-5 5 5 5-5M5 21h14"/></svg>',
+      stop: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6h12v12H6z"/></svg>',
+      close: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>',
+      check: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>',
+      alert: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 2 21h20L12 3zm0 6v6m0 3h.01"/></svg>'
+    };
+    const scenarios = ['running','success','waiting','loading','empty','error'];
+    const labels = { running: '训练中', success: '产物可验收', waiting: '等待实例', loading: '读取中', empty: '空工作区', error: '失败诊断' };
+    const views = ['overview','logs','artifacts','inference'];
+    const params = new URLSearchParams(location.search);
+    const initialScenario = scenarios.includes(params.get('scenario')) ? params.get('scenario') : 'running';
+    const requestedView = params.get('view');
+    const defaultJobByScenario = { running: 'current', success: 'current', waiting: 'waiting', loading: 'current', empty: 'current', error: 'current' };
+    const state = {
+      scenario: initialScenario,
+      view: views.includes(requestedView) ? requestedView : initialScenario === 'success' ? 'artifacts' : 'overview',
+      selected: params.get('selected') || defaultJobByScenario[initialScenario],
+      range: 'STEP',
+      query: '',
+      level: 'all',
+      drawer: false,
+      drawerStep: 1,
+      chat: [],
+      sending: false,
+      filter: 'active'
+    };
+    const jobs = [
+      { id: 'current', title: '客服意图 LoRA · qwen3', code: '8e024600', attempt: 'A#7', status: 'running', label: '训练中', data: '客服意图 v3', metric: '0.4362', time: '1m ago' },
+      { id: 'previous', title: '客服意图 LoRA · 基线复测', code: '5bb29e33', attempt: 'A#6', status: 'success', label: '可验收', data: '客服意图 v3', metric: '0.3218', time: '18h ago' },
+      { id: 'waiting', title: '意图分类 · 对比 preset', code: 'ce40a491', attempt: 'A#2', status: 'waiting', label: '等待实例', data: '客服意图 v3', metric: '—', time: '20h ago' },
+      { id: 'failed', title: '意图分类 · 运行时诊断', code: 'c27f9844', attempt: 'A#1', status: 'error', label: '需处理', data: '客服意图 v3', metric: '—', time: '22h ago' }
+    ];
+    const metrics = [
+      { step: 20, train: .7821, eval: .6632 },
+      { step: 40, train: .6153, eval: .5114 },
+      { step: 60, train: .5148, eval: .4239 },
+      { step: 80, train: .4362, eval: .3218 }
+    ];
+    const logs = [
+      ['10:28:04','INFO','WORKER','远程工作目录已准备；实例 u-4090-02-7fca 通过清理授权。'],
+      ['10:28:11','INFO','WORKER','数据集 v3 已挂载；split-4f82b9d1 与冻结快照一致。'],
+      ['10:28:14','INFO','WORKER','基座指纹 Qwen3-0.6B-20261102-r1 匹配。'],
+      ['10:28:39','INFO','TRAINER','llamafactory training started · epochs=1 · cutoff_len=512 · lora_r=8'],
+      ['10:31:56','INFO','TRAINER','step 20/168 · loss 0.7821 · eval_loss 0.6632 · lr 2.00e-4'],
+      ['10:32:02','INFO','TRAINER','step 40/168 · loss 0.6153 · eval_loss 0.5114 · lr 1.94e-4'],
+      ['10:32:08','INFO','TRAINER','step 60/168 · loss 0.5148 · eval_loss 0.4239 · lr 1.82e-4'],
+      ['10:32:12','INFO','TRAINER','step 80/168 · loss 0.4362 · eval_loss 0.3218 · lr 1.64e-4']
+    ];
+    const icon = (name) => icons[name] || '';
+    const esc = (value) => String(value).replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+    function displayJobs() {
+      return jobs.map(job => {
+        if (job.id !== 'current' || state.scenario === 'empty') return job;
+        if (state.scenario === 'success') return { ...job, status: 'success', label: '可验收', metric: '0.3218', time: '11:09' };
+        if (state.scenario === 'error') return { ...job, status: 'error', label: '需处理', metric: '—', time: '15:28' };
+        if (state.scenario === 'loading') return { ...job, status: 'running', label: '同步中', metric: '—', time: '—' };
+        return job;
+      });
+    }
+    function selectedJob() {
+      const list = displayJobs();
+      return list.find(job => job.id === state.selected) || list[0];
+    }
+    function toast(message) {
+      const node = document.getElementById('toast');
+      node.textContent = message;
+      node.classList.add('show');
+      clearTimeout(window.__signalToast);
+      window.__signalToast = setTimeout(() => node.classList.remove('show'), 3000);
+    }
+    function statusChip(status) {
+      return `<span class="state-chip ${status}">${status === 'success' ? 'READY' : status === 'running' ? 'RUNNING' : status === 'error' ? 'ATTENTION' : status === 'waiting' ? 'WAITING' : 'IDLE'}</span>`;
+    }
+    function updateUrl() {
+      const q = new URLSearchParams();
+      if (state.scenario !== 'running') q.set('scenario', state.scenario);
+      if (state.view !== 'overview') q.set('view', state.view);
+      if (state.selected !== 'current') q.set('selected', state.selected);
+      history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q.toString() : ''));
+    }
+    function setScenario(scenario) {
+      state.scenario = scenario;
+      state.selected = defaultJobByScenario[scenario] || 'current';
+      if (scenario === 'success') state.view = 'artifacts';
+      else if (scenario === 'empty' || scenario === 'loading' || scenario === 'error' || scenario === 'waiting') state.view = 'overview';
+      updateUrl();
+      render();
+      window.scrollTo({top: 0, behavior: 'smooth'});
+    }
+    function topbar() {
+      return `<header class="topbar">
+        <div class="brand"><span class="brand-mark">MF</span><div><strong>ModelForge</strong><small>SIGNAL DECK / 信号舱</small></div></div>
+        <div class="crumb"><span>个人工作空间</span><span>/</span><b>${state.view === 'inference' ? '推理验收' : '训练'}</b><span>/</span><span>${state.view === 'artifacts' ? '产物' : state.view === 'logs' ? '日志' : '遥测'}</span></div>
+        <div class="top-actions"><span class="top-status"><i></i>SSE 已连接 · 10:32:12</span><label class="sr-only" for="scenario-select">原型场景</label><select class="scenario-select" id="scenario-select">${scenarios.map(item => `<option value="${item}" ${state.scenario === item ? 'selected' : ''}>DEMO / ${labels[item]}</option>`).join('')}</select><button class="secondary-button" type="button" data-action="open-create">${icon('plus')}新训练</button></div>
+      </header>`;
+    }
+    function rail() {
+      return `<aside class="rail"><div class="rail-mark">M</div><nav class="rail-nav" aria-label="模块导航">
+        <button class="rail-btn" type="button" title="工作台" aria-label="工作台">${icon('grid')}</button>
+        <button class="rail-btn" type="button" title="数据集" aria-label="数据集">${icon('data')}</button>
+        <button class="rail-btn" type="button" title="模型" aria-label="模型">${icon('model')}</button>
+        <button class="rail-btn active" type="button" title="训练" aria-label="训练">${icon('train')}</button>
+        <button class="rail-btn" type="button" title="推理试用" aria-label="推理试用">${icon('serving')}</button>
+      </nav><div class="rail-foot">SIGNAL / 01</div></aside>`;
+    }
+    function runList() {
+      const visibleJobs = state.scenario === 'empty' ? [] : displayJobs();
+      return `<aside class="run-list">
+        <div class="run-list-head"><div class="run-list-title"><h2>运行索引</h2><button class="primary-button" type="button" data-action="open-create">${icon('plus')}新建</button></div><div class="run-search">${icon('search')}<input type="search" placeholder="搜索 Run / Task / 错误码" aria-label="搜索运行"></div><div class="run-filter"><button class="filter-btn active" type="button">ACTIVE ${visibleJobs.filter(job => ['running','waiting'].includes(job.status)).length}</button><button class="filter-btn" type="button">ALL 18</button><button class="filter-btn" type="button">ARCHIVED</button></div></div>
+        <div class="run-scroll">${visibleJobs.length ? visibleJobs.map(job => `<button class="run-item ${state.selected === job.id ? 'selected' : ''}" type="button" data-select="${job.id}">
+          <div class="run-item-top"><h2>${job.title}</h2>${statusChip(job.status)}</div>
+          <p>${job.code} / ${job.attempt} / ${job.data}</p>
+          <div class="run-meta"><svg class="sparkline" viewBox="0 0 74 20" aria-hidden="true"><path d="${job.status === 'error' ? 'M0 8 12 8 20 15 28 6 42 17 56 5 74 12' : job.status === 'success' ? 'M0 4 12 9 22 7 34 14 48 11 62 16 74 15' : 'M0 5 12 10 22 8 34 14 48 11 62 16 74 15'}" class="${job.status === 'error' ? 'dim' : ''}"/></svg><span>${job.metric} · ${job.time}</span></div>
+        </button>`).join('') : `<div class="run-empty"><strong>还没有活动运行</strong><p>新建训练只会冻结输入，不会购买或预留 GPU。</p></div>`}</div>
+        <div class="run-list-foot"><span>${visibleJobs.length} / 18 RUNS</span><span>SYNC 3s</span></div>
+      </aside>`;
+    }
+    function header() {
+      const job = selectedJob();
+      const success = state.scenario === 'success';
+      const waiting = state.scenario === 'waiting';
+      if (state.scenario === 'empty') return `<header class="workspace-head"><div class="eyebrow">RUN QUEUE / EMPTY WORKSPACE</div><div class="workspace-title-row"><div><h1>没有活动运行</h1><p>工作区尚未产生 Task 或 Attempt · 原型不连接后端</p></div><div class="workspace-actions">${statusChip('idle')}<button class="primary-button" type="button" data-action="open-create">${icon('plus')}新建第一次训练</button></div></div></header>`;
+      const chipStatus = success ? 'success' : state.scenario === 'error' ? 'error' : waiting ? 'waiting' : state.scenario === 'loading' ? 'idle' : 'running';
+      const title = state.view === 'inference' ? '推理验收通道' : job?.title || '选择一条运行';
+      const identifier = state.view === 'inference' ? `TRIAL fdb5a28c · ${job?.attempt || 'A#7'} · Qwen3-0.6B` : waiting ? `${job?.code || '8e024600'} · ${job?.attempt || 'A#7'} · RTX 4090 / 等待绑定实例` : `${job?.code || '8e024600'} · ${job?.attempt || 'A#7'} · RTX 4090 / cn-bj2-02 · 手动实例 u-4090-02-7fca`;
+      return `<header class="workspace-head"><div class="eyebrow">${state.view === 'inference' ? 'INFERENCE TRIAL / CHANNEL 05' : waiting ? 'MANUAL COMPUTE / WAITING INSTANCE' : state.scenario === 'error' ? 'RUN FAILURE / PREPARATION' : `LIVE RUN / ATTEMPT ${job?.attempt?.replace('A#','') || '07'}`}</div><div class="workspace-title-row"><div><h1>${title}</h1><p>${identifier}</p></div><div class="workspace-actions">${statusChip(chipStatus)}<button class="secondary-button" type="button" data-action="refresh">${icon('refresh')}刷新事实</button>${success ? `<button class="primary-button" type="button" data-action="open-inference">${icon('serving')}进入推理</button>` : waiting ? `<button class="primary-button" type="button" data-action="bind-instance">${icon('plus')}绑定实例</button>` : `<button class="secondary-button" type="button" data-action="open-logs">${icon('terminal')}日志</button>`}</div></div><div class="tabs" role="tablist">${[['overview','遥测总览'],['logs','运行日志'],['artifacts','产物门禁'],['inference','推理验收']].map(([key,label]) => `<button class="tab ${state.view === key ? 'active' : ''}" type="button" role="tab" aria-selected="${state.view === key}" data-view="${key}">${label}</button>`).join('')}</div></header>`;
+    }
+    function metricsRow(success = false) {
+      return `<div class="metric-line">
+        <div class="signal-metric"><small>LATEST STEP</small><strong>${success ? '168' : '80'}</strong><span>${success ? 'EXIT 0 / COMPLETE' : 'OF 168 · EPOCH 0.95'}</span></div>
+        <div class="signal-metric"><small>TRAIN LOSS</small><strong>${success ? '0.4362' : '0.4362'}</strong><span>${success ? 'FINAL SAMPLE' : 'Δ -0.0786'}</span></div>
+        <div class="signal-metric"><small>EVAL LOSS</small><strong>0.3218</strong><span>BEST @ STEP 80</span></div>
+        <div class="signal-metric"><small>LEARNING RATE</small><strong>1.64e-4</strong><span>COSINE · TRAINER</span></div>
+      </div>`;
+    }
+    function chart() {
+      return `<section class="chart-panel"><div class="chart-head"><div><h2>训练信号 / Loss</h2><p>${state.range === 'STEP' ? '按 STEP · 仅显示已上报采样' : '按时间 · 仅显示已上报采样'}</p></div><div class="range-row">${['STEP','TIME'].map(range => `<button class="range-btn ${state.range === range ? 'active' : ''}" type="button" data-range="${range}">${range}</button>`).join('')}<button class="range-btn" type="button" aria-label="刷新图表" data-action="refresh">R</button></div></div><div class="chart-svg-wrap"><svg class="big-chart" viewBox="0 0 760 260" role="img" aria-label="训练 Loss 从 0.7821 降至 0.4362，验证 Loss 从 0.6632 降至 0.3218"><defs><linearGradient id="lossFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6fe2c6" stop-opacity=".18"/><stop offset="1" stop-color="#6fe2c6" stop-opacity="0"/></linearGradient></defs>
+        ${[31,75,119,163,207].map(y => `<line class="chart-grid" x1="52" y1="${y}" x2="736" y2="${y}"/>`).join('')}
+        ${[52,180,308,436,564,692].map((x,i) => `<line class="chart-grid" x1="${x}" y1="24" x2="${x}" y2="218"/><text class="chart-axis" x="${x-8}" y="242">${[0,20,40,60,80,100][i]}</text>`).join('')}
+        <text class="chart-axis" x="15" y="34">0.80</text><text class="chart-axis" x="15" y="78">0.60</text><text class="chart-axis" x="15" y="122">0.40</text><text class="chart-axis" x="15" y="166">0.20</text><text class="chart-axis" x="15" y="210">0.00</text>
+        <path class="chart-area" d="M52 80 C112 96 155 131 180 137 S245 168 308 178 S365 187 436 191 S530 200 564 202 S650 206 704 207 L704 218 L52 218 Z"/>
+        <path class="train-line" d="M52 80 C112 96 155 131 180 137 S245 168 308 178 S365 187 436 191 S530 200 564 202 S650 206 704 207"/>
+        <path class="eval-line" d="M52 145 C112 154 155 167 180 170 S245 181 308 184 S365 191 436 194 S530 200 564 202 S650 204 704 205"/>
+        <line class="chart-marker-line" x1="436" y1="24" x2="436" y2="218"/><circle class="chart-dot" cx="436" cy="191" r="3.2"/><circle class="chart-dot eval" cx="436" cy="194" r="3.2"/><rect x="407" y="171" width="58" height="14" fill="#0a1714" stroke="#36524a"/><text class="chart-axis" x="414" y="181" style="fill:#b5c3ca">BEST EVAL</text>
+      </svg><div class="chart-tooltip">STEP 80 · 10:32:12<br><span style="color:var(--signal)">TRAIN 0.4362</span><br><span style="color:var(--amber)">EVAL&nbsp; 0.3218</span></div></div><div class="chart-legend"><span><i></i>TRAIN LOSS</span><span class="eval"><i></i>EVAL LOSS · DASHED</span><span style="margin-left:auto">4 OBSERVATIONS</span></div></section>`;
+    }
+    function eventPanels() {
+      return `<div class="panel-grid"><section class="event-panel"><div class="panel-title"><h2>运行事件</h2><span>05 EVENTS</span></div>
+        <div class="event"><time>10:32:12</time><i></i><div><strong>最新指标已入库</strong><p>step 80 · train 0.4362 · eval 0.3218</p></div></div>
+        <div class="event"><time>10:28:39</time><i></i><div><strong>训练进程已启动</strong><p>LlamaFactory 0.9.5 · 远程 SSH 通道保持连接</p></div></div>
+        <div class="event"><time>10:28:14</time><i></i><div><strong>基座指纹核查通过</strong><p>Qwen3-0.6B-20261102-r1</p></div></div>
+        <div class="event"><time>10:28:11</time><i></i><div><strong>数据拆分已冻结</strong><p>split-4f82b9d1 · 1,116 / 124</p></div></div>
+      </section><section class="mini-panel"><div class="panel-title"><h2>门禁链</h2><span>RUNTIME</span></div><ul class="gate-list"><li><b>✓</b><div><strong>训练进程</strong><small>step 80 / 168 · 3 条事件</small></div><em>LIVE</em></li><li class="wait"><b>4</b><div><strong>Best / Final 产物</strong><small>训练结束后成对发布</small></div><em>WAIT</em></li><li class="wait"><b>5</b><div><strong>实例与租约</strong><small>训练实例运行中</small></div><em>HOLD</em></li><li class="wait"><b>6</b><div><strong>推理验收</strong><small>GPU 释放后开放</small></div><em>LOCK</em></li></ul></section></div>`;
+    }
+    function waitingView(job) {
+      const attempt = job?.attempt || 'A#7';
+      return `<section class="waiting-view"><div class="waiting-head"><div><div class="eyebrow">MANUAL COMPUTE / ACTION REQUIRED</div><h2>输入已冻结，等待你创建实例</h2><p>${attempt} 已生成实例要求；平台不会代购、预留或自动替换 GPU。</p></div><span class="tag warn">NO GPU CHARGED</span></div><div class="waiting-layout"><div class="waiting-main"><h3>下一步是绑定真实实例，不是重复配置</h3><p>在优云控制台创建一台 RTX 4090 单卡实例，确认 Running 后填写实例 ID，并授权平台在成功、失败或取消后停止并删除。</p><div class="manual-steps"><div class="manual-step"><b>01</b><div><strong>按冻结规格创建实例</strong><span>RTX 4090 · cn-bj2-02 · compshareImage-1fc8fjody17l</span></div></div><div class="manual-step"><b>02</b><div><strong>填写实例并授权清理</strong><span>平台先核对镜像、GPU、可用区与清理授权。</span></div></div><div class="manual-step"><b>03</b><div><strong>通过预检后自动启动训练</strong><span>不需要再次选择数据、基座或参数。</span></div></div></div><button class="primary-button" type="button" style="margin-top:15px" data-action="bind-instance">${icon('plus')}绑定手动实例</button></div><aside class="waiting-side"><h3>FROZEN INSTANCE SPEC</h3><div class="drawer-summary"><div class="drawer-summary-row"><span>GPU</span><strong>RTX 4090 · 1×</strong></div><div class="drawer-summary-row"><span>ZONE</span><strong>cn-bj2-02</strong></div><div class="drawer-summary-row"><span>IMAGE</span><strong>compshareImage-1fc8fjody17l</strong></div><div class="drawer-summary-row"><span>RUNTIME</span><strong>llamafactory-0.9.5-cu124</strong></div><div class="drawer-summary-row"><span>费用</span><strong>由你的实例产生</strong></div></div><div class="drawer-note">当前没有训练进程，也没有 Loss 或 Adapter。页面不会用占位数据填充空白。</div></aside></div></section>`;
+    }
+    function overview() {
+      if (state.scenario === 'loading') return `<section class="loading-view" aria-busy="true"><div class="loader"><div class="loader-bars"><span></span><span></span><span></span><span></span></div><strong>正在接入 Run 信号</strong><p>ATTEMPT · TELEMETRY · RESOURCE LEASES</p></div></section>`;
+      if (state.scenario === 'empty') return `<section class="empty-view"><div><div class="empty-icon">${icon('pulse')}</div><h2>暂无活动运行</h2><p>当前没有可观察的任务。新建训练只会生成冻结输入和实例要求，不会购买或预留 GPU。</p><button class="primary-button" type="button" data-action="open-create">${icon('plus')}创建第一次训练</button></div></section>`;
+      if (state.scenario === 'error') return errorView();
+      if (state.scenario === 'waiting') return waitingView(selectedJob());
+      const success = state.scenario === 'success';
+      return `${metricsRow(success)}${chart()}${eventPanels()}`;
+    }
+    function logsView() {
+      const query = state.query.toLowerCase();
+      const rows = logs.filter(row => (state.level === 'all' || row[1] === state.level) && (!query || row.join(' ').toLowerCase().includes(query)));
+      return `<div class="logs-panel"><div class="logs-toolbar"><label class="sr-only" for="log-query">搜索日志</label><input id="log-query" type="search" placeholder="grep logs…" value="${esc(state.query)}"><label class="sr-only" for="log-level">日志级别</label><select id="log-level"><option value="all" ${state.level === 'all' ? 'selected' : ''}>ALL LEVELS</option><option ${state.level === 'INFO' ? 'selected' : ''}>INFO</option><option ${state.level === 'ERROR' ? 'selected' : ''}>ERROR</option></select><button class="secondary-button" type="button" data-action="download-logs">${icon('download')}下载</button></div><div class="logs-body">${rows.length ? rows.map(([time,level,source,text]) => `<div class="log-row"><span class="time">${time}</span><span class="level">${level}</span><span class="source">${source}</span><p>${esc(text)}</p></div>`).join('') : '<div class="log-empty">NO MATCHES / 当前筛选没有日志。</div>'}</div></div>`;
+    }
+    function artifactView() {
+      const ready = state.scenario === 'success';
+      return `<section class="artifacts-top"><div><div class="eyebrow">RELEASE GATE / ATOMIC PAIR</div><h2>${ready ? 'Best / Final 已通过成对发布' : '产物门禁仍锁定'}</h2><p>${ready ? 'MinIO 回读校验通过；训练实例已释放；可发起独立推理。' : '两份 Adapter 都写入并回读校验后才会一起可用。'}</p></div><div class="gate-big">${ready ? '2 / 2' : '0 / 2'}</div></section>
+        <div class="artifact-grid">
+          <article class="artifact best"><div class="artifact-head"><div><div class="artifact-role">BEST ADAPTER</div><h3>验证集最优</h3></div><span class="tag ${ready ? 'good' : 'warn'}">${ready ? 'AVAILABLE' : 'LOCKED'}</span></div><div class="artifact-value">${ready ? '0.3218' : '—'} <small>eval loss</small></div><dl><dt>来源</dt><dd>Attempt #7</dd><dt>训练位置</dt><dd>step 80</dd><dt>Adapter ID</dt><dd>adapter-best-01</dd><dt>文件校验</dt><dd>${ready ? 'SHA-256 PASS' : 'NOT PUBLISHED'}</dd></dl><button class="secondary-button" type="button" ${ready ? '' : 'disabled'} data-action="download">${icon('download')}下载 Best</button></article>
+          <article class="artifact final"><div class="artifact-head"><div><div class="artifact-role">FINAL ADAPTER</div><h3>最终保存点</h3></div><span class="tag ${ready ? 'good' : 'warn'}">${ready ? 'AVAILABLE' : 'LOCKED'}</span></div><div class="artifact-value">${ready ? '0.3389' : '—'} <small>eval loss</small></div><dl><dt>来源</dt><dd>Attempt #7</dd><dt>训练位置</dt><dd>step 168</dd><dt>Adapter ID</dt><dd>adapter-final-01</dd><dt>文件校验</dt><dd>${ready ? 'SHA-256 PASS' : 'NOT PUBLISHED'}</dd></dl><button class="secondary-button" type="button" ${ready ? '' : 'disabled'} data-action="download">${icon('download')}下载 Final</button></article>
+        </div>${ready ? `<section class="handoff"><div><strong>准备推理试用 · 预选 Best Adapter</strong><p>将携带 attempt、adapter、role，进入后不需要重新选择产物。</p></div><button class="primary-button" type="button" data-action="open-inference">${icon('serving')}打开推理通道</button></section>` : `<section class="handoff"><div><strong>等待训练完成与实例释放</strong><p>当前训练未结束；前端不会提前打开推理，也不会用同步中的产物占 GPU。</p></div><button class="secondary-button" type="button" disabled>${icon('stop')}推理门禁关闭</button></section>`}`;
+    }
+    function errorView() {
+      const job = selectedJob();
+      return `<section class="error-view"><div class="error-head"><div><div class="eyebrow">INCIDENT / PREPARATION TERMINATED</div><h2>运行时不兼容，训练未启动</h2><p>${job?.attempt || 'A#7'} · 准备阶段终止 · 未产生 Loss 或 Adapter</p></div><span class="tag warn">INSTANCE STILL HELD</span></div><div class="error-layout"><div class="error-detail"><div class="error-code">runtime_incompatible</div><h3>所选手动实例与已验证镜像不一致。</h3><p>后端在启动训练前拒绝执行。当前实例仍可能计费，应先保存诊断日志，再安全清理并创建新 Attempt。</p><div class="diff-grid"><div class="diff-row head"><span>FIELD</span><span>EXPECTED</span><span>ACTUAL</span></div><div class="diff-row"><span>image</span><span>compshareImage-1fc8…</span><span class="bad">img-cuda-12.2</span></div><div class="diff-row"><span>gpu</span><span>RTX 4090</span><span class="bad">RTX A5000</span></div><div class="diff-row"><span>zone</span><span>cn-bj2-02</span><span>cn-bj2-02</span></div></div></div><div class="error-steps"><h3>恢复路径</h3><div class="error-step"><b>1</b><div>核对供应商实例规格<span>检查镜像、GPU 与可用区。</span></div></div><div class="error-step"><b>2</b><div>保留日志并回收实例<span>停止计费后才能重新开始。</span></div></div><div class="error-step"><b>3</b><div>用同一冻结输入新建 Attempt<span>不重新随机拆分。</span></div></div><button class="secondary-button" type="button" data-action="open-logs" style="margin-top:14px">${icon('terminal')}查看诊断日志</button></div></div></section>`;
+    }
+    function inferenceView() {
+      if (state.scenario === 'loading') return `<section class="loading-view"><div class="loader"><div class="loader-bars"><span></span><span></span><span></span><span></span></div><strong>正在拉起独立推理实例</strong><p>BASE · ADAPTER · VLLM HEALTH</p></div></section>`;
+      if (state.scenario === 'error') return `<section class="error-view"><div class="error-head"><div><div class="eyebrow">INFERENCE / BLOCKED</div><h2>推理实例未就绪</h2><p>Best Adapter 可用，但 vLLM 模型加载失败。</p></div><span class="tag warn">NO REQUESTS SENT</span></div><div class="error-layout"><div class="error-detail"><div class="error-code">vllm_model_load_failed</div><h3>实例保留，GPU 门禁仍关闭。</h3><p>先查看模型加载日志，检查基座与 Adapter 路径；修复后重试，或结束实例并回收。</p><button class="secondary-button" type="button" data-action="retry-inference" style="margin-top:14px">${icon('refresh')}重新检查</button></div><div class="error-steps"><h3>资源边界</h3><div class="error-step"><b>!</b><div>GPU 正在计费<span>结束前不会自动启动另一个实例。</span></div></div><div class="error-step"><b>×</b><div>没有对话证据<span>未发出任何推理请求。</span></div></div></div></section>`;
+      return `<div class="chat-wrap"><div class="chat-header"><div class="chat-id"><span class="chat-glyph">M</span><div><h2>推理验收 · Best Adapter</h2><p>adapter-best-01 · attempt#7 · qwen3-0.6b</p></div></div>${statusChip('success')}</div><div class="chat-body">${state.chat.length ? state.chat.map(message => `<article class="message ${message.role}"><span>${message.role === 'user' ? 'YOU' : 'MODEL'}</span><p>${esc(message.content)}</p></article>`).join('') : `<div class="chat-welcome">${icon('pulse')}<strong>模型已加载，等待真实问题</strong><p>Loss 不是回答质量。用固定问题检查意图、边界、语气和指令遵循。</p><div class="prompt-list"><button class="prompt" type="button" data-prompt="用户说：我要退款，但已经超过七天。请判断意图并给出下一步。">退款 · 超过七天</button><button class="prompt" type="button" data-prompt="用户说：转人工。不要解释。请只返回意图标签。">转人工 · 指令约束</button><button class="prompt" type="button" data-prompt="用户情绪激烈，询问是否可以提供补偿。">投诉 · 情绪边界</button></div></div>`}</div><div class="composer"><label class="sr-only" for="chat-input">输入问题</label><textarea id="chat-input" placeholder="输入真实客服问题，例如：订单还没发货，我要取消，可以吗？"></textarea><div class="composer-row"><small>max 512 tokens · temperature 0.7 · session not persisted</small><button class="primary-button" type="button" data-action="send" ${state.sending ? 'disabled' : ''}>${state.sending ? 'GENERATING…' : 'SEND'}</button></div></div></div>`;
+    }
+    function mainBody() {
+      if (state.view === 'logs') return logsView();
+      if (state.view === 'artifacts') return artifactView();
+      if (state.view === 'inference') return inferenceView();
+      return overview();
+    }
+    function inspector() {
+      const success = state.scenario === 'success';
+      const waiting = state.scenario === 'waiting';
+      const empty = state.scenario === 'empty';
+      const loading = state.scenario === 'loading';
+      const nextKind = success ? 'READY TO TRIAL' : state.scenario === 'error' ? 'RECOVERY REQUIRED' : waiting ? 'INSTANCE REQUIRED' : empty ? 'NO ACTIVE RUN' : loading ? 'SYNC IN PROGRESS' : 'WAIT FOR EXIT';
+      const nextTitle = success ? '从 Best Adapter 发起推理' : state.scenario === 'error' ? '先清理错误实例' : waiting ? '创建并绑定手动实例' : empty ? '创建第一次训练' : loading ? '等待运行事实返回' : '让训练自然结束';
+      const nextCopy = success ? '训练资源已释放。独立实例只加载 Best Adapter。' : state.scenario === 'error' ? '保存日志、删除实例并确认租约释放。' : waiting ? '平台不代购 GPU；只有实例与运行时检查通过后才开始训练。' : empty ? '从已发布数据与已验证基座开始，只冻结输入和实例要求。' : loading ? '不使用上一份快照冒充当前状态。' : '训练中不发布部分 Adapter，也不提前打开推理门禁。';
+      const nextAction = success ? 'open-inference' : waiting ? 'bind-instance' : state.scenario === 'error' ? 'open-logs' : empty ? 'open-create' : 'open-logs';
+      const nextButton = success ? '进入推理验收' : waiting ? '绑定手动实例' : state.scenario === 'error' ? '查看证据' : empty ? '新建训练' : '查看证据';
+      return `<aside class="inspector"><div class="inspector-head"><div><h2>运行检查器</h2><p>EVIDENCE / RESOURCE / NEXT</p></div><span class="pulse-box">${icon('pulse')}</span></div><section class="inspector-section"><h3>当前唯一动作</h3><div class="next-box"><span>${nextKind}</span><strong>${nextTitle}</strong><p>${nextCopy}</p><button class="${success || waiting || empty ? 'primary-button' : 'secondary-button'}" type="button" data-action="${nextAction}">${success ? icon('serving') : waiting || empty ? icon('plus') : icon('terminal')}${nextButton}</button></div></section><section class="inspector-section"><h3>冻结输入</h3><div class="fact-row"><span>数据版本</span><strong>${empty ? '尚未创建' : '客服意图训练集 v3'}</strong></div><div class="fact-row"><span>拆分</span><strong>${empty ? '—' : '1,116 / 124 · split-4f82b9d1'}</strong></div><div class="fact-row"><span>基座</span><strong>${empty ? '—' : 'Qwen3-0.6B-20261102-r1'}</strong></div><div class="fact-row"><span>参数</span><strong>${empty ? '—' : 'epoch 1 · LR 2e-4 · r8'}</strong></div><div class="fact-row"><span>实例</span><strong>${empty ? '—' : waiting ? 'RTX 4090 · 待绑定' : 'RTX 4090 · cn-bj2-02'}</strong></div></section><section class="inspector-section"><h3>事实边界</h3><div class="fact-row"><span>产物</span><strong>${success ? 'Best + Final 2/2' : empty ? '没有运行' : waiting ? '尚未生成' : loading ? '待核对' : '训练中未发布'}</strong></div><div class="fact-row"><span>训练实例</span><strong>${success ? '已删除 · 租约已释放' : state.scenario === 'error' ? '仍保留 · 需清理' : empty || waiting ? '未建立' : '运行中 · 仍计费'}</strong></div><div class="fact-row"><span>推理 GPU</span><strong>${success ? '可创建独立实例' : '门禁关闭'}</strong></div><div class="fact-row"><span>数据新鲜度</span><strong>${loading ? '正在读取' : '10:32:12 · ±3s'}</strong></div></section><section class="inspector-section"><h3>边界声明</h3><p class="boundary">当前仅有 <strong>Qwen3-0.6B / RTX 4090 / 固定运行时</strong> 组合已验证。目录中可见不代表可训练。</p></section></aside>`;
+    }
+    function drawerContent() {
+      if (state.drawerStep === 1) return `<h3>冻结训练输入</h3><p>选择已发布数据与已验证基座；后续步骤不会让你重新猜测兼容性。</p><div class="form-field"><label for="run-name">训练名称</label><input id="run-name" value="客服意图 LoRA · signal-08"></div><div class="choice selected"><span class="radio"></span><div><strong>客服意图训练集 · v3 <span class="tag good">PUBLISHED</span></strong><p>SFT · 1,240 rows · 1,116 / 124 split · split-4f82b9d1</p></div><span class="tag">v3</span></div><div class="choice selected"><span class="radio"></span><div><strong>Qwen3-0.6B <span class="tag good">COMPATIBLE</span></strong><p>平台托管 · qwen3 · fingerprint 20261102-r1</p></div><span class="tag">BASE</span></div>`;
+      if (state.drawerStep === 2) return `<h3>确认可执行方案</h3><p>这里不是自由拼装器。只展示后端已验证的一组硬件、镜像和运行时。</p><div class="drawer-summary"><div class="drawer-summary-row"><span>方案</span><strong>qwen3-0.6b-rtx4090-cn-bj2-partial</strong></div><div class="drawer-summary-row"><span>GPU / ZONE</span><strong>RTX 4090 · cn-bj2-02</strong></div><div class="drawer-summary-row"><span>CPU / RAM</span><strong>12 cores · 64 GB</strong></div><div class="drawer-summary-row"><span>IMAGE</span><strong>compshareImage-1fc8fjody17l</strong></div><div class="drawer-summary-row"><span>RUNTIME</span><strong>llamafactory-0.9.5-cu124</strong></div><div class="drawer-summary-row"><span>BASELINE</span><strong>PARTIAL · tested</strong></div></div><div class="drawer-note">提交仅生成实例要求。平台不购买、创建或预留 GPU；你需要去优云手动创建实例并返回绑定。</div>`;
+      if (state.drawerStep === 3) return `<h3>冻结参数</h3><p>除 seed 外，全部字段与当前基线绑定。锁定值不会做成误导性的可编辑控件。</p><div class="drawer-summary">${[['epochs','1'],['learning rate','0.0002'],['cutoff len','512'],['batch size','1'],['grad accumulation','1'],['LoRA rank / alpha','8 / 16'],['scheduler','cosine'],['template','qwen3_nothink'],['seed','42 · editable']].map(([key,value]) => `<div class="drawer-summary-row"><span>${key}</span><strong>${value}</strong></div>`).join('')}</div><div class="drawer-note">数据拆分来自已发布版本，不会因重试而重新随机。</div>`;
+      return `<h3>确认并冻结</h3><p>提交后创建 Task + Attempt，并固定所有输入。不会启动真实训练或产生费用。</p><div class="choice selected"><span class="radio"></span><div><strong>客服意图 LoRA · signal-08</strong><p>客服意图 v3 · Qwen3-0.6B · SFT + LoRA · RTX 4090 · seed 42</p></div><span class="tag good">READY</span></div><div class="drawer-summary"><div class="drawer-summary-row"><span>将创建</span><strong>1 Task · 1 Attempt</strong></div><div class="drawer-summary-row"><span>初始状态</span><strong>waiting_instance</strong></div><div class="drawer-summary-row"><span>输入快照</span><strong>SHA-256 frozen</strong></div><div class="drawer-summary-row"><span>GPU 购买</span><strong>NO · manual</strong></div></div><div class="drawer-note">只有在实例 Running、清理授权和运行时检查通过后，平台才会启动训练。</div>`;
+    }
+    function render() {
+      const drawer = `<div class="drawer-layer ${state.drawer ? 'open' : ''}" id="drawer-layer"><aside class="drawer" role="dialog" aria-modal="true" aria-label="新建训练"><div class="drawer-head"><div><div class="eyebrow">NEW RUN / MODULE ASSEMBLY</div><h2>新建训练</h2><p>冻结输入 → 核验门禁 → 确认提交</p></div><button class="close-button" type="button" data-action="close-create" aria-label="关闭新建训练">${icon('close')}</button></div><div class="drawer-progress">${['输入','方案','参数','冻结'].map((label,i) => `<button class="drawer-step ${state.drawerStep === i+1 ? 'active' : ''} ${state.drawerStep > i+1 ? 'done' : ''}" type="button" data-step="${i+1}">0${i+1} ${label}</button>`).join('')}</div><div class="drawer-body">${drawerContent()}</div><div class="drawer-foot"><small>PROTOTYPE · NO GPU REQUEST</small><div style="display:flex;gap:7px"><button class="secondary-button" type="button" data-action="drawer-back" ${state.drawerStep === 1 ? 'disabled' : ''}>上一步</button>${state.drawerStep < 4 ? `<button class="primary-button" type="button" data-action="drawer-next">下一步${icon('arrow')}</button>` : `<button class="primary-button" type="button" data-action="drawer-submit">${icon('check')}创建并冻结</button>`}</div></div></aside></div>`;
+      document.getElementById('app').innerHTML = `${topbar()}<div class="console">${rail()}${runList()}<main class="main">${header()}<div class="main-body">${mainBody()}</div></main>${inspector()}</div>${drawer}`;
+      document.getElementById('scenario-select')?.addEventListener('change', event => setScenario(event.target.value));
+      const q = document.getElementById('log-query');
+      q?.addEventListener('input', event => { state.query = event.target.value; render(); document.getElementById('log-query')?.focus(); });
+      document.getElementById('log-level')?.addEventListener('change', event => { state.level = event.target.value; render(); });
+      const chat = document.getElementById('chat-input');
+      chat?.addEventListener('input', event => { state.chatDraft = event.target.value; });
+      if (state.chatDraft && chat) chat.value = state.chatDraft;
+    }
+    function switchView(view) {
+      state.view = view;
+      updateUrl();
+      render();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    function openDialog(type) {
+      const dialog = document.getElementById('action-dialog');
+      if (type === 'stop') {
+        dialog.innerHTML = `<div class="dialog-head"><small>RESOURCE RECLAIM</small><h2>结束推理试用？</h2></div><div class="dialog-body"><p>停止 vLLM、删除独立推理实例并确认 GPU 租约释放。页面会话将失效。</p><div class="dialog-note">当前处于原型模式，不会停止真实进程。</div></div><div class="dialog-actions"><button class="secondary-button" type="button" data-action="close-dialog">保持运行</button><button class="danger-button" type="button" data-action="confirm-stop">结束并回收</button></div>`;
+      } else if (type === 'bind') {
+        dialog.innerHTML = `<div class="dialog-head"><small>MANUAL INSTANCE / BIND</small><h2>绑定手动创建的训练实例</h2></div><div class="dialog-body"><p>确认实例已 Running，且镜像、GPU 和可用区符合冻结要求。绑定后先执行运行时预检。</p><div class="dialog-field"><label for="bind-instance">实例 ID</label><input id="bind-instance" placeholder="例如：u-4090-02-7fca"></div><label class="dialog-check"><input type="checkbox" id="bind-ack">我拥有此实例，并授权平台在成功、失败或取消后停止并删除。</label><div class="dialog-note">平台不会代为购买实例；原型不会调用真实云接口。</div></div><div class="dialog-actions"><button class="secondary-button" type="button" data-action="close-dialog">取消</button><button class="primary-button" type="button" data-action="confirm-bind">核验并绑定</button></div>`;
+      } else {
+        dialog.innerHTML = `<div class="dialog-head"><small>MANUAL COMPUTE</small><h2>确认创建并冻结？</h2></div><div class="dialog-body"><p>将创建 Task 与 Attempt，并进入 waiting_instance。平台不会购买或预留 GPU。</p><div class="dialog-note">原型不会连接后端或发起真实实例请求。</div></div><div class="dialog-actions"><button class="secondary-button" type="button" data-action="close-dialog">返回检查</button><button class="primary-button" type="button" data-action="confirm-create">创建并冻结</button></div>`;
+      }
+      dialog.showModal();
+    }
+    async function sendChat(text) {
+      if (!text.trim() || state.sending) return;
+      state.chat = [...state.chat, { role: 'user', content: text.trim() }, { role: 'assistant', content: '' }];
+      state.sending = true;
+      state.chatDraft = '';
+      render();
+      const answer = '判断：退款意图，且超过七天。\n\n下一步：先核对订单签收状态，再转交售后审核。不要直接承诺退款。建议回复：“我理解您希望尽快处理。由于已超过七天，我先为您核对订单状态，并转交售后专员审核，预计 24 小时内给出处理结果。”';
+      let cursor = 0;
+      await new Promise(resolve => {
+        const timer = setInterval(() => {
+          cursor += Math.max(2, Math.ceil(answer.length / 24));
+          state.chat[state.chat.length - 1].content = answer.slice(0, cursor);
+          const messages = document.querySelectorAll('.chat-body .message.assistant p');
+          const last = messages[messages.length - 1];
+          if (last) last.textContent = state.chat[state.chat.length - 1].content;
+          if (cursor >= answer.length) {
+            clearInterval(timer);
+            state.sending = false;
+            render();
+            resolve();
+          }
+        }, 55);
+      });
+    }
+    document.addEventListener('click', event => {
+      const selectRun = event.target.closest('[data-select]');
+      if (selectRun) {
+        state.selected = selectRun.dataset.select;
+        state.scenario = state.selected === 'previous' ? 'success' : state.selected === 'failed' ? 'error' : state.selected === 'waiting' ? 'waiting' : 'running';
+        if (state.scenario === 'success') state.view = 'artifacts';
+        updateUrl();
+        render();
+        return;
+      }
+      const view = event.target.closest('[data-view]');
+      if (view) { switchView(view.dataset.view); return; }
+      const range = event.target.closest('[data-range]');
+      if (range) { state.range = range.dataset.range; render(); return; }
+      const prompt = event.target.closest('[data-prompt]');
+      if (prompt) { void sendChat(prompt.dataset.prompt); return; }
+      const step = event.target.closest('[data-step]');
+      if (step) { state.drawerStep = Number(step.dataset.step); render(); return; }
+      const actionNode = event.target.closest('[data-action]');
+      if (!actionNode) return;
+      const action = actionNode.dataset.action;
+      if (action === 'open-create') { state.drawer = true; state.drawerStep = 1; render(); return; }
+      if (action === 'bind-instance') { openDialog('bind'); return; }
+      if (action === 'close-create') { state.drawer = false; render(); return; }
+      if (action === 'drawer-next') { state.drawerStep = Math.min(4, state.drawerStep + 1); render(); return; }
+      if (action === 'drawer-back') { state.drawerStep = Math.max(1, state.drawerStep - 1); render(); return; }
+      if (action === 'drawer-submit') { openDialog('create'); return; }
+      if (action === 'close-dialog') { document.getElementById('action-dialog')?.close(); return; }
+      if (action === 'confirm-create') {
+        document.getElementById('action-dialog')?.close();
+        state.drawer = false;
+        const waiting = jobs.find(job => job.id === 'waiting');
+        if (waiting) {
+          waiting.title = '客服意图 LoRA · signal-08';
+          waiting.code = '8f1c2a77';
+          waiting.attempt = 'A#8';
+          waiting.time = '刚刚';
+          waiting.metric = '—';
+        }
+        state.scenario = 'waiting';
+        state.selected = 'waiting';
+        state.view = 'overview';
+        updateUrl();
+        render();
+        toast('原型：Task 与 Attempt 已冻结，进入 waiting_instance；平台没有购买 GPU。');
+        return;
+      }
+      if (action === 'confirm-bind') {
+        const id = document.getElementById('bind-instance')?.value.trim();
+        const ack = document.getElementById('bind-ack')?.checked;
+        if (!id || !ack) {
+          toast('请填写实例 ID，并确认清理授权。');
+          return;
+        }
+        document.getElementById('action-dialog')?.close();
+        state.scenario = 'loading';
+        render();
+        setTimeout(() => {
+          state.scenario = 'running';
+          state.selected = 'current';
+          state.view = 'overview';
+          updateUrl();
+          render();
+          toast('运行时检查通过，训练已启动。');
+        }, 950);
+        return;
+      }
+      if (action === 'open-logs') { switchView('logs'); return; }
+      if (action === 'open-inference') { state.scenario = state.scenario === 'error' ? 'error' : 'success'; switchView('inference'); return; }
+      if (action === 'refresh') { toast('已刷新。旧事实保留，直到新响应确认。'); return; }
+      if (action === 'download') { toast('原型：Adapter 下载已模拟。'); return; }
+      if (action === 'download-logs') { toast('原型：日志下载已模拟。'); return; }
+      if (action === 'send') { const value = document.getElementById('chat-input')?.value || state.chatDraft || ''; void sendChat(value); return; }
+      if (action === 'retry-inference') { state.scenario = 'loading'; render(); setTimeout(() => { state.scenario = 'error'; render(); toast('vLLM 仍未通过健康检查。'); }, 900); return; }
+      if (action === 'stop') { openDialog('stop'); return; }
+      if (action === 'confirm-stop') { document.getElementById('action-dialog')?.close(); toast('结束指令已记录；等待实例删除与租约释放确认。'); return; }
+    });
+    render();
+  </script>
+</body>
+</html>

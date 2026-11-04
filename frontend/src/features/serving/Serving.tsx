@@ -1,49 +1,759 @@
-import {useEffect,useRef,useState} from 'react';
-import {api,json} from '../../shared/http';
-import {listAdapters,type AdapterVersion} from '../models';
-import {requestMessages,type Message} from './conversation';
-import {emptyInstance,InstanceFields,ManualInstanceDialog,type InstanceSpec} from '../resources';
-import {adapterCompatibilityReason,getRuntimeBaseline,type RuntimeBaseline} from '../runtime';
+import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import {ApiError} from '../../shared/http';
+import {listAdapters, type AdapterVersion} from '../models';
+import {getRuntimeBaseline, type RuntimeBaseline} from '../runtime';
+import {
+  bindServingInstance,
+  cancelServingRequest,
+  createServingTrial,
+  getServingTrial,
+  listServingTrials,
+  openServingChat,
+  stopServingTrial,
+  type ServingChatInput,
+} from './api';
+import {BindInstancePanel} from './components/BindInstancePanel';
+import {CreateTrialDialog} from './components/CreateTrialDialog';
+import {ServingIcon} from './components/ServingIcon';
+import {ServingQueue} from './components/ServingQueue';
+import {ServingSession} from './components/ServingSession';
+import {StopTrialDialog} from './components/StopTrialDialog';
+import {TrialContextPanel} from './components/TrialContextPanel';
+import {parseSseFrames, requestMessages, type Message} from './conversation';
+import {
+  deriveTrialView,
+  parseServingRoute,
+  servingErrorMessage,
+  servingRouteQuery,
+  summarizeTrials,
+} from './serving-model';
+import type {
+  ServingRoute,
+  ServingTrial,
+  TrialViewState,
+} from './types';
+import './serving.css';
 
-type Trial={id:string;state:string;adapter_id:string;instance_id?:string;error_code?:string;stop_requested:boolean;request_state:string;request_cancel_requested:boolean;last_activity_at:string;snapshot:{base:{id:string;fingerprint:string};instance:InstanceSpec;adapter_fingerprint:string;config?:{template?:string;cutoff_len?:number;lora_rank?:number}}};
+function timeLabel() {
+  return new Date().toLocaleTimeString('zh-CN', {hour12: false});
+}
 
-const states:Record<string,string>={queued:'排队',waiting_instance:'等待手动创建实例',preparing:'准备推理',ready:'可试用',stopping:'停止并回收中',stopped:'已结束',blocked:'需要处理'};
+function errorMessage(error: unknown): string {
+  if (error instanceof ApiError) return servingErrorMessage(error.code, error.message);
+  if (error instanceof Error) return error.message;
+  return String(error);
+}
 
-export function Serving(){
- const [adapters,setAdapters]=useState<AdapterVersion[]>([]),[trials,setTrials]=useState<Trial[]>([]),[selected,setSelected]=useState(''),[detail,setDetail]=useState<Trial|null>(null);
- const [runtime,setRuntime]=useState<RuntimeBaseline|null>(null);
- const [adapter,setAdapter]=useState(''),[instance,setInstance]=useState(emptyInstance),[instanceId,setInstanceId]=useState(''),[ack,setAck]=useState(false);
- const [messages,setMessages]=useState<Message[]>([]),[text,setText]=useState(''),[busy,setBusy]=useState(false),[sending,setSending]=useState(false),[error,setError]=useState('');
- const [maxTokens,setMaxTokens]=useState(128),[temperature,setTemperature]=useState(.7),[topP,setTopP]=useState(.9),[confirmInstance,setConfirmInstance]=useState(false);
- const stream=useRef<AbortController|null>(null),mounted=useRef(true),generation=useRef(0);
- useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;stream.current?.abort();};},[]);
- useEffect(()=>{const c=new AbortController();getRuntimeBaseline(c.signal).then(r=>{setRuntime(r);setMaxTokens(r.inference.conversation.max_tokens_default);}).catch(e=>{if(!c.signal.aborted)setError((e as Error).message);});let pending=false;const refresh=async()=>{if(pending)return;pending=true;try{const [a,t]=await Promise.all([listAdapters(c.signal),api<Trial[]>('/serving/trials',{signal:c.signal})]);setAdapters(a);setTrials(t);}catch(e){if(!c.signal.aborted)setError((e as Error).message);}finally{pending=false;}};void refresh();const t=setInterval(()=>void refresh(),3000);return()=>{c.abort();clearInterval(t);};},[]);
- useEffect(()=>{generation.current++;stream.current?.abort();setSending(false);setMessages([]);setDetail(null);setInstanceId('');setAck(false);if(!selected)return;const c=new AbortController();let pending=false;const refresh=async()=>{if(pending)return;pending=true;try{setDetail(await api<Trial>('/serving/trials/'+selected,{signal:c.signal}));}catch(e){if(!c.signal.aborted)setError((e as Error).message);}finally{pending=false;}};void refresh();const t=setInterval(()=>void refresh(),2500);return()=>{c.abort();clearInterval(t);};},[selected]);
- async function act(action:()=>Promise<Trial>){setBusy(true);setError('');try{const row=await action();setSelected(row.id);setDetail(row);}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
- async function send(){
-  if(!detail||!text.trim()||sending)return;const history=[...messages,{role:'user' as const,content:text.trim()}];const c=new AbortController();stream.current=c;const current=++generation.current;const trialId=detail.id;let completed=false;
-  setMessages([...history,{role:'assistant',content:''}]);setText('');setSending(true);setError('');
-  const append=(delta:string)=>{if(mounted.current&&current===generation.current)setMessages(old=>old.map((m,i)=>i===old.length-1?{...m,content:m.content+delta}:m));};
-  try{
-   const response=await fetch('/api/v1/serving/trials/'+trialId+'/chat',{...json('POST',{messages:requestMessages(history),max_tokens:maxTokens,temperature,top_p:topP}),signal:c.signal});
-   if(!response.ok){const body=await response.json();throw new Error(body.error?.message??'无法开始生成');}
-   if(!response.body)throw new Error('流式连接不可用');const reader=response.body.getReader(),decoder=new TextDecoder();let buffer='';
-   while(true){const {value,done}=await reader.read();buffer+=decoder.decode(value,{stream:!done});let boundary;
-    while((boundary=buffer.indexOf('\n\n'))>=0){const event=buffer.slice(0,boundary);buffer=buffer.slice(boundary+2);const kind=event.split('\n').find(l=>l.startsWith('event:'))?.slice(6).trim();const data=event.split('\n').filter(l=>l.startsWith('data:')).map(l=>l.slice(5).trim()).join('\n');if(!data)continue;const payload=JSON.parse(data);
-     if(kind==='delta')append(payload.text);if(kind==='error')throw new Error(payload.code);
-     if(kind==='done'){completed=true;if(payload.partial&&current===generation.current)setMessages(old=>old.map((m,i)=>i===old.length-1?{...m,partial:true}:m));}
-    }if(done)break;
-   }if(!completed)throw new Error('连接结束，生成结果尚未确认');
-  }catch(e){if(mounted.current&&current===generation.current){setError(c.signal.aborted?'已请求停止，等待后端确认。':(e as Error).message);setMessages(old=>old.map((m,i)=>i===old.length-1?{...m,partial:true}:m));}}
-  finally{if(!completed){try{await api('/serving/trials/'+trialId+'/cancel-request',json('POST'));}catch{}}if(mounted.current&&current===generation.current)setSending(false);if(stream.current===c)stream.current=null;}
- }
- async function cancel(){if(!detail)return;try{await api('/serving/trials/'+detail.id+'/cancel-request',json('POST'));}catch(e){setError((e as Error).message);}}
- return <><div className="page-heading"><div><h1>推理试用</h1><p>从正式 Best / Final Adapter 创建独立实例。会话仅保存在当前页面。</p></div></div>{error&&<div className="notice" role="alert">{error}</div>}
- <section className="panel asset-form"><h2>创建独立推理试用</h2><form onSubmit={e=>{e.preventDefault();setConfirmInstance(true);}}><fieldset disabled={busy||!runtime}><div className="form-grid"><label>已同步 Adapter<select required value={adapter} onChange={e=>setAdapter(e.target.value)}><option value="">选择训练产物</option>{adapters.filter(a=>a.state==='available').map(a=>{const reason=adapterCompatibilityReason(a,runtime);return <option key={a.id} value={a.id} disabled={Boolean(reason)}>{a.role==='best'?'Best':'Final'} · {a.source_attempt_id.slice(0,8)} · eval loss {a.metrics.eval_loss??'—'}{reason?' · 未支持':''}</option>})}</select></label></div><InstanceFields value={instance} onChange={setInstance}/><div className="workflow-actions"><button disabled={busy}>{busy?'正在创建…':'创建试用记录'}</button></div>{runtime&&<p className="muted">推理基线 {runtime.model.display_name} · {runtime.inference.hardware.gpu_type} · 模型长度 {runtime.model.max_model_len} · 最大生成 {runtime.inference.conversation.max_tokens_limit} Token。训练实例回收确认后才可占用 GPU。</p>}</fieldset></form></section>
- {confirmInstance&&<ManualInstanceDialog purpose="独立推理" instance={instance} busy={busy} onCancel={()=>setConfirmInstance(false)} onConfirm={()=>{setConfirmInstance(false);void act(()=>api<Trial>('/serving/trials',json('POST',{adapter_id:adapter,instance})));}}/>}
- <section className="panel asset-list"><div className="section-heading"><div><h2>试用记录</h2><p>无活动请求且空闲 15 分钟后，由后端自动回收实例。</p></div></div>{trials.length?<div className="table-scroll"><table><thead><tr><th>试用</th><th>状态</th><th>实例</th><th>操作</th></tr></thead><tbody>{trials.map(t=><tr key={t.id} aria-selected={t.id===selected}><td>{t.id.slice(0,8)}</td><td>{states[t.state]??t.state}{t.error_code&&<small>{t.error_code}</small>}</td><td>{t.instance_id??'待关联'}</td><td><button className="text-button" onClick={()=>setSelected(t.id)}>打开试用</button></td></tr>)}</tbody></table></div>:<p className="empty-state">暂无推理试用。完成训练并同步 Best / Final 后，即可选择产物。</p>}</section>
- {detail&&<section className="panel asset-detail"><div className="section-heading"><div><h2>当前试用 · {detail.id.slice(0,8)}</h2><p>{states[detail.state]} · 请求：{detail.request_state}</p></div></div><dl className="metadata"><dt>基础模型版本</dt><dd>{detail.snapshot.base.id}</dd><dt>基座指纹</dt><dd><code>{detail.snapshot.base.fingerprint}</code></dd><dt>Adapter</dt><dd>{detail.adapter_id}</dd><dt>空闲回收</dt><dd>{detail.stop_requested?'正在停止并回收':detail.state==='stopped'?'已结束':detail.state==='ready'&&detail.request_state==='idle'?`${Math.max(0,Math.ceil((Date.parse(detail.last_activity_at)+900000-Date.now())/1000))} 秒后；预计 ${new Date(Date.parse(detail.last_activity_at)+900000).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai'})}`:'服务就绪且无活动请求后开始计时'}</dd><dt>指纹</dt><dd><code>{detail.snapshot.adapter_fingerprint}</code></dd><dt>实例</dt><dd>{detail.instance_id??'尚未关联'}</dd><dt>错误</dt><dd>{detail.error_code??'无'}</dd></dl>
- {detail.state==='waiting_instance'&&<div className="detail-body"><h3>手动创建独立实例</h3><pre>{JSON.stringify(detail.snapshot.instance,null,2)}</pre><form onSubmit={e=>{e.preventDefault();void act(()=>api<Trial>('/serving/trials/'+detail.id+'/instance',json('POST',{instance_id:instanceId,acknowledge_cleanup:ack})));}}><label>实例 ID<input required value={instanceId} onChange={e=>setInstanceId(e.target.value)}/></label><label className="check-label"><input required type="checkbox" checked={ack} onChange={e=>setAck(e.target.checked)}/>我拥有此实例，授权平台停止并删除</label><button disabled={busy}>核对并关联</button></form></div>}
- <div className="detail-body"><h3>当前页面会话</h3><div className="chat-messages" aria-live="polite">{messages.length?messages.map((m,i)=><article key={i}><strong>{m.role==='user'?'你':'模型'}{m.partial?' · 部分输出':''}</strong><p>{m.content||'正在等待输出…'}</p></article>):<p className="muted">服务准备完成后开始对话。刷新或离开页面后，会话清空。</p>}</div><form onSubmit={e=>{e.preventDefault();void send();}}><label htmlFor="chat-input">消息</label><textarea id="chat-input" required maxLength={runtime?.inference.conversation.max_content_chars_per_message??12000} rows={4} value={text} disabled={!runtime||detail.state!=='ready'||sending} onChange={e=>setText(e.target.value)}/><div className="form-grid"><label>最大生成 Token<input type="number" min={1} max={runtime?.inference.conversation.max_tokens_limit??256} value={maxTokens} disabled={!runtime} onChange={e=>setMaxTokens(Number(e.target.value))}/></label><label>Temperature<input type="number" min={0} max={2} step={.1} value={temperature} disabled={!runtime} onChange={e=>setTemperature(Number(e.target.value))}/></label><label>Top P<input type="number" min={Number.MIN_VALUE} max={1} step="any" value={topP} disabled={!runtime} onChange={e=>setTopP(Number(e.target.value))}/></label></div><div className="workflow-actions"><button disabled={!runtime||sending||detail.state!=='ready'||detail.request_state!=='idle'||!text.trim()}>发送</button><button type="button" className="secondary" disabled={detail.request_state==='idle'||detail.request_cancel_requested} onClick={()=>void cancel()}>停止生成</button><button type="button" className="secondary" disabled={sending||detail.request_state!=='idle'} onClick={()=>setMessages([])}>清空页面会话</button></div></form></div>
- <div className="actions"><button className="danger secondary" disabled={busy||detail.stop_requested||detail.state==='stopped'} onClick={()=>void act(()=>api<Trial>('/serving/trials/'+detail.id+'/stop',json('POST')))}>结束试用并回收实例</button></div></section>}</>;
+function routeError(error: unknown): boolean {
+  return error instanceof ApiError && (error.status === 404 || error.status === 422);
+}
+
+function CenterSkeleton() {
+  return <section className="serving-column serving-main serving-main-skeleton" role="status" aria-label="正在加载当前试用">
+    <div className="serving-skeleton-head"><span/><span/><span/></div>
+    <div className="serving-skeleton-body">
+      <span className="wide"/><span/><span className="mid"/><span className="tall"/>
+    </div>
+  </section>;
+}
+
+function InvalidRoute({
+  trialId,
+  onBack,
+}: {
+  trialId: string;
+  onBack: () => void;
+}) {
+  return <section className="serving-column serving-main serving-route-error">
+    <span className="serving-route-error-icon"><ServingIcon name="alert" size={26}/></span>
+    <span className="serving-kicker">TRIAL NOT FOUND</span>
+    <h2>找不到这条试用记录</h2>
+    <p>地址中的标识可能无效，记录也可能已被删除。页面保留当前 URL，没有自动选择队列中的其他 Trial。</p>
+    <code>{trialId}</code>
+    <div><button type="button" onClick={onBack}>返回队列</button></div>
+  </section>;
+}
+
+function DetailError({
+  message,
+  onRefresh,
+  onBack,
+}: {
+  message: string;
+  onRefresh: () => void;
+  onBack: () => void;
+}) {
+  return <section className="serving-column serving-main serving-route-error">
+    <span className="serving-route-error-icon warning"><ServingIcon name="refresh" size={25}/></span>
+    <span className="serving-kicker">DETAIL UNAVAILABLE</span>
+    <h2>暂时无法读取试用详情</h2>
+    <p>{message}</p>
+    <div><button type="button" onClick={onRefresh}>重新读取</button><button type="button" className="secondary" onClick={onBack}>返回队列</button></div>
+  </section>;
+}
+
+function EmptyWorkbench({
+  hasTrials,
+  onCreate,
+  onOpenQueue,
+}: {
+  hasTrials: boolean;
+  onCreate: () => void;
+  onOpenQueue: () => void;
+}) {
+  return <section className="serving-column serving-main serving-landing">
+    <div className="serving-landing-head">
+      <span className="serving-landing-mark"><ServingIcon name="spark" size={24}/></span>
+      <span className="serving-kicker">ONE TRIAL · ONE CLEAR PATH</span>
+      <h2>把「训练成功」和「可以用」分开。</h2>
+      <p>选择一条 Trial，确认它绑定了什么，完成一次真实对话，然后安全结束并核对回收事实。</p>
+      <div className="serving-landing-actions">
+        {hasTrials && <button type="button" onClick={onOpenQueue}><ServingIcon name="queue" size={15}/>从试用队列选择</button>}
+        <button type="button" className={hasTrials ? 'secondary' : ''} onClick={onCreate}><ServingIcon name="plus" size={15}/>创建推理试用</button>
+        {!hasTrials && <a className="serving-secondary-link" href="#training">查看训练产物</a>}
+      </div>
+    </div>
+    <div className="serving-landing-flow">
+      <article><span>01</span><div><strong>选一条 Trial</strong><p>队列刷新不会改变当前选择，复制 URL 可恢复当前上下文。</p></div><ServingIcon name="queue" size={19}/></article>
+      <article><span>02</span><div><strong>确认实例与身份</strong><p>Adapter、基座指纹、实例规格和 GPU 租约始终可见。</p></div><ServingIcon name="gpu" size={19}/></article>
+      <article><span>03</span><div><strong>生成并安全结束</strong><p>会话只在当前页面；结束后四项回收事实分别核对。</p></div><ServingIcon name="check" size={19}/></article>
+    </div>
+    <div className="serving-landing-note"><ServingIcon name="info" size={16}/><p>当前页面不会自动购买 GPU，也不会把停止请求显示成实例已回收。</p></div>
+  </section>;
+}
+
+function Notice({
+  tone,
+  title,
+  children,
+  action,
+}: {
+  tone: 'warning' | 'danger';
+  title: string;
+  children: string;
+  action?: {label: string; run: () => void};
+}) {
+  return <div className={`serving-page-notice ${tone}`} role={tone === 'danger' ? 'alert' : 'status'}>
+    <ServingIcon name="alert" size={17}/>
+    <div><strong>{title}</strong><p>{children}</p></div>
+    {action && <button type="button" onClick={action.run}>{action.label}</button>}
+  </div>;
+}
+
+export function Serving() {
+  const [route, setRoute] = useState<ServingRoute>(() => parseServingRoute(location.search));
+  const [trials, setTrials] = useState<ServingTrial[]>([]);
+  const [adapters, setAdapters] = useState<AdapterVersion[]>([]);
+  const [runtime, setRuntime] = useState<RuntimeBaseline | null>(null);
+  const [runtimeError, setRuntimeError] = useState('');
+  const [listLoading, setListLoading] = useState(true);
+  const [listRefreshing, setListRefreshing] = useState(false);
+  const [listError, setListError] = useState('');
+  const [listStale, setListStale] = useState(false);
+  const [listLoadedAt, setListLoadedAt] = useState('');
+  const [detail, setDetail] = useState<ServingTrial | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState('');
+  const [detailStale, setDetailStale] = useState(false);
+  const [detailLoadedAt, setDetailLoadedAt] = useState('');
+  const [invalidRoute, setInvalidRoute] = useState(false);
+  const [detailRevision, setDetailRevision] = useState(0);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [text, setText] = useState('');
+  const [maxTokens, setMaxTokens] = useState(128);
+  const [temperature, setTemperature] = useState(0.7);
+  const [topP, setTopP] = useState(0.9);
+  const [sending, setSending] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [actionError, setActionError] = useState('');
+  const [busyAction, setBusyAction] = useState<'' | 'create' | 'bind' | 'stop'>('');
+  const [bindingOpen, setBindingOpen] = useState(false);
+  const [stoppingOpen, setStoppingOpen] = useState(false);
+  const [queueOpen, setQueueOpen] = useState(false);
+  const [contextOpen, setContextOpen] = useState(false);
+  const listPending = useRef(false);
+  const listAbort = useRef<AbortController | null>(null);
+  const trialsRef = useRef<ServingTrial[]>([]);
+  const detailRef = useRef<ServingTrial | null>(null);
+  const invalidRef = useRef(false);
+  const lastTrialRef = useRef('');
+  const mounted = useRef(false);
+  const stream = useRef<AbortController | null>(null);
+  const streamGeneration = useRef(0);
+  const queueTrigger = useRef<HTMLButtonElement>(null);
+  const contextTrigger = useRef<HTMLButtonElement>(null);
+
+  const visibleDetail = detail?.id === route.trialId ? detail : null;
+  const rawView = visibleDetail ? deriveTrialView(visibleDetail) : null;
+  const view: TrialViewState | null = rawView
+    ? sending && rawView.kind !== 'ended' ? {kind: 'generating'}
+      : cancelling && rawView.kind !== 'ended' ? {kind: 'cancelling'}
+        : rawView
+    : null;
+  const selectedAdapter = useMemo(
+    () => adapters.find((adapter) => adapter.id === visibleDetail?.adapter_id),
+    [adapters, visibleDetail?.adapter_id],
+  );
+  const queueTrials = useMemo(() => trials.map((trial) => (
+    trial.id === visibleDetail?.id ? {...trial, lifecycle: visibleDetail.lifecycle} : trial
+  )), [trials, visibleDetail]);
+  const listSummary = useMemo(() => summarizeTrials(queueTrials), [queueTrials]);
+
+  const navigate = useCallback((next: ServingRoute, mode: 'push' | 'replace' = 'push', top = false) => {
+    const search = servingRouteQuery(next);
+    history[mode === 'push' ? 'pushState' : 'replaceState'](null, '', location.pathname + search + '#serving');
+    setRoute(next);
+    if (top) window.scrollTo({top: 0, behavior: 'smooth'});
+  }, []);
+
+  const refreshList = useCallback(async () => {
+    if (listPending.current) return;
+    listPending.current = true;
+    const request = new AbortController();
+    listAbort.current = request;
+    if (trialsRef.current.length) setListRefreshing(true);
+    try {
+      const rows = await listServingTrials(request.signal);
+      if (request.signal.aborted) return;
+      setTrials(rows);
+      setListError('');
+      setListStale(false);
+      setListLoadedAt(timeLabel());
+    } catch (error) {
+      if (request.signal.aborted) return;
+      setListError(errorMessage(error));
+      setListStale(trialsRef.current.length > 0);
+    } finally {
+      if (listAbort.current === request) listAbort.current = null;
+      listPending.current = false;
+      if (mounted.current) {
+        setListLoading(false);
+        setListRefreshing(false);
+      }
+    }
+  }, []);
+
+  const refreshDetailNow = useCallback(() => {
+    invalidRef.current = false;
+    setInvalidRoute(false);
+    setActionError('');
+    setDetailRevision((value) => value + 1);
+  }, []);
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      streamGeneration.current += 1;
+      stream.current?.abort();
+      listAbort.current?.abort();
+    };
+  }, []);
+
+  useEffect(() => {
+    trialsRef.current = trials;
+  }, [trials]);
+
+  useEffect(() => {
+    detailRef.current = detail;
+  }, [detail]);
+
+  useEffect(() => {
+    const onPopState = () => setRoute(parseServingRoute(location.search));
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
+
+  useEffect(() => {
+    const onServingNav = (event: MouseEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const link = target.closest('a.nav-item[href="#serving"]');
+      if (!link || (!route.trialId && !route.create)) return;
+      event.preventDefault();
+      navigate({trialId: '', create: false}, 'push', true);
+    };
+    document.addEventListener('click', onServingNav, true);
+    return () => document.removeEventListener('click', onServingNav, true);
+  }, [navigate, route.create, route.trialId]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    Promise.allSettled([
+      getRuntimeBaseline(controller.signal),
+      listAdapters(controller.signal),
+    ]).then(([runtimeResult, adapterResult]) => {
+      if (controller.signal.aborted) return;
+      if (runtimeResult.status === 'fulfilled') {
+        setRuntime(runtimeResult.value);
+        setRuntimeError('');
+        setMaxTokens(runtimeResult.value.inference.conversation.max_tokens_default);
+      } else {
+        setRuntimeError(errorMessage(runtimeResult.reason));
+      }
+      if (adapterResult.status === 'fulfilled') setAdapters(adapterResult.value);
+    });
+    return () => controller.abort();
+  }, []);
+
+  useEffect(() => {
+    let timer = 0;
+    const stop = () => {
+      if (timer) window.clearInterval(timer);
+      timer = 0;
+    };
+    const start = () => {
+      stop();
+      if (document.visibilityState !== 'visible') return;
+      void refreshList();
+      timer = window.setInterval(() => {
+        if (document.visibilityState === 'visible') void refreshList();
+      }, 3000);
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') start();
+      else stop();
+    };
+    start();
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      stop();
+      document.removeEventListener('visibilitychange', onVisibility);
+      listAbort.current?.abort();
+      listAbort.current = null;
+      listPending.current = false;
+    };
+  }, [refreshList]);
+
+  useEffect(() => {
+    streamGeneration.current += 1;
+    stream.current?.abort();
+    stream.current = null;
+    setSending(false);
+    setCancelling(false);
+    setMessages([]);
+    setText('');
+    setActionError('');
+    setBindingOpen(false);
+    setStoppingOpen(false);
+    setDetailLoading(Boolean(route.trialId));
+    setDetailError('');
+    setDetailStale(false);
+    setDetailLoadedAt('');
+    if (!route.trialId) {
+      setDetail(null);
+      setInvalidRoute(false);
+      invalidRef.current = false;
+    }
+  }, [route.trialId]);
+
+  useEffect(() => {
+    if (!visibleDetail || visibleDetail.request_state === 'idle') setCancelling(false);
+  }, [visibleDetail]);
+
+  useEffect(() => {
+    const trialId = route.trialId;
+    if (!trialId) return;
+    if (lastTrialRef.current !== trialId) {
+      lastTrialRef.current = trialId;
+      invalidRef.current = false;
+      setInvalidRoute(false);
+    }
+    let timer = 0;
+    let pending = false;
+    const request = new AbortController();
+    const refresh = async () => {
+      if (pending || request.signal.aborted || invalidRef.current) return;
+      pending = true;
+      const matchesTrial = detailRef.current?.id === trialId;
+      if (!matchesTrial) setDetailLoading(true);
+      try {
+        const row = await getServingTrial(trialId, request.signal);
+        if (request.signal.aborted) return;
+        setDetail(row);
+        setInvalidRoute(false);
+        invalidRef.current = false;
+        setDetailError('');
+        setDetailStale(false);
+        setDetailLoadedAt(timeLabel());
+      } catch (error) {
+        if (request.signal.aborted) return;
+        if (routeError(error)) {
+          invalidRef.current = true;
+          setInvalidRoute(true);
+          setDetail(null);
+          setDetailError('');
+        } else if (detailRef.current?.id === trialId) {
+          setDetailError(errorMessage(error));
+          setDetailStale(true);
+        } else {
+          setDetailError(errorMessage(error));
+        }
+      } finally {
+        pending = false;
+        if (!request.signal.aborted) setDetailLoading(false);
+      }
+    };
+    const stop = () => {
+      if (timer) window.clearInterval(timer);
+      timer = 0;
+    };
+    const start = () => {
+      stop();
+      if (document.visibilityState !== 'visible') return;
+      void refresh();
+      timer = window.setInterval(() => {
+        if (document.visibilityState === 'visible') void refresh();
+      }, 2500);
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') start();
+      else stop();
+    };
+    start();
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      stop();
+      document.removeEventListener('visibilitychange', onVisibility);
+      request.abort();
+    };
+  }, [detailRevision, route.trialId]);
+
+  useEffect(() => {
+    if (!queueOpen && !contextOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      setQueueOpen(false);
+      setContextOpen(false);
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [contextOpen, queueOpen]);
+
+  function selectTrial(identifier: string) {
+    setQueueOpen(false);
+    setActionError('');
+    navigate({trialId: identifier, create: false}, 'push', true);
+  }
+
+  function openCreate() {
+    setActionError('');
+    setQueueOpen(false);
+    navigate({trialId: route.trialId, create: true}, 'push');
+  }
+
+  function closeCreate() {
+    if (busyAction) return;
+    setActionError('');
+    navigate({trialId: route.trialId, create: false}, 'replace');
+  }
+
+  function openQueue() {
+    setContextOpen(false);
+    setQueueOpen(true);
+    window.requestAnimationFrame(() => document.querySelector<HTMLElement>('#serving-queue [data-drawer-close]')?.focus());
+  }
+
+  function closeQueue() {
+    setQueueOpen(false);
+    window.requestAnimationFrame(() => queueTrigger.current?.focus());
+  }
+
+  function openContext() {
+    setQueueOpen(false);
+    setContextOpen(true);
+    window.requestAnimationFrame(() => document.querySelector<HTMLElement>('.serving-context-shell [aria-label="关闭运行事实"]')?.focus());
+  }
+
+  function closeContext() {
+    setContextOpen(false);
+    window.requestAnimationFrame(() => contextTrigger.current?.focus());
+  }
+
+  async function createTrial(adapterId: string, instance: Parameters<typeof createServingTrial>[1]) {
+    setBusyAction('create');
+    setActionError('');
+    try {
+      const created = await createServingTrial(adapterId, instance);
+      setTrials((current) => [created, ...current.filter((row) => row.id !== created.id)]);
+      setDetail(created);
+      setDetailLoading(false);
+      setInvalidRoute(false);
+      invalidRef.current = false;
+      setMessages([]);
+      navigate({trialId: created.id, create: false}, 'push', true);
+      void refreshList();
+    } catch (error) {
+      setActionError(errorMessage(error));
+    } finally {
+      setBusyAction('');
+    }
+  }
+
+  async function bindInstance(instanceId: string, acknowledgeCleanup: boolean) {
+    if (!visibleDetail) return;
+    setBusyAction('bind');
+    setActionError('');
+    try {
+      const updated = await bindServingInstance(visibleDetail.id, instanceId, acknowledgeCleanup);
+      setDetail(updated);
+      setDetailStale(false);
+      setBindingOpen(false);
+      void refreshList();
+      refreshDetailNow();
+    } catch (error) {
+      setActionError(errorMessage(error));
+    } finally {
+      setBusyAction('');
+    }
+  }
+
+  async function requestStop() {
+    if (!visibleDetail) return;
+    setBusyAction('stop');
+    setActionError('');
+    try {
+      const updated = await stopServingTrial(visibleDetail.id);
+      setDetail(updated);
+      setDetailStale(false);
+      setStoppingOpen(false);
+      setTrials((current) => current.map((row) => row.id === updated.id ? updated : row));
+      refreshDetailNow();
+    } catch (error) {
+      setActionError(errorMessage(error));
+    } finally {
+      setBusyAction('');
+    }
+  }
+
+  async function sendMessage() {
+    if (!visibleDetail || rawView?.kind !== 'ready' || !runtime || !text.trim() || sending || detailStale) return;
+    const userText = text.trim();
+    const history: Message[] = [...messages, {role: 'user', content: userText}];
+    const visible = [...history, {role: 'assistant' as const, content: ''}];
+    const request: ServingChatInput = {
+      messages: requestMessages(history),
+      max_tokens: maxTokens,
+      temperature,
+      top_p: topP,
+    };
+    const controller = new AbortController();
+    stream.current?.abort();
+    stream.current = controller;
+    const current = ++streamGeneration.current;
+    const trialId = visibleDetail.id;
+    let completed = false;
+    setMessages(visible);
+    setText('');
+    setSending(true);
+    setCancelling(false);
+    setActionError('');
+    const append = (delta: string) => {
+      if (!mounted.current || current !== streamGeneration.current) return;
+      setMessages((rows) => rows.map((message, index) => index === rows.length - 1
+        ? {...message, content: message.content + delta}
+        : message));
+    };
+    try {
+      const response = await openServingChat(trialId, request, controller.signal);
+      const reader = response.body!.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      while (true) {
+        const {value, done} = await reader.read();
+        buffer += decoder.decode(value, {stream: !done});
+        const parsed = parseSseFrames(buffer);
+        buffer = parsed.rest;
+        for (const frame of parsed.frames) {
+          if (!frame.data) continue;
+          let payload: Record<string, unknown>;
+          try {
+            payload = JSON.parse(frame.data) as Record<string, unknown>;
+          } catch {
+            throw new Error('流式响应格式无法确认，已保留当前页面的部分输出。');
+          }
+          if (frame.event === 'delta' && typeof payload.text === 'string') append(payload.text);
+          if (frame.event === 'error') {
+            throw new Error(servingErrorMessage(String(payload.code ?? 'remote_request_unconfirmed')));
+          }
+          if (frame.event === 'done') {
+            completed = true;
+            if (payload.partial && current === streamGeneration.current) {
+              setMessages((rows) => rows.map((message, index) => index === rows.length - 1
+                ? {...message, partial: true}
+                : message));
+            }
+          }
+        }
+        if (done) break;
+      }
+      if (!completed) throw new Error('连接结束，但生成结果尚未确认。');
+    } catch (error) {
+      if (mounted.current && current === streamGeneration.current) {
+        const abort = error instanceof DOMException && error.name === 'AbortError';
+        if (!abort) setActionError(errorMessage(error));
+        setMessages((rows) => rows.map((message, index) => index === rows.length - 1
+          ? {...message, partial: true}
+          : message));
+      }
+    } finally {
+      if (!completed) {
+        void cancelServingRequest(trialId).catch(() => undefined);
+      }
+      if (mounted.current && current === streamGeneration.current) {
+        setSending(false);
+        setCancelling(false);
+        setDetailRevision((value) => value + 1);
+      }
+      if (stream.current === controller) stream.current = null;
+    }
+  }
+
+  async function cancelGeneration() {
+    if (!visibleDetail || cancelling) return;
+    setCancelling(true);
+    setActionError('');
+    try {
+      const updated = await cancelServingRequest(visibleDetail.id);
+      setDetail(updated);
+      setDetailRevision((value) => value + 1);
+    } catch (error) {
+      setCancelling(false);
+      setActionError(errorMessage(error));
+    }
+  }
+
+  const createOpen = route.create;
+  const showCenterSkeleton = route.trialId
+    ? !visibleDetail && detailLoading && !invalidRoute && !detailError
+    : listLoading && !trials.length;
+
+  return <div className="serving-page">
+    <header className="serving-page-heading">
+      <div>
+        <span className="serving-eyebrow">SERVING / INDEPENDENT INFERENCE</span>
+        <h1>推理试用工作台</h1>
+        <p>从已同步 Adapter 创建独立试用，验证真实生成，并把停止请求与实例回收事实分开。</p>
+      </div>
+      <div className="serving-heading-actions">
+        <span>队列读取 <strong>{listLoadedAt || '尚未刷新'}</strong></span>
+        <button ref={queueTrigger} type="button" className="serving-mobile-queue-toggle secondary" onClick={openQueue}><ServingIcon name="queue" size={15}/>试用队列</button>
+        <button type="button" className="serving-mobile-context-toggle secondary" onClick={openContext}><ServingIcon name="panel" size={15}/>运行事实</button>
+        <button type="button" className="secondary" onClick={() => {void refreshList(); refreshDetailNow();}} disabled={listRefreshing}><ServingIcon name="refresh" size={15}/>{listRefreshing ? '刷新中' : '刷新'}</button>
+        <button type="button" onClick={openCreate}><ServingIcon name="plus" size={15}/>新建试用</button>
+      </div>
+    </header>
+
+    {listError && <Notice
+      tone={listStale ? 'warning' : 'danger'}
+      title={listStale ? '队列刷新失败，保留上次结果' : '无法读取试用队列'}
+      action={{label: '重新读取', run: () => void refreshList()}}
+    >{listError}</Notice>}
+    {!listError && listStale && <Notice tone="warning" title="当前显示上次队列结果" action={{label: '重新读取', run: () => void refreshList()}}>最近一次刷新失败。数据可能已经过期，发送操作会保持禁用。</Notice>}
+    {detailStale && visibleDetail && <Notice tone="warning" title="当前 Trial 详情已过期" action={{label: '重新读取', run: refreshDetailNow}}>{detailError || `最近一次详情读取失败。页面保留 ${detailLoadedAt || '上次'} 的结果。`}</Notice>}
+
+    {(queueOpen || contextOpen) && <button type="button" className="serving-scrim" aria-label="关闭侧栏" onClick={() => {
+      setQueueOpen(false);
+      setContextOpen(false);
+    }}/>}
+
+    <div className="serving-workbench">
+      <ServingQueue
+        trials={queueTrials}
+        adapters={adapters}
+        selectedId={route.trialId}
+        loading={listLoading}
+        refreshing={listRefreshing}
+        lastLoadedAt={listLoadedAt}
+        mobileOpen={queueOpen}
+        onSelect={selectTrial}
+        onCreate={openCreate}
+        onRefresh={() => void refreshList()}
+        onClose={closeQueue}
+      />
+
+      {showCenterSkeleton ? <CenterSkeleton/> : !route.trialId ? <EmptyWorkbench
+        hasTrials={trials.length > 0}
+        onCreate={openCreate}
+        onOpenQueue={openQueue}
+      /> : invalidRoute ? <InvalidRoute
+        trialId={route.trialId}
+        onBack={() => navigate({trialId: '', create: false}, 'push', true)}
+      /> : !visibleDetail && detailError ? <DetailError
+        message={detailError}
+        onRefresh={refreshDetailNow}
+        onBack={() => navigate({trialId: '', create: false}, 'push', true)}
+      /> : visibleDetail && view ? <ServingSession
+        trial={visibleDetail}
+        view={view}
+        adapter={selectedAdapter}
+        runtime={runtime}
+        runtimeError={runtimeError}
+        stale={detailStale}
+        lastLoadedAt={detailLoadedAt}
+        messages={messages}
+        text={text}
+        sending={sending}
+        cancelling={cancelling}
+        actionError={actionError}
+        maxTokens={maxTokens}
+        temperature={temperature}
+        topP={topP}
+        onText={setText}
+        onMaxTokens={setMaxTokens}
+        onTemperature={setTemperature}
+        onTopP={setTopP}
+        onSend={() => void sendMessage()}
+        onStop={() => void cancelGeneration()}
+        onClear={() => setMessages([])}
+        onOpenBind={() => {setActionError(''); setBindingOpen(true);}}
+        onCreate={openCreate}
+        onRefresh={refreshDetailNow}
+      /> : <CenterSkeleton/>}
+
+      <TrialContextPanel
+        trial={visibleDetail}
+        view={view}
+        adapter={selectedAdapter}
+        mobileOpen={contextOpen}
+        onOpenBind={() => {setActionError(''); setBindingOpen(true);}}
+        onStop={() => {setActionError(''); setStoppingOpen(true);}}
+        onClose={closeContext}
+      />
+    </div>
+
+    <div className="serving-page-foot">
+      <span><i className={listSummary.attention ? 'attention' : ''}/>{listSummary.attention ? `${listSummary.attention} 条试用需要核对` : '队列中暂无需要人工核对的状态'}</span>
+      <span>Serving F1.1 · 会话不持久化 · 状态事实来自后端</span>
+    </div>
+
+    {createOpen && <CreateTrialDialog
+      adapters={adapters}
+      runtime={runtime}
+      runtimeError={runtimeError}
+      busy={busyAction === 'create'}
+      error={busyAction === 'create' ? '' : actionError}
+      onClose={closeCreate}
+      onCreate={createTrial}
+    />}
+    {bindingOpen && visibleDetail && <BindInstancePanel
+      trial={visibleDetail}
+      busy={busyAction === 'bind'}
+      error={busyAction === 'bind' ? '' : actionError}
+      onClose={() => {if (!busyAction) {setBindingOpen(false); setActionError('');}}}
+      onBind={bindInstance}
+    />}
+    {stoppingOpen && visibleDetail && <StopTrialDialog
+      trial={visibleDetail}
+      busy={busyAction === 'stop'}
+      error={busyAction === 'stop' ? '' : actionError}
+      onClose={() => {if (!busyAction) {setStoppingOpen(false); setActionError('');}}}
+      onConfirm={() => void requestStop()}
+    />}
+  </div>;
 }

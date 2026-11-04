@@ -1,0 +1,1542 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <link rel="icon" href="data:,">
+  <script src="prototype-readable.js" defer></script>
+  <title>铸造台 · ModelForge 推理训练重设计</title>
+  <style>
+    :root {
+      --ground: #edf1f3;
+      --panel: #f8fafb;
+      --panel-strong: #ffffff;
+      --panel-soft: #f2f6f7;
+      --graphite: #14232b;
+      --graphite-2: #1c303a;
+      --ink: #162129;
+      --ink-2: #32424b;
+      --muted: #5e707a;
+      --faint: #62757f;
+      --line: #c9d4da;
+      --line-soft: #e0e8eb;
+      --blue: #245ad0;
+      --blue-deep: #1745a4;
+      --blue-soft: #e9f0ff;
+      --teal: #0b777d;
+      --teal-soft: #e1f2f2;
+      --green: #1c704c;
+      --green-soft: #e2f0e7;
+      --amber: #986315;
+      --amber-soft: #fbf0d8;
+      --red: #a63d38;
+      --red-soft: #fae8e6;
+      --log: #112027;
+      --log-soft: #1a3039;
+      --display: "Bahnschrift SemiCondensed", "Bahnschrift", "Arial Narrow", "Microsoft YaHei UI", sans-serif;
+      --sans: "Segoe UI", "Microsoft YaHei UI", "PingFang SC", sans-serif;
+      --mono: "Cascadia Code", "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+      --radius: 2px;
+      --shadow: 0 18px 48px rgba(26, 42, 50, .12);
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      min-width: 320px;
+      color: var(--ink);
+      background:
+        linear-gradient(90deg, rgba(20, 35, 43, .028) 1px, transparent 1px),
+        linear-gradient(rgba(20, 35, 43, .022) 1px, transparent 1px),
+        var(--ground);
+      background-size: 28px 28px, 28px 28px, auto;
+      font-family: var(--sans);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+    button, input, select, textarea { font: inherit; }
+    button { cursor: pointer; }
+    button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
+    button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus-visible {
+      outline: 3px solid rgba(36, 90, 208, .38);
+      outline-offset: 2px;
+    }
+    button:disabled { cursor: not-allowed; opacity: .45; }
+    a { color: inherit; }
+    svg { display: block; }
+    .sr-only {
+      position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+      overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+    }
+    .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+    .icon { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+
+    .topbar {
+      position: sticky; top: 0; z-index: 45;
+      min-height: 58px;
+      display: flex; align-items: center; gap: 22px;
+      padding: 0 20px;
+      color: #eaf0f2;
+      background: rgba(20, 35, 43, .98);
+      border-bottom: 1px solid rgba(234, 240, 242, .16);
+      backdrop-filter: blur(12px);
+    }
+    .brand { display: flex; align-items: center; gap: 10px; min-width: 214px; }
+    .brand-mark {
+      width: 30px; height: 32px; display: grid; place-items: center;
+      border: 1px solid rgba(255,255,255,.38);
+      color: #fff; font-family: var(--display); font-size: 18px; letter-spacing: -.04em;
+      box-shadow: inset 0 -4px 0 rgba(36, 90, 208, .8);
+    }
+    .brand strong { display: block; font-size: 14px; letter-spacing: .01em; }
+    .brand small { display: block; margin-top: 1px; color: #a6b7c0; font-family: var(--mono); font-size: 8px; letter-spacing: .12em; }
+    .crumb {
+      display: flex; align-items: center; gap: 8px; min-width: 0;
+      color: #91a4ae; font-family: var(--mono); font-size: 9px; letter-spacing: .02em;
+    }
+    .crumb b { color: #dce7eb; font-weight: 500; }
+    .top-actions { margin-left: auto; display: flex; align-items: center; gap: 9px; }
+    .connection { display: inline-flex; align-items: center; gap: 7px; color: #a4b7c0; font-family: var(--mono); font-size: 9px; white-space: nowrap; }
+    .connection i { width: 8px; height: 8px; border-radius: 50%; background: #64c79a; border: 1px solid #4b9073; }
+    .snapshot-time { color: #7e929d; font-family: var(--mono); font-size: 8px; white-space: nowrap; }
+    .scenario-select {
+      min-height: 40px; max-width: 148px; padding: 0 8px;
+      border: 1px solid #3d505a; background: #192a33; color: #dbe6ea;
+      font-family: var(--mono); font-size: 9px;
+    }
+    .top-button {
+      min-height: 40px; display: inline-flex; align-items: center; gap: 7px;
+      padding: 0 12px; border: 1px solid #4c606a; background: transparent; color: #e2eaee;
+      font-size: 10px; font-weight: 600;
+    }
+    .top-button:hover { background: #1f3540; border-color: #6c828d; }
+
+    .app { display: grid; grid-template-columns: 210px minmax(0, 1fr); min-height: calc(100dvh - 58px); }
+    .sidebar {
+      position: sticky; top: 58px; z-index: 20;
+      height: calc(100dvh - 58px); padding: 19px 14px 14px;
+      display: flex; flex-direction: column;
+      color: #c5d1d7; background: #172730; border-right: 1px solid #29404b;
+    }
+    .workspace-label { padding: 0 8px 16px; border-bottom: 1px solid #2a414c; }
+    .workspace-label small { display: block; color: #758b96; font-family: var(--mono); font-size: 8px; letter-spacing: .14em; }
+    .workspace-label strong { display: block; margin-top: 5px; color: #eff5f7; font-size: 12px; font-weight: 550; }
+    .side-nav { margin-top: 13px; display: grid; gap: 3px; }
+    .nav-item {
+      position: relative; min-height: 42px; display: flex; align-items: center; gap: 10px;
+      padding: 0 9px; border: 0; background: transparent; color: #a8bac3;
+      text-align: left; font-size: 11px;
+    }
+    .nav-item:hover { color: #f1f5f7; background: #1d323c; }
+    .nav-item.active { color: #fff; background: #223b47; box-shadow: inset 2px 0 0 #65a1ff; }
+    .nav-item .nav-index { margin-left: auto; color: #9eb0b9; font-family: var(--mono); font-size: 8px; }
+    .nav-item.active .nav-index { color: #9fbeff; }
+    .side-nav-divider { height: 1px; margin: 12px 0; background: #29414c; }
+    .side-caption { padding: 0 9px; color: #9eb0b9; font-family: var(--mono); font-size: 8px; letter-spacing: .12em; }
+    .sidebar-foot { margin-top: auto; padding: 12px 9px 2px; border-top: 1px solid #2a414c; color: #768b95; font-size: 9px; line-height: 1.65; }
+    .sidebar-foot strong { display: block; color: #c8d6dc; font-size: 10px; font-weight: 500; }
+    .sidebar-foot span { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
+    .sidebar-foot i { width: 5px; height: 5px; border-radius: 50%; background: #64c79a; }
+
+    .workspace {
+      display: grid; grid-template-columns: 248px minmax(0, 1fr) 286px;
+      align-items: start; min-width: 0;
+    }
+    .ledger {
+      position: sticky; top: 58px;
+      height: calc(100dvh - 58px); overflow: auto;
+      background: #f5f8f9; border-right: 1px solid var(--line);
+    }
+    .ledger-head { padding: 19px 15px 13px; border-bottom: 1px solid var(--line); }
+    .ledger-title-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+    .ledger-title-row h1, .ledger-title-row h2 { margin: 0; font-family: var(--display); font-size: 22px; letter-spacing: -.02em; line-height: 1.1; font-weight: 650; }
+    .ledger-title-row p { margin: 4px 0 0; color: var(--muted); font-family: var(--mono); font-size: 8px; letter-spacing: .04em; }
+    .count-badge { min-width: 27px; height: 24px; display: grid; place-items: center; border: 1px solid var(--line); background: var(--panel-strong); color: var(--ink-2); font-family: var(--mono); font-size: 9px; }
+    .queue-close { display: none; width: 40px; height: 40px; place-items: center; border: 1px solid var(--line); background: var(--panel-strong); color: var(--muted); }
+    .queue-close:hover { color: var(--ink); background: var(--panel-soft); }
+    .search-box { position: relative; margin-top: 13px; }
+    .search-box .icon { position: absolute; left: 9px; top: 12px; color: var(--faint); }
+    .search-box input {
+      width: 100%; min-height: 40px; padding: 0 10px 0 31px;
+      border: 1px solid var(--line); background: var(--panel-strong); color: var(--ink); font-size: 10px;
+    }
+    .search-box input::placeholder { color: var(--faint); }
+    .ledger-note { margin: 10px 0 0; color: var(--faint); font-size: 9px; line-height: 1.55; }
+    .queue-groups { padding: 9px 10px 18px; }
+    .queue-group { margin-top: 8px; }
+    .group-head {
+      min-height: 29px; display: flex; align-items: center; gap: 7px;
+      padding: 0 5px; color: var(--muted); font-family: var(--mono); font-size: 8px; letter-spacing: .08em;
+    }
+    .group-head span { margin-left: auto; color: var(--faint); }
+    .group-head::before { content: ""; width: 11px; height: 1px; background: var(--line); }
+    .run-card {
+      width: 100%; margin: 0 0 5px; display: block; padding: 12px 11px 11px;
+      border: 1px solid transparent; border-left: 2px solid transparent;
+      background: transparent; color: var(--ink); text-align: left;
+    }
+    .run-card:hover { border-color: var(--line); border-left-color: #8da4ae; background: var(--panel-strong); }
+    .run-card.active { border-color: var(--line); border-left-color: var(--blue); background: var(--panel-strong); }
+    .run-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+    .run-name { margin: 0; font-size: 11px; font-weight: 650; line-height: 1.4; }
+    .run-code { margin: 4px 0 0; color: var(--faint); font-family: var(--mono); font-size: 8px; }
+    .run-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 9px; color: var(--faint); font-family: var(--mono); font-size: 8px; }
+    .run-progress { height: 3px; margin-top: 9px; background: var(--line-soft); }
+    .run-progress i { display: block; height: 100%; background: var(--blue); }
+    .run-progress.success i { background: var(--green); }
+    .run-progress.failed i { background: var(--red); }
+    .ledger-foot { padding: 12px 15px; border-top: 1px solid var(--line); color: var(--faint); font-family: var(--mono); font-size: 8px; }
+
+    .stage { min-width: 0; min-height: calc(100dvh - 58px); background: var(--panel); border-right: 1px solid var(--line); }
+    .stage-head {
+      position: relative;
+      padding: 20px 24px 0;
+      background:
+        linear-gradient(90deg, rgba(36,90,208,.035) 1px, transparent 1px),
+        linear-gradient(rgba(36,90,208,.028) 1px, transparent 1px),
+        var(--panel-strong);
+      background-size: 24px 24px, 24px 24px, auto;
+      border-bottom: 1px solid var(--line);
+    }
+    .stage-head::after {
+      content: "CONTROL SHEET / 01";
+      position: absolute; right: 24px; top: 14px;
+      color: #b3c0c6; font-family: var(--mono); font-size: 7px; letter-spacing: .13em;
+    }
+    .eyebrow { color: var(--blue); font-family: var(--mono); font-size: 8px; letter-spacing: .13em; text-transform: uppercase; }
+    .stage-title-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; margin-top: 5px; }
+    .stage-title { min-width: 0; }
+    .stage-title h1 {
+      margin: 0; font-family: var(--display); font-size: clamp(27px, 2.6vw, 38px);
+      line-height: 1.06; letter-spacing: -.025em; font-weight: 650;
+    }
+    .stage-title p { margin: 7px 0 0; color: var(--muted); font-family: var(--mono); font-size: 9px; overflow-wrap: anywhere; }
+    .stage-actions { display: flex; flex-wrap: wrap; gap: 7px; justify-content: flex-end; }
+    .status-pill {
+      min-height: 32px; display: inline-flex; align-items: center; gap: 6px;
+      padding: 0 9px; border: 1px solid var(--line); background: var(--panel-strong);
+      color: var(--muted); font-family: var(--mono); font-size: 8px; white-space: nowrap;
+    }
+    .status-pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+    .status-pill.running { color: var(--blue); border-color: #b8cdf6; background: var(--blue-soft); }
+    .status-pill.success { color: var(--green); border-color: #b9d8c6; background: var(--green-soft); }
+    .status-pill.waiting { color: var(--amber); border-color: #e4cc99; background: var(--amber-soft); }
+    .status-pill.danger { color: var(--red); border-color: #e2bcb8; background: var(--red-soft); }
+    .stage-tabs { display: flex; gap: 2px; margin-top: 18px; overflow-x: auto; scrollbar-width: thin; }
+    .tab {
+      position: relative; min-height: 44px; padding: 0 13px; border: 0; border-bottom: 2px solid transparent;
+      background: transparent; color: var(--muted); white-space: nowrap; font-size: 10px;
+    }
+    .tab:hover { color: var(--ink); background: rgba(36, 90, 208, .035); }
+    .tab.active { color: var(--blue); border-bottom-color: var(--blue); font-weight: 650; }
+    .tab-lock { margin-left: 5px; color: var(--faint); font-family: var(--mono); font-size: 7px; }
+    .stage-body { padding: 20px 24px 40px; }
+
+    .queue-toggle { display: none; min-height: 38px; padding: 0 10px; border: 1px solid var(--line); background: var(--panel-strong); color: var(--ink-2); font-size: 10px; }
+    .button {
+      min-height: 40px; display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+      padding: 0 13px; border: 1px solid var(--blue); background: var(--blue); color: #fff;
+      font-size: 10px; font-weight: 650; border-radius: var(--radius);
+    }
+    .button:hover { background: var(--blue-deep); border-color: var(--blue-deep); }
+    .button.secondary { color: var(--ink-2); border-color: var(--line); background: var(--panel-strong); font-weight: 550; }
+    .button.secondary:hover { border-color: #9eafb7; background: #fff; }
+    .button.ghost { color: var(--blue); border-color: transparent; background: transparent; padding-inline: 8px; }
+    .button.ghost:hover { background: var(--blue-soft); }
+    .button.danger { color: var(--red); border-color: #d9aba7; background: transparent; }
+    .button.danger:hover { background: var(--red-soft); border-color: var(--red); }
+    .button.small { min-height: 40px; font-size: 9px; padding-inline: 10px; }
+    .button.full { width: 100%; }
+
+    .route-wrap { border: 1px solid var(--line); background: var(--panel-strong); }
+    .route-head { min-height: 37px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 13px; border-bottom: 1px solid var(--line-soft); }
+    .route-head strong { font-family: var(--mono); font-size: 8px; letter-spacing: .09em; color: var(--muted); font-weight: 500; }
+    .route-head span { color: var(--faint); font-family: var(--mono); font-size: 8px; }
+    .route { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); }
+    .route-node { position: relative; min-width: 0; padding: 13px 11px 12px; border-right: 1px solid var(--line-soft); }
+    .route-node:last-child { border-right: 0; }
+    .route-node::after {
+      content: ""; position: absolute; top: 18px; right: -4px; width: 7px; height: 7px;
+      border-radius: 50%; background: var(--line); z-index: 2;
+    }
+    .route-node:last-child::after { display: none; }
+    .route-node .route-index { display: flex; align-items: center; gap: 7px; color: var(--faint); font-family: var(--mono); font-size: 8px; }
+    .route-index b {
+      width: 18px; height: 18px; display: grid; place-items: center;
+      border: 1px solid var(--line); background: var(--panel-soft); color: var(--faint); font-weight: 500;
+    }
+    .route-node strong { display: block; margin-top: 7px; font-size: 10px; color: var(--ink-2); }
+    .route-node small { display: block; margin-top: 3px; color: var(--faint); font-size: 8px; line-height: 1.45; }
+    .route-node.done::after { background: var(--green); }
+    .route-node.done b { color: #fff; border-color: var(--green); background: var(--green); }
+    .route-node.active { background: #f6f9ff; box-shadow: inset 0 -2px 0 var(--blue); }
+    .route-node.active::after { background: var(--blue); }
+    .route-node.active b { color: #fff; border-color: var(--blue); background: var(--blue); }
+    .route-node.ready { background: var(--green-soft); }
+    .route-node.ready::after { background: var(--green); }
+    .route-node.ready b { color: var(--green); border-color: #9bc6ad; background: #fff; }
+    .route-node.fail { background: var(--red-soft); }
+    .route-node.fail::after { background: var(--red); }
+    .route-node.fail b { color: #fff; border-color: var(--red); background: var(--red); }
+    .route-node.fail strong { color: var(--red); }
+
+    .metric-strip { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top: 14px; border: 1px solid var(--line); background: var(--panel-strong); }
+    .metric { min-width: 0; padding: 14px 14px 13px; border-right: 1px solid var(--line-soft); }
+    .metric:last-child { border-right: 0; }
+    .metric small { display: block; color: var(--muted); font-family: var(--mono); font-size: 8px; letter-spacing: .06em; }
+    .metric strong { display: block; margin-top: 6px; font-family: var(--display); font-size: clamp(21px, 2.2vw, 30px); letter-spacing: -.035em; font-weight: 600; line-height: 1; }
+    .metric span { display: block; margin-top: 6px; color: var(--faint); font-size: 8px; line-height: 1.45; }
+    .metric.accent strong { color: var(--blue); }
+
+    .overview-grid { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(260px, .8fr); gap: 14px; margin-top: 14px; }
+    .section { border: 1px solid var(--line); background: var(--panel-strong); min-width: 0; }
+    .section-head { min-height: 52px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 14px; border-bottom: 1px solid var(--line-soft); }
+    .section-head h2 { margin: 0; font-family: var(--display); font-size: 19px; letter-spacing: -.015em; font-weight: 600; }
+    .section-head p { margin: 2px 0 0; color: var(--muted); font-size: 9px; }
+    .section-meta { color: var(--faint); font-family: var(--mono); font-size: 8px; white-space: nowrap; }
+    .chart-wrap { padding: 10px 12px 9px; }
+    .loss-chart { width: 100%; height: auto; min-height: 220px; }
+    .chart-grid { stroke: #dbe4e8; stroke-width: 1; }
+    .chart-axis { fill: #87979f; font-family: var(--mono); font-size: 8px; }
+    .chart-train { fill: none; stroke: var(--blue); stroke-width: 2; }
+    .chart-eval { fill: none; stroke: var(--amber); stroke-width: 1.6; stroke-dasharray: 5 4; }
+    .chart-dot { fill: #fff; stroke: var(--blue); stroke-width: 2; }
+    .chart-dot.eval { stroke: var(--amber); }
+    .chart-marker { stroke: #9cb5e6; stroke-width: 1; stroke-dasharray: 3 3; }
+    .chart-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 15px; padding: 0 12px 10px; color: var(--muted); font-family: var(--mono); font-size: 8px; }
+    .chart-legend i { display: inline-block; width: 16px; height: 2px; margin-right: 5px; vertical-align: middle; background: var(--blue); }
+    .chart-legend .eval i { background: var(--amber); }
+    .chart-legend span:last-child { margin-left: auto; color: var(--faint); }
+    .event-list { list-style: none; margin: 0; padding: 4px 14px 10px; }
+    .event-item { display: grid; grid-template-columns: 52px 9px minmax(0, 1fr); gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--line-soft); }
+    .event-item:last-child { border-bottom: 0; }
+    .event-item time { color: var(--faint); font-family: var(--mono); font-size: 8px; padding-top: 2px; }
+    .event-item i { width: 5px; height: 5px; margin-top: 5px; border-radius: 50%; background: var(--green); }
+    .event-item.warn i { background: var(--amber); }
+    .event-item.bad i { background: var(--red); }
+    .event-item strong { display: block; color: var(--ink-2); font-size: 9px; font-weight: 550; }
+    .event-item p { margin: 2px 0 0; color: var(--muted); font-size: 8px; line-height: 1.55; }
+    .event-foot { padding: 9px 14px; border-top: 1px solid var(--line-soft); }
+    .event-foot .button { width: 100%; }
+
+    .run-brief { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 14px; border: 1px solid var(--line); background: var(--panel-strong); }
+    .run-brief div { min-width: 0; padding: 12px 13px; border-right: 1px solid var(--line-soft); }
+    .run-brief div:last-child { border-right: 0; }
+    .run-brief small { display: block; color: var(--muted); font-family: var(--mono); font-size: 8px; }
+    .run-brief strong { display: block; margin-top: 4px; color: var(--ink-2); font-size: 10px; font-weight: 600; }
+    .run-brief span { display: block; margin-top: 2px; color: var(--faint); font-size: 8px; line-height: 1.55; }
+
+    .artifact-summary { margin-top: 14px; border: 1px solid #b9d0c1; background: var(--green-soft); }
+    .artifact-summary-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 14px 16px; border-bottom: 1px solid #c3dacb; }
+    .artifact-summary-head h2 { margin: 0; font-family: var(--display); font-size: 21px; letter-spacing: -.02em; }
+    .artifact-summary-head p { margin: 3px 0 0; color: var(--muted); font-size: 9px; }
+    .pair-count { color: var(--green); font-family: var(--mono); font-size: 28px; letter-spacing: -.06em; white-space: nowrap; }
+    .pair-rows { background: rgba(255,255,255,.52); }
+    .pair-row { display: grid; grid-template-columns: 76px 90px minmax(0, 1fr) 112px; gap: 12px; align-items: center; padding: 10px 15px; border-bottom: 1px solid #d5e5da; font-size: 9px; }
+    .pair-row:last-child { border-bottom: 0; }
+    .pair-role { color: var(--muted); font-family: var(--mono); font-size: 8px; }
+    .pair-row strong { font-family: var(--mono); font-size: 14px; font-weight: 500; }
+    .pair-row code { color: var(--ink-2); font-family: var(--mono); font-size: 8px; overflow-wrap: anywhere; }
+    .pair-row .button { min-height: 40px; }
+
+    .state-board { min-height: 470px; border: 1px solid var(--line); background: var(--panel-strong); display: grid; place-items: center; padding: 38px 24px; text-align: center; }
+    .state-inner { width: min(520px, 100%); }
+    .state-mark { width: 48px; height: 48px; margin: 0 auto 15px; display: grid; place-items: center; border: 1px solid var(--line); background: var(--panel-soft); color: var(--blue); }
+    .state-board h2 { margin: 0; font-family: var(--display); font-size: 27px; letter-spacing: -.025em; }
+    .state-board p { margin: 8px auto 0; color: var(--muted); font-size: 11px; line-height: 1.75; }
+    .state-board .actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 16px; }
+    .state-path { display: flex; flex-wrap: wrap; justify-content: center; gap: 7px; margin-top: 22px; color: var(--faint); font-family: var(--mono); font-size: 8px; }
+    .state-path span:nth-child(even) { color: #c3cfd4; }
+    .loading-board { min-height: 470px; border: 1px solid var(--line); background: var(--panel-strong); display: grid; place-items: center; }
+    .loader { width: min(430px, 80%); text-align: center; }
+    .loader-head { display: flex; align-items: center; gap: 10px; justify-content: center; color: var(--blue); font-family: var(--mono); font-size: 9px; }
+    .loader-bars { display: flex; align-items: flex-end; gap: 3px; height: 30px; }
+    .loader-bars span { width: 4px; height: 12px; background: var(--blue); animation: bars 1s ease-in-out infinite; }
+    .loader-bars span:nth-child(2) { animation-delay: .12s; }
+    .loader-bars span:nth-child(3) { animation-delay: .24s; }
+    .loader-bars span:nth-child(4) { animation-delay: .36s; }
+    .loader-lines { margin-top: 22px; display: grid; gap: 8px; }
+    .loader-lines i { display: block; height: 12px; background: linear-gradient(90deg, #e6ecee, #f4f7f8, #e6ecee); background-size: 200% 100%; animation: shimmer 1.3s linear infinite; }
+    .loader-lines i:nth-child(2) { width: 76%; margin: 0 auto; }
+    .loader-lines i:nth-child(3) { width: 58%; margin: 0 auto; }
+    @keyframes bars { 0%, 100% { height: 10px; opacity: .35; } 50% { height: 28px; opacity: 1; } }
+    @keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+
+    .error-board { border: 1px solid #dfb9b5; background: #fff9f7; }
+    .error-head { padding: 18px 19px; border-bottom: 1px solid #e7c9c5; background: var(--red-soft); }
+    .error-head .eyebrow { color: var(--red); }
+    .error-head h2 { margin: 6px 0 0; font-family: var(--display); font-size: 28px; letter-spacing: -.025em; }
+    .error-head p { margin: 5px 0 0; color: var(--muted); font-size: 10px; }
+    .error-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(230px, .75fr); }
+    .error-copy { padding: 18px 19px; border-right: 1px solid #e7c9c5; }
+    .error-code { color: var(--red); font-family: var(--mono); font-size: 9px; }
+    .error-copy h3 { margin: 7px 0 6px; font-family: var(--display); font-size: 22px; line-height: 1.2; }
+    .error-copy p { margin: 0; color: var(--muted); font-size: 10px; line-height: 1.8; }
+    .diff-table { margin-top: 14px; border: 1px solid #e2c8c5; background: rgba(255,255,255,.6); }
+    .diff-row { display: grid; grid-template-columns: .8fr 1.1fr 1.1fr; gap: 8px; padding: 8px 9px; border-bottom: 1px solid #edd8d5; font-family: var(--mono); font-size: 8px; }
+    .diff-row:last-child { border-bottom: 0; }
+    .diff-row.head { color: var(--muted); background: var(--red-soft); }
+    .diff-row .bad { color: var(--red); }
+    .recovery { padding: 18px 19px; }
+    .recovery h3 { margin: 0 0 10px; font-family: var(--mono); font-size: 8px; letter-spacing: .08em; color: var(--muted); font-weight: 500; }
+    .recovery-step { display: grid; grid-template-columns: 21px minmax(0, 1fr); gap: 8px; padding: 10px 0; border-top: 1px solid #e7c9c5; }
+    .recovery-step b { width: 19px; height: 19px; display: grid; place-items: center; border: 1px solid #d4a8a3; color: var(--red); font-family: var(--mono); font-size: 8px; font-weight: 500; }
+    .recovery-step strong { display: block; font-size: 9px; font-weight: 550; }
+    .recovery-step span { display: block; margin-top: 2px; color: var(--muted); font-size: 8px; line-height: 1.55; }
+    .recovery .button { margin-top: 12px; width: 100%; }
+
+    .logs-shell { border: 1px solid var(--line); background: var(--panel-strong); }
+    .logs-toolbar { display: flex; flex-wrap: wrap; gap: 7px; padding: 10px; border-bottom: 1px solid var(--line); background: var(--panel-soft); }
+    .logs-toolbar input, .logs-toolbar select {
+      min-height: 40px; border: 1px solid var(--line); background: #fff; color: var(--ink-2);
+      padding: 0 9px; font-size: 9px;
+    }
+    .logs-toolbar input { flex: 1 1 220px; }
+    .follow-toggle { min-height: 40px; display: inline-flex; align-items: center; gap: 6px; padding: 0 10px; border: 1px solid var(--line); color: var(--muted); font-size: 9px; background: #fff; }
+    .follow-toggle input { min-height: 0; }
+    .logs-viewer { min-height: 470px; background: var(--log); color: #cbd9df; font-family: var(--mono); font-size: 9px; line-height: 1.75; }
+    .log-row { display: grid; grid-template-columns: 64px 54px 64px minmax(0, 1fr); gap: 9px; padding: 7px 12px; border-bottom: 1px solid #1f333c; }
+    .log-row:hover { background: #172a32; }
+    .log-row time { color: #708790; }
+    .log-row .level { color: #7dd3a7; }
+    .log-row .level.warn { color: #f0bd68; }
+    .log-row .level.error { color: #ff9d93; }
+    .log-row .source { color: #89b9ff; }
+    .log-row p { margin: 0; overflow-wrap: anywhere; }
+    .log-empty { padding: 50px 18px; text-align: center; color: #738b95; }
+    .logs-foot { padding: 9px 12px; border-top: 1px solid var(--line); color: var(--faint); font-family: var(--mono); font-size: 8px; }
+
+    .metrics-layout { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(260px, .65fr); gap: 14px; }
+    .metrics-chart .chart-wrap { padding-bottom: 2px; }
+    .metrics-chart .loss-chart { min-height: 290px; }
+    .sample-table { width: 100%; border-collapse: collapse; font-size: 9px; }
+    .sample-table th, .sample-table td { padding: 9px 10px; border-bottom: 1px solid var(--line-soft); text-align: left; }
+    .sample-table th { color: var(--muted); background: var(--panel-soft); font-weight: 500; font-family: var(--mono); font-size: 8px; }
+    .sample-table td { font-family: var(--mono); }
+    .sample-table tr:last-child td { border-bottom: 0; }
+    .metrics-note { border: 1px solid var(--line); background: var(--panel-strong); padding: 15px; }
+    .metrics-note h3 { margin: 0 0 10px; font-family: var(--mono); font-size: 8px; letter-spacing: .08em; color: var(--muted); font-weight: 500; }
+    .metrics-note dl { margin: 0; display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 7px 8px; font-size: 9px; }
+    .metrics-note dt { color: var(--muted); }
+    .metrics-note dd { margin: 0; color: var(--ink-2); font-family: var(--mono); overflow-wrap: anywhere; }
+    .honesty-note { margin-top: 12px; padding: 10px; border-left: 2px solid var(--amber); background: var(--amber-soft); color: var(--muted); font-size: 8px; line-height: 1.65; }
+
+    .release-board { border: 1px solid #b7d0c2; background: var(--green-soft); }
+    .release-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 17px 18px; border-bottom: 1px solid #c4dbce; }
+    .release-head .eyebrow { color: var(--green); }
+    .release-head h2 { margin: 5px 0 0; font-family: var(--display); font-size: 27px; letter-spacing: -.025em; }
+    .release-head p { margin: 4px 0 0; color: var(--muted); font-size: 9px; }
+    .release-count { color: var(--green); font-family: var(--mono); font-size: 35px; letter-spacing: -.07em; white-space: nowrap; }
+    .artifact-rows { background: rgba(255,255,255,.66); }
+    .artifact-row { display: grid; grid-template-columns: 74px 96px minmax(0, 1fr) 112px; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid #d6e6db; }
+    .artifact-row:last-child { border-bottom: 0; }
+    .artifact-role { color: var(--muted); font-family: var(--mono); font-size: 8px; letter-spacing: .06em; }
+    .artifact-row strong { display: block; font-family: var(--mono); font-size: 16px; font-weight: 500; }
+    .artifact-row small { display: block; color: var(--faint); font-family: var(--mono); font-size: 8px; }
+    .artifact-row dl { margin: 0; display: grid; grid-template-columns: 68px minmax(0, 1fr); gap: 3px 8px; font-size: 8px; }
+    .artifact-row dt { color: var(--muted); }
+    .artifact-row dd { margin: 0; color: var(--ink-2); font-family: var(--mono); overflow-wrap: anywhere; }
+    .artifact-row .button { min-height: 40px; }
+    .handoff-panel { margin-top: 14px; display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(270px, .85fr); border: 1px solid var(--line); background: var(--panel-strong); }
+    .handoff-copy { padding: 17px 18px; border-right: 1px solid var(--line); }
+    .handoff-copy h2 { margin: 0; font-family: var(--display); font-size: 23px; letter-spacing: -.02em; }
+    .handoff-copy p { margin: 5px 0 0; color: var(--muted); font-size: 9px; line-height: 1.7; }
+    .context-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 12px; }
+    .context-chip { min-height: 26px; display: inline-flex; align-items: center; padding: 0 7px; border: 1px solid #bfd0f5; background: var(--blue-soft); color: var(--blue-deep); font-family: var(--mono); font-size: 8px; }
+    .handoff-action { padding: 17px 18px; display: flex; flex-direction: column; justify-content: center; gap: 8px; background: #f8faff; }
+    .handoff-action small { color: var(--muted); font-size: 8px; line-height: 1.55; }
+
+    .locked-board { border: 1px solid var(--line); background: var(--panel-strong); padding: 18px; }
+    .locked-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; }
+    .locked-head h2 { margin: 0; font-family: var(--display); font-size: 24px; letter-spacing: -.02em; }
+    .locked-head p { margin: 4px 0 0; color: var(--muted); font-size: 9px; }
+    .locked-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 16px; }
+    .locked-card { min-height: 105px; padding: 13px; border: 1px dashed var(--line); background: var(--panel-soft); color: var(--faint); }
+    .locked-card strong { display: block; margin-top: 5px; color: var(--muted); font-family: var(--mono); font-size: 10px; font-weight: 500; }
+    .locked-card p { margin: 6px 0 0; font-size: 8px; line-height: 1.6; }
+    .locked-foot { margin-top: 14px; padding: 11px 12px; border-left: 2px solid var(--blue); background: var(--blue-soft); color: var(--muted); font-size: 9px; line-height: 1.65; }
+
+    .inference-shell { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(240px, .65fr); gap: 14px; }
+    .chat-panel { min-height: 570px; display: flex; flex-direction: column; border: 1px solid var(--line); background: var(--panel-strong); }
+    .chat-head { min-height: 62px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 14px; border-bottom: 1px solid var(--line); }
+    .chat-id { display: flex; align-items: center; gap: 10px; min-width: 0; }
+    .chat-glyph { width: 34px; height: 34px; display: grid; place-items: center; border: 1px solid #bacaf0; background: var(--blue-soft); color: var(--blue); font-family: var(--display); font-size: 18px; }
+    .chat-head h2 { margin: 0; font-family: var(--display); font-size: 20px; letter-spacing: -.015em; }
+    .chat-head p { margin: 2px 0 0; color: var(--muted); font-family: var(--mono); font-size: 8px; }
+    .chat-stream { flex: 1; min-height: 378px; overflow: auto; padding: 15px; background: #fbfcfd; }
+    .chat-welcome { min-height: 300px; display: grid; place-items: center; text-align: center; }
+    .chat-welcome > div { max-width: 460px; }
+    .chat-welcome-mark { width: 44px; height: 44px; display: grid; place-items: center; margin: 0 auto 12px; border: 1px solid #c3d1d8; background: #fff; color: var(--blue); }
+    .chat-welcome strong { display: block; font-family: var(--display); font-size: 23px; letter-spacing: -.02em; }
+    .chat-welcome p { margin: 6px 0 0; color: var(--muted); font-size: 9px; line-height: 1.7; }
+    .prompt-list { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-top: 12px; }
+    .prompt { min-height: 40px; padding: 0 9px; border: 1px solid var(--line); background: #fff; color: var(--ink-2); font-size: 9px; }
+    .prompt:hover { border-color: #9cb1e5; background: var(--blue-soft); }
+    .message { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 9px; margin-bottom: 12px; }
+    .message.user { grid-template-columns: minmax(0, 1fr) 40px; }
+    .message-label { align-self: start; padding-top: 2px; color: var(--faint); font-family: var(--mono); font-size: 7px; letter-spacing: .08em; }
+    .message.user .message-label { order: 2; text-align: right; }
+    .message-body { border: 1px solid var(--line-soft); background: #fff; padding: 10px 12px; }
+    .message.user .message-body { background: var(--blue-soft); border-color: #c7d6f5; }
+    .message-body p { margin: 0; white-space: pre-wrap; font-size: 10px; line-height: 1.75; overflow-wrap: anywhere; }
+    .message.partial .message-body p::after { content: ""; display: inline-block; width: 5px; height: 13px; margin-left: 2px; background: var(--blue); vertical-align: -2px; animation: blink .8s steps(1) infinite; }
+    @keyframes blink { 50% { opacity: 0; } }
+    .composer { padding: 10px 12px 12px; border-top: 1px solid var(--line); background: #fff; }
+    .composer textarea { width: 100%; min-height: 72px; resize: vertical; border: 1px solid var(--line); background: #fbfcfd; color: var(--ink); padding: 9px; font-size: 10px; line-height: 1.6; }
+    .composer-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; }
+    .composer-row small { color: var(--faint); font-size: 8px; }
+    .composer-actions { display: flex; gap: 7px; }
+    .trial-checks { border: 1px solid var(--line); background: var(--panel-strong); }
+    .trial-checks .section-head { min-height: 48px; }
+    .check-list { list-style: none; margin: 0; padding: 2px 14px 10px; }
+    .check-item { display: grid; grid-template-columns: 19px minmax(0, 1fr); gap: 8px; padding: 11px 0; border-bottom: 1px solid var(--line-soft); font-size: 9px; }
+    .check-item:last-child { border-bottom: 0; }
+    .check-item b { width: 17px; height: 17px; display: grid; place-items: center; border: 1px solid #b6d3c3; color: var(--green); font-family: var(--mono); font-size: 8px; font-weight: 500; }
+    .check-item.wait b { color: var(--amber); border-color: #dfc58f; }
+    .check-item strong { display: block; color: var(--ink-2); font-weight: 550; }
+    .check-item span { display: block; margin-top: 2px; color: var(--faint); font-size: 8px; line-height: 1.55; }
+    .trial-identity { margin-top: 12px; border: 1px solid var(--line); background: var(--panel-strong); }
+    .trial-identity dl { margin: 0; padding: 9px 14px 12px; display: grid; grid-template-columns: 72px minmax(0, 1fr); gap: 6px 8px; font-size: 8px; }
+    .trial-identity dt { color: var(--muted); }
+    .trial-identity dd { margin: 0; color: var(--ink-2); font-family: var(--mono); overflow-wrap: anywhere; }
+
+    .create-mode .workspace { grid-template-columns: minmax(0, 1fr); }
+    .create-mode .ledger, .create-mode .command { display: none; }
+    .create-mode .stage { grid-column: 1; border-right: 0; }
+    .create-stage { padding: 4px 2px 30px; }
+    .create-title-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
+    .create-title-row .eyebrow { color: var(--blue); }
+    .create-title-row h1 { margin: 6px 0 0; font-family: var(--display); font-size: 31px; letter-spacing: -.03em; }
+    .create-title-row p { margin: 5px 0 0; color: var(--muted); font-size: 9px; }
+    .create-layout { display: grid; grid-template-columns: 196px minmax(0, 1fr) 280px; gap: 16px; align-items: start; margin-top: 16px; }
+    .step-rail { border: 1px solid var(--line); background: var(--panel-strong); }
+    .step-rail button {
+      width: 100%; min-height: 60px; display: grid; grid-template-columns: 25px minmax(0, 1fr); gap: 8px;
+      align-items: center; padding: 9px 11px; border: 0; border-bottom: 1px solid var(--line-soft);
+      background: transparent; color: var(--muted); text-align: left;
+    }
+    .step-rail button:last-child { border-bottom: 0; }
+    .step-rail button:hover { background: var(--panel-soft); }
+    .step-rail button.active { background: var(--blue-soft); box-shadow: inset 2px 0 0 var(--blue); }
+    .step-rail button.done b { color: #fff; border-color: var(--green); background: var(--green); }
+    .step-rail b { width: 22px; height: 22px; display: grid; place-items: center; border: 1px solid var(--line); color: var(--faint); font-family: var(--mono); font-size: 8px; font-weight: 500; }
+    .step-rail strong { display: block; color: var(--ink-2); font-size: 10px; font-weight: 550; }
+    .step-rail span { display: block; margin-top: 2px; color: var(--faint); font-size: 8px; line-height: 1.45; }
+    .step-rail .active strong { color: var(--blue-deep); }
+    .step-rail-foot { padding: 11px; border-top: 1px solid var(--line); color: var(--faint); font-size: 8px; line-height: 1.6; }
+    .create-card { border: 1px solid var(--line); background: var(--panel-strong); }
+    .create-card-head { padding: 16px 18px 13px; border-bottom: 1px solid var(--line-soft); }
+    .create-card-head small { color: var(--blue); font-family: var(--mono); font-size: 8px; letter-spacing: .1em; }
+    .create-card-head h2 { margin: 4px 0 0; font-family: var(--display); font-size: 25px; letter-spacing: -.025em; }
+    .create-card-head p { margin: 4px 0 0; color: var(--muted); font-size: 9px; line-height: 1.65; }
+    .create-body { padding: 18px; }
+    .error-summary { display: none; margin-bottom: 14px; padding: 11px 12px; border: 1px solid #e4b7b1; background: var(--red-soft); color: var(--red); font-size: 9px; }
+    .error-summary.show { display: block; }
+    .field { display: grid; gap: 5px; margin-bottom: 14px; }
+    .field label { color: var(--ink-2); font-size: 9px; font-weight: 550; }
+    .field input { min-height: 40px; border: 1px solid var(--line); background: #fff; color: var(--ink); padding: 0 9px; font-size: 10px; }
+    .field small { color: var(--faint); font-size: 8px; line-height: 1.55; }
+    .field.invalid input { border-color: var(--red); }
+    .field .field-error { display: none; color: var(--red); font-size: 8px; }
+    .field.invalid .field-error { display: block; }
+    .choice-card { display: grid; grid-template-columns: 17px minmax(0, 1fr) auto; gap: 10px; align-items: start; padding: 13px; margin-bottom: 8px; border: 1px solid var(--line); background: #fff; }
+    .choice-card.selected { border-color: #95b3eb; box-shadow: inset 3px 0 0 var(--blue); }
+    .choice-radio { width: 15px; height: 15px; margin-top: 2px; border: 1px solid var(--line); border-radius: 50%; display: grid; place-items: center; }
+    .choice-card.selected .choice-radio::after { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--blue); }
+    .choice-card strong { display: block; font-size: 10px; }
+    .choice-card p { margin: 4px 0 0; color: var(--muted); font-size: 8px; line-height: 1.65; }
+    .tag { min-height: 21px; display: inline-flex; align-items: center; padding: 0 6px; border: 1px solid var(--line); color: var(--muted); font-family: var(--mono); font-size: 7px; white-space: nowrap; }
+    .tag.good { color: var(--green); border-color: #b9d8c6; background: var(--green-soft); }
+    .tag.warn { color: var(--amber); border-color: #e2c894; background: var(--amber-soft); }
+    .plan-card { border: 1px solid var(--line); background: #fff; }
+    .plan-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 12px 13px; border-bottom: 1px solid var(--line-soft); }
+    .plan-head strong { display: block; font-family: var(--mono); font-size: 9px; }
+    .plan-head p { margin: 3px 0 0; color: var(--muted); font-size: 8px; }
+    .plan-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .plan-grid div { padding: 10px 13px; border-right: 1px solid var(--line-soft); border-bottom: 1px solid var(--line-soft); }
+    .plan-grid div:nth-child(2n) { border-right: 0; }
+    .plan-grid div:nth-last-child(-n+2) { border-bottom: 0; }
+    .plan-grid small { display: block; color: var(--faint); font-size: 8px; }
+    .plan-grid span { display: block; margin-top: 2px; color: var(--ink-2); font-size: 9px; }
+    .boundary-callout { display: grid; grid-template-columns: 21px minmax(0, 1fr); gap: 9px; padding: 11px 12px; margin-top: 13px; border-left: 2px solid var(--amber); background: var(--amber-soft); color: var(--muted); font-size: 8px; line-height: 1.65; }
+    .boundary-callout strong { color: var(--ink-2); }
+    .param-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border: 1px solid var(--line); }
+    .param-cell { min-height: 66px; padding: 10px; border-right: 1px solid var(--line-soft); border-bottom: 1px solid var(--line-soft); background: #fff; }
+    .param-cell:nth-child(3n) { border-right: 0; }
+    .param-cell:nth-last-child(-n+3) { border-bottom: 0; }
+    .param-cell small { display: flex; justify-content: space-between; gap: 6px; color: var(--muted); font-size: 8px; }
+    .param-cell small em { color: var(--faint); font-style: normal; font-family: var(--mono); font-size: 7px; }
+    .param-cell strong { display: block; margin-top: 5px; font-family: var(--mono); font-size: 12px; font-weight: 500; }
+    .param-cell.locked { background: var(--panel-soft); }
+    .review-facts { border: 1px solid var(--line); background: #fff; }
+    .review-fact { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--line-soft); font-size: 8px; }
+    .review-fact:last-child { border-bottom: 0; }
+    .review-fact span { color: var(--muted); }
+    .review-fact strong { color: var(--ink-2); font-family: var(--mono); font-weight: 400; overflow-wrap: anywhere; }
+    .create-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 18px; border-top: 1px solid var(--line); background: var(--panel-soft); }
+    .create-foot small { color: var(--faint); font-size: 8px; }
+    .manifest { position: sticky; top: 75px; border: 1px solid var(--line); background: var(--panel-strong); }
+    .manifest-head { padding: 14px 14px 12px; background: var(--graphite); color: #eaf1f3; }
+    .manifest-head small { display: block; color: #93a7b1; font-family: var(--mono); font-size: 8px; letter-spacing: .1em; }
+    .manifest-head strong { display: block; margin-top: 3px; font-family: var(--display); font-size: 19px; }
+    .manifest-body { padding: 5px 14px 11px; }
+    .manifest-row { display: grid; grid-template-columns: 68px minmax(0, 1fr); gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--line-soft); font-size: 8px; }
+    .manifest-row:last-child { border-bottom: 0; }
+    .manifest-row span { color: var(--muted); }
+    .manifest-row strong { color: var(--ink-2); font-family: var(--mono); font-weight: 400; overflow-wrap: anywhere; }
+    .manifest-foot { padding: 10px 12px; border-top: 1px solid var(--line); color: var(--faint); font-size: 8px; line-height: 1.6; }
+
+    .command { position: sticky; top: 58px; height: calc(100dvh - 58px); overflow: auto; padding: 17px 15px 28px; background: #f4f7f8; border-left: 1px solid var(--line); }
+    .command-kicker { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--muted); font-family: var(--mono); font-size: 8px; letter-spacing: .1em; }
+    .command-kicker i { width: 7px; height: 7px; border-radius: 50%; background: var(--blue); }
+    .command h2 { margin: 7px 0 0; font-family: var(--display); font-size: 23px; line-height: 1.1; letter-spacing: -.02em; }
+    .next-card { margin-top: 10px; padding: 14px; border: 1px solid #b9c9f3; background: var(--blue-soft); }
+    .next-card .next-label { color: var(--blue); font-family: var(--mono); font-size: 8px; letter-spacing: .08em; }
+    .next-card strong { display: block; margin-top: 6px; color: var(--ink); font-size: 12px; font-weight: 650; }
+    .next-card p { margin: 5px 0 0; color: var(--muted); font-size: 9px; line-height: 1.65; }
+    .next-card .button { width: 100%; margin-top: 11px; }
+    .next-card.danger { border-color: #e4c0bc; background: var(--red-soft); }
+    .next-card.danger .next-label { color: var(--red); }
+    .next-card.success { border-color: #b9d8c6; background: var(--green-soft); }
+    .next-card.success .next-label { color: var(--green); }
+    .next-card.waiting { border-color: #e3cc9c; background: var(--amber-soft); }
+    .next-card.waiting .next-label { color: var(--amber); }
+    .command-section { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); }
+    .command-section h3 { margin: 0 0 9px; color: var(--muted); font-family: var(--mono); font-size: 8px; font-weight: 500; letter-spacing: .09em; }
+    .gate-list { list-style: none; margin: 0; padding: 0; }
+    .gate-item { display: grid; grid-template-columns: 17px minmax(0, 1fr) auto; gap: 7px; align-items: start; padding: 8px 0; border-bottom: 1px solid var(--line-soft); }
+    .gate-item:last-child { border-bottom: 0; }
+    .gate-item b { width: 16px; height: 16px; display: grid; place-items: center; border: 1px solid #acd0ba; color: var(--green); font-family: var(--mono); font-size: 7px; font-weight: 500; }
+    .gate-item.wait b { color: var(--amber); border-color: #e0c994; }
+    .gate-item.fail b { color: var(--red); border-color: #deb5b0; }
+    .gate-item strong { display: block; color: var(--ink-2); font-size: 9px; font-weight: 550; }
+    .gate-item span { display: block; margin-top: 2px; color: var(--faint); font-size: 8px; line-height: 1.45; }
+    .gate-item em { color: var(--faint); font-family: var(--mono); font-size: 7px; font-style: normal; white-space: nowrap; }
+    .command-facts { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 6px 7px; margin: 0; font-size: 8px; }
+    .command-facts dt { color: var(--muted); }
+    .command-facts dd { margin: 0; color: var(--ink-2); font-family: var(--mono); overflow-wrap: anywhere; }
+    .boundary-note { margin-top: 15px; padding: 9px 10px; border: 1px solid var(--line); background: var(--panel-strong); color: var(--muted); font-size: 8px; line-height: 1.65; }
+    .boundary-note strong { color: var(--amber); font-weight: 550; }
+    .mobile-action { display: none; }
+
+    .toast {
+      position: fixed; left: 50%; bottom: 24px; z-index: 80; transform: translate(-50%, 10px);
+      min-width: 220px; max-width: calc(100vw - 28px); padding: 10px 14px;
+      border: 1px solid #60747e; background: #1a2b34; color: #f0f5f7; box-shadow: var(--shadow);
+      font-size: 10px; text-align: center; opacity: 0; pointer-events: none; transition: .18s ease;
+    }
+    .toast.show { opacity: 1; transform: translate(-50%, 0); }
+    .dialog { width: min(560px, calc(100vw - 28px)); padding: 0; border: 1px solid #9aabb4; background: var(--panel-strong); color: var(--ink); box-shadow: 0 30px 90px rgba(15, 28, 35, .26); }
+    .dialog::backdrop { background: rgba(10, 21, 27, .58); }
+    .dialog-head { padding: 18px 20px 0; }
+    .dialog-head small { color: var(--blue); font-family: var(--mono); font-size: 8px; letter-spacing: .1em; }
+    .dialog-head h2 { margin: 5px 0 0; font-family: var(--display); font-size: 25px; letter-spacing: -.02em; }
+    .dialog-body { padding: 11px 20px 17px; color: var(--ink-2); font-size: 10px; line-height: 1.75; }
+    .dialog-body p { margin: 0; }
+    .dialog-note { margin-top: 11px; padding: 10px; border-left: 2px solid var(--blue); background: var(--blue-soft); color: var(--muted); font-size: 9px; }
+    .dialog-note.warn { border-left-color: var(--amber); background: var(--amber-soft); }
+    .dialog-field { display: grid; gap: 5px; margin-top: 13px; }
+    .dialog-field label { color: var(--ink-2); font-size: 9px; font-weight: 550; }
+    .dialog-field input { min-height: 40px; border: 1px solid var(--line); padding: 0 9px; background: #fff; }
+    .dialog-check { display: flex; gap: 8px; align-items: flex-start; margin-top: 11px; color: var(--muted); font-size: 9px; line-height: 1.6; }
+    .dialog-check input { margin-top: 3px; }
+    .dialog-actions { display: flex; justify-content: flex-end; gap: 7px; padding: 12px 20px 18px; border-top: 1px solid var(--line); }
+
+    @media (max-width: 1280px) {
+      .app { grid-template-columns: 72px minmax(0, 1fr); }
+      .sidebar { padding-inline: 8px; }
+      .workspace-label { padding-inline: 5px; }
+      .workspace-label strong, .workspace-label small, .nav-item span:not(.nav-index), .side-caption, .sidebar-foot { display: none; }
+      .nav-item { justify-content: center; padding: 0; }
+      .nav-item .nav-index { margin-left: 0; position: absolute; right: 4px; top: 4px; font-size: 7px; }
+      .workspace { grid-template-columns: 230px minmax(0, 1fr) 268px; }
+    }
+    @media (max-width: 1100px) {
+      .workspace { grid-template-columns: 220px minmax(0, 1fr); }
+      .command { grid-column: 2; position: static; height: auto; overflow: visible; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 18px; border-left: 0; border-top: 1px solid var(--line); }
+      .command > .command-kicker, .command > h2, .command > .next-card { grid-column: 1 / 3; }
+      .command-section { margin-top: 12px; }
+      .boundary-note { grid-column: 1 / 3; }
+      .stage { border-right: 0; }
+      .overview-grid { grid-template-columns: 1fr; }
+      .create-layout { grid-template-columns: 176px minmax(0, 1fr); }
+      .manifest { display: none; }
+    }
+    @media (max-width: 900px) {
+      .queue-toggle { display: inline-flex; align-items: center; }
+      .workspace { display: block; }
+      .ledger {
+        display: none; position: fixed; top: 66px; left: 10px; right: 10px; z-index: 60;
+        height: auto; max-height: 76dvh; border: 1px solid #8fa2ab; box-shadow: var(--shadow);
+      }
+      .workspace.queue-open .ledger { display: block; }
+      .ledger.close-hint::after { content: ""; }
+      .queue-close { display: grid; }
+      .stage { min-height: 0; }
+      .command { display: grid; }
+      .mobile-action { display: none; }
+      .inference-shell { grid-template-columns: 1fr; }
+      .trial-checks { display: none; }
+      .metrics-layout, .handoff-panel, .error-grid { grid-template-columns: 1fr; }
+      .error-copy { border-right: 0; border-bottom: 1px solid #e7c9c5; }
+      .handoff-copy { border-right: 0; border-bottom: 1px solid var(--line); }
+      .create-layout { grid-template-columns: 1fr; }
+      .step-rail { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+      .step-rail button { border-right: 1px solid var(--line-soft); border-bottom: 0; grid-template-columns: 20px minmax(0, 1fr); min-height: 54px; }
+      .step-rail button:last-child { border-right: 0; }
+      .step-rail span, .step-rail-foot { display: none; }
+    }
+    @media (max-width: 760px) {
+      .topbar { flex-wrap: wrap; min-height: 56px; padding: 6px 12px; gap: 8px 14px; }
+      .brand { min-width: 0; }
+      .crumb { order: 4; width: 100%; font-size: 8px; }
+      .top-actions { gap: 6px; }
+      .connection, .snapshot-time { display: none; }
+      .scenario-select { max-width: 124px; }
+      .top-button { padding-inline: 9px; }
+      .app { display: block; }
+      .sidebar { display: none; }
+      .stage { padding-bottom: 88px; }
+      .stage-head { padding: 15px 14px 0; }
+      .stage-head::after { display: none; }
+      .stage-title-row { flex-direction: column; gap: 10px; }
+      .stage-actions { justify-content: flex-start; }
+      .stage-title h1 { font-size: 29px; }
+      .stage-body { padding: 13px 12px 92px; }
+      .route { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .route-node { border-bottom: 1px solid var(--line-soft); }
+      .route-node::after { display: none; }
+      .route-node:nth-last-child(-n+2) { border-bottom: 0; }
+      .metric-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .metric:nth-child(2) { border-right: 0; }
+      .metric:nth-child(-n+2) { border-bottom: 1px solid var(--line-soft); }
+      .overview-grid, .metrics-layout { grid-template-columns: 1fr; }
+      .run-brief { grid-template-columns: 1fr; }
+      .run-brief div { border-right: 0; border-bottom: 1px solid var(--line-soft); }
+      .run-brief div:last-child { border-bottom: 0; }
+      .pair-row, .artifact-row { grid-template-columns: 60px 88px minmax(0, 1fr); }
+      .pair-row .button, .artifact-row .button { grid-column: 1 / 4; justify-self: start; }
+      .locked-pair { grid-template-columns: 1fr; }
+      .chat-panel { min-height: 540px; }
+      .chat-stream { min-height: 330px; }
+      .composer-row { align-items: stretch; flex-direction: column; }
+      .composer-actions .button { flex: 1; }
+      .command { display: none; }
+      .mobile-action {
+        position: fixed; left: 0; right: 0; bottom: 0; z-index: 55;
+        display: flex; align-items: center; justify-content: space-between; gap: 12px;
+        padding: 10px 12px; border-top: 1px solid #aebbc2;
+        background: rgba(248, 250, 251, .97); backdrop-filter: blur(10px); box-shadow: 0 -8px 26px rgba(20,35,43,.1);
+      }
+      .mobile-action-copy { min-width: 0; }
+      .mobile-action small { display: block; color: var(--faint); font-family: var(--mono); font-size: 7px; letter-spacing: .08em; }
+      .mobile-action strong { display: block; margin-top: 1px; color: var(--ink-2); font-size: 10px; font-weight: 550; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .mobile-action .button { flex: 0 0 auto; max-width: 52%; }
+      .create-stage { padding-bottom: 20px; }
+      .create-title-row { flex-direction: column; gap: 9px; }
+      .create-title-row h1 { font-size: 27px; }
+      .create-layout { margin-top: 12px; }
+      .step-rail button { padding: 7px 5px; grid-template-columns: 18px minmax(0, 1fr); min-height: 52px; gap: 5px; }
+      .step-rail b { width: 18px; height: 18px; }
+      .step-rail strong { font-size: 8px; line-height: 1.35; }
+      .create-body { padding: 14px; }
+      .param-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .param-cell:nth-child(3n) { border-right: 1px solid var(--line-soft); }
+      .param-cell:nth-child(2n) { border-right: 0; }
+      .param-cell:nth-last-child(-n+3) { border-bottom: 1px solid var(--line-soft); }
+      .param-cell:nth-last-child(-n+2) { border-bottom: 0; }
+      .create-foot { align-items: stretch; flex-direction: column; }
+      .create-foot .actions { display: flex; gap: 7px; }
+      .create-foot .actions .button { flex: 1; }
+      .log-row { grid-template-columns: 56px 42px minmax(0, 1fr); padding-inline: 8px; }
+      .log-row .source { display: none; }
+      .toast { bottom: 82px; }
+    }
+    @media (max-width: 460px) {
+      .brand small { display: none; }
+      .brand strong { font-size: 12px; }
+      .top-actions .scenario-select { max-width: 100px; font-size: 7px; }
+      .top-button { font-size: 9px; }
+      .stage-tabs { margin-inline: -14px; padding-inline: 6px; }
+      .tab { min-width: 44px; justify-content: center; padding-inline: 10px; font-size: 9px; }
+      .stage-title h1 { font-size: 26px; }
+      .stage-title p { font-size: 8px; }
+      .route-node { padding: 10px 9px; }
+      .pair-row, .artifact-row { grid-template-columns: 1fr 1fr; }
+      .pair-row code, .artifact-row dl { grid-column: 1 / 3; }
+      .pair-row .button, .artifact-row .button { grid-column: 1 / 3; }
+      .chat-head { align-items: flex-start; }
+      .chat-head .status-pill { display: none; }
+      .message { grid-template-columns: 28px minmax(0, 1fr); }
+      .message.user { grid-template-columns: minmax(0, 1fr) 28px; }
+      .prompt-list { flex-direction: column; }
+      .prompt { width: 100%; }
+      .step-rail { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .step-rail button:nth-child(2) { border-right: 0; }
+      .step-rail button:nth-child(-n+2) { border-bottom: 1px solid var(--line-soft); }
+      .plan-grid { grid-template-columns: 1fr; }
+      .plan-grid div { border-right: 0; }
+      .plan-grid div:nth-last-child(-n+2) { border-bottom: 1px solid var(--line-soft); }
+      .plan-grid div:last-child { border-bottom: 0; }
+      .dialog-actions { flex-direction: column-reverse; }
+      .dialog-actions .button { width: 100%; }
+      .mobile-action .button { max-width: 58%; font-size: 9px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <dialog class="dialog" id="action-dialog" aria-labelledby="dialog-title"></dialog>
+  <script>
+    const icons = {
+      grid: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/></svg>',
+      data: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v16H4zM8 8h8M8 12h8M8 16h5"/></svg>',
+      model: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5-9 5-9-5 9-5zM3 12l9 5 9-5M3 16l9 5 9-5"/></svg>',
+      compute: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v12H4zM8 20h8M12 16v4M8 8h8"/></svg>',
+      train: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18l6-6 4 3 6-10M14 5h6v6"/></svg>',
+      serving: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14v13H9l-4 3V5zM8 9h8M8 13h5"/></svg>',
+      plus: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>',
+      search: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg>',
+      refresh: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 6M20 4v7h-7"/></svg>',
+      terminal: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4zM7 9l3 3-3 3M12 15h5"/></svg>',
+      arrow: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5"/></svg>',
+      back: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5m5-5-5 5 5 5"/></svg>',
+      download: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v13m-5-5 5 5 5-5M5 21h14"/></svg>',
+      play: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5 11 7-11 7V5z"/></svg>',
+      stop: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6h12v12H6z"/></svg>',
+      close: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>',
+      shield: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3zM9 12l2 2 4-4"/></svg>',
+      alert: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 2 21h20L12 3zm0 6v6m0 3h.01"/></svg>',
+      check: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>',
+      copy: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 8h11v12H8zM5 16H4V4h11v1"/></svg>',
+      pause: '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14"/></svg>'
+    };
+    const icon = (name) => icons[name] || '';
+
+    const scenarios = ['running', 'success', 'waiting', 'error', 'trial_error', 'loading', 'empty'];
+    const views = ['overview', 'metrics', 'logs', 'artifacts', 'inference', 'create'];
+    const scenarioLabels = {
+      running: '训练中', success: '产物可验收', waiting: '等待实例', error: '失败诊断',
+      trial_error: '推理失败', loading: '读取中', empty: '空工作区'
+    };
+    const params = new URLSearchParams(location.search);
+    let initialScenario = scenarios.includes(params.get('scenario')) ? params.get('scenario') : 'running';
+    let initialView = views.includes(params.get('view')) ? params.get('view') : '';
+    if (!initialView) initialView = initialScenario === 'success' ? 'artifacts' : initialScenario === 'trial_error' ? 'inference' : 'overview';
+    if (initialView === 'inference' && !params.get('scenario')) initialScenario = 'success';
+    const state = {
+      scenario: initialScenario,
+      view: initialView,
+      queueOpen: false,
+      search: '',
+      logQuery: '',
+      logLevel: 'all',
+      follow: true,
+      chat: [],
+      chatDraft: '',
+      sending: false,
+      streamTimer: null,
+      messagePartial: false,
+      wizardStep: Math.min(4, Math.max(1, Number(params.get('step') || 1))),
+      taskName: '客服意图 LoRA · 实验 08',
+      formError: '',
+      creating: false,
+      cancelRequested: false,
+      cleanupRequested: false,
+      trialStopped: false,
+      autoConfirm: params.get('confirm') === '1'
+    };
+
+    const runs = {
+      current: {
+        id: '8e024600-d9a8-43cf-a159-cde62f6e4a1b', short: '8e024600', attempt: 7,
+        title: '客服意图 LoRA · qwen3', dataset: '客服意图训练集 v3', split: '1,116 / 124',
+        splitHash: 'split-4f82b9d1', base: 'Qwen3-0.6B', baseFingerprint: 'Qwen3-0.6B-20261102-r1',
+        hardware: 'RTX 4090 · cn-bj2-02', instance: 'u-4090-02-7fca', lease: 'lease-7f2a-4b91',
+        step: 80, total: 168, train: '0.4362', eval: '0.3218', lr: '1.64e-4',
+        best: '0.3218', bestStep: 80, final: '—', updated: '10:32:12', source: 'current'
+      },
+      previous: {
+        id: '5bb29e33-7f27-4f5f-b968-2d02bcbd5821', short: '5bb29e33', attempt: 6,
+        title: '客服意图 LoRA · 基线复测', dataset: '客服意图训练集 v3', split: '1,116 / 124',
+        splitHash: 'split-4f82b9d1', base: 'Qwen3-0.6B', baseFingerprint: 'Qwen3-0.6B-20261102-r1',
+        hardware: 'RTX 4090 · cn-bj2-02', instance: 'u-4090-08-12ab', lease: 'lease-6c82-3a11',
+        step: 168, total: 168, train: '0.4127', eval: '0.3389', lr: '1.03e-5',
+        best: '0.3218', bestStep: 80, final: '0.3389', updated: '昨天 18:42', source: 'previous'
+      },
+      waiting: {
+        id: 'ce40a491-0d23-4f47-85b1-bb7af0dc3902', short: 'ce40a491', attempt: 2,
+        title: '意图分类 · 对照 preset', dataset: '客服意图训练集 v3', split: '1,116 / 124',
+        splitHash: 'split-4f82b9d1', base: 'Qwen3-0.6B', baseFingerprint: 'Qwen3-0.6B-20261102-r1',
+        hardware: 'RTX 4090 · 待绑定', instance: '尚未绑定', lease: '尚未建立',
+        step: null, total: 168, train: '—', eval: '—', lr: '—',
+        best: '—', bestStep: null, final: '—', updated: '昨天 16:10', source: 'waiting'
+      },
+      failed: {
+        id: 'c27f9844-b76f-4ac3-90e0-970c6cd65f07', short: 'c27f9844', attempt: 1,
+        title: '意图分类 · 运行时诊断', dataset: '客服意图训练集 v3', split: '1,116 / 124',
+        splitHash: 'split-4f82b9d1', base: 'Qwen3-0.6B', baseFingerprint: 'Qwen3-0.6B-20261102-r1',
+        hardware: 'RTX 4090 · cn-bj2-02', instance: 'u-4090-03-84bc', lease: 'lease-9e11-22c7',
+        step: null, total: 168, train: '—', eval: '—', lr: '—',
+        best: '—', bestStep: null, final: '—', updated: '昨天 15:28', source: 'failed'
+      }
+    };
+
+    const metricSamples = [
+      { step: 20, epoch: 0.24, train: 0.7821, eval: 0.6632, lr: '2.00e-4' },
+      { step: 40, epoch: 0.48, train: 0.6153, eval: 0.5114, lr: '1.94e-4' },
+      { step: 60, epoch: 0.71, train: 0.5148, eval: 0.4239, lr: '1.82e-4' },
+      { step: 80, epoch: 0.95, train: 0.4362, eval: 0.3218, lr: '1.64e-4' }
+    ];
+
+    const logRows = [
+      ['10:28:04', 'INFO', 'WORKER', '远程工作目录已准备；实例 u-4090-02-7fca 通过清理授权。'],
+      ['10:28:11', 'INFO', 'WORKER', '数据集 v3 已挂载；split-4f82b9d1 与冻结快照一致。'],
+      ['10:28:14', 'INFO', 'WORKER', '基座指纹 Qwen3-0.6B-20261102-r1 匹配。'],
+      ['10:28:39', 'INFO', 'TRAINER', 'llamafactory training started · epochs=1 · cutoff_len=512 · lora_r=8'],
+      ['10:31:56', 'INFO', 'TRAINER', 'step 20/168 · loss 0.7821 · eval_loss 0.6632 · lr 2.00e-4'],
+      ['10:32:02', 'INFO', 'TRAINER', 'step 40/168 · loss 0.6153 · eval_loss 0.5114 · lr 1.94e-4'],
+      ['10:32:08', 'INFO', 'TRAINER', 'step 60/168 · loss 0.5148 · eval_loss 0.4239 · lr 1.82e-4'],
+      ['10:32:12', 'INFO', 'TRAINER', 'step 80/168 · loss 0.4362 · eval_loss 0.3218 · lr 1.64e-4']
+    ];
+
+    const successLogRows = [
+      ...logRows,
+      ['11:08:40', 'INFO', 'TRAINER', '训练进程退出，exit code 0；outcome=succeeded。'],
+      ['11:08:41', 'INFO', 'SYNC', 'Best Adapter adapter-best-06 写入 MinIO，回读校验通过。'],
+      ['11:08:43', 'INFO', 'SYNC', 'Final Adapter adapter-final-06 写入 MinIO，回读校验通过。'],
+      ['11:09:03', 'INFO', 'CLEANUP', '实例已删除，租约已释放；推理 GPU 门禁打开。']
+    ];
+
+    const failedLogRows = [
+      ['15:27:51', 'INFO', 'WORKER', '收到手动实例 u-4090-03-84bc 绑定与清理授权。'],
+      ['15:28:02', 'WARN', 'PREFLIGHT', '实例镜像 img-cuda-12.2 与方案镜像不一致。'],
+      ['15:28:05', 'ERROR', 'PREFLIGHT', 'runtime_incompatible：训练在启动前终止，未产生 Loss 或 Adapter。'],
+      ['15:28:06', 'WARN', 'CLEANUP', '实例仍保留，等待人工确认回收与租约释放。']
+    ];
+
+    const scenarioRun = {
+      running: 'current', success: 'previous', waiting: 'waiting', error: 'failed',
+      trial_error: 'previous', loading: 'current', empty: null
+    };
+    const activeRun = () => runs[scenarioRun[state.scenario]] || null;
+    const isSuccess = () => state.scenario === 'success';
+    const isTrialError = () => state.scenario === 'trial_error';
+    const isFailure = () => state.scenario === 'error' || state.scenario === 'trial_error';
+
+    function esc(value) {
+      return String(value).replace(/[&<>"']/g, (char) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+    }
+    function statusMeta(run) {
+      if (state.scenario === 'running') return {tone: 'running', label: 'RUNNING / 训练中', short: 'RUNNING'};
+      if (state.scenario === 'success') return {tone: 'success', label: 'READY / 产物可验收', short: 'READY'};
+      if (state.scenario === 'waiting') return {tone: 'waiting', label: 'WAITING / 等待实例', short: 'WAITING'};
+      if (state.scenario === 'error') return {tone: 'danger', label: 'ATTENTION / 失败诊断', short: 'ATTENTION'};
+      if (state.scenario === 'trial_error') return {tone: 'danger', label: 'BLOCKED / 推理失败', short: 'BLOCKED'};
+      if (state.scenario === 'loading') return {tone: '', label: 'SYNCING / 读取中', short: 'SYNC'};
+      return {tone: '', label: 'IDLE / 空工作区', short: 'IDLE'};
+    }
+    function runStatusMeta(run) {
+      if (run.source === 'current') return statusMeta();
+      if (run.source === 'previous') return {tone: 'success', label: 'READY / 可验收', short: 'READY'};
+      if (run.source === 'waiting') return {tone: 'waiting', label: 'WAITING / 等待实例', short: 'WAITING'};
+      return {tone: 'danger', label: 'ATTENTION / 失败', short: 'ATTENTION'};
+    }
+    function queueStatus(run) {
+      if (run.source === 'current') return {tone: 'running', label: '训练中'};
+      if (run.source === 'previous') return {tone: 'success', label: '可验收'};
+      if (run.source === 'waiting') return {tone: 'waiting', label: '等待实例'};
+      return {tone: 'danger', label: '需处理'};
+    }
+    function statusPill(meta) {
+      return `<span class="status-pill ${meta.tone}">${meta.label}</span>`;
+    }
+    function toast(message) {
+      const node = document.getElementById('toast');
+      node.textContent = message;
+      node.classList.add('show');
+      clearTimeout(window.__forgeToast);
+      window.__forgeToast = setTimeout(() => node.classList.remove('show'), 3200);
+    }
+    function updateUrl() {
+      const q = new URLSearchParams();
+      if (state.scenario !== 'running') q.set('scenario', state.scenario);
+      if (state.view !== 'overview') q.set('view', state.view);
+      if (state.view === 'create' && state.wizardStep !== 1) q.set('step', String(state.wizardStep));
+      history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q.toString() : ''));
+    }
+    function setView(view, options = {}) {
+      state.view = view;
+      if (options.step) state.wizardStep = options.step;
+      if (view !== 'create') state.queueOpen = false;
+      updateUrl();
+      render();
+      window.scrollTo({top: 0, behavior: 'smooth'});
+    }
+    function setScenario(scenario) {
+      state.scenario = scenario;
+      state.trialStopped = false;
+      state.cancelRequested = false;
+      state.cleanupRequested = false;
+      if (scenario === 'success') state.view = 'artifacts';
+      else if (scenario === 'trial_error') state.view = 'inference';
+      else state.view = 'overview';
+      updateUrl();
+      render();
+      window.scrollTo({top: 0, behavior: 'smooth'});
+    }
+
+    function topbar() {
+      const currentRun = activeRun();
+      return `<header class="topbar">
+        <div class="brand"><span class="brand-mark">M</span><div><strong>ModelForge</strong><small>INFERENCE TRAINING / CONTROL PLANE</small></div></div>
+        <div class="crumb"><span>个人工作空间</span><span>/</span><b>训练</b><span>/</span><span>${state.view === 'inference' ? '推理验收' : state.view === 'create' ? '新建训练' : currentRun ? 'Attempt #' + currentRun.attempt : '运行索引'}</span></div>
+        <div class="top-actions">
+          <span class="connection"><i></i>本地控制面在线</span>
+          <span class="snapshot-time">SNAPSHOT 10:32:12</span>
+          <label class="sr-only" for="scenario-select">切换原型状态</label>
+          <select class="scenario-select" id="scenario-select">${scenarios.map(item => `<option value="${item}" ${state.scenario === item ? 'selected' : ''}>演示 / ${scenarioLabels[item]}</option>`).join('')}</select>
+          <button class="top-button" type="button" data-action="new-training">${icon('plus')}新训练</button>
+        </div>
+      </header>`;
+    }
+    function sidebar() {
+      const nav = [
+        ['overview','工作台','grid','00'], ['datasets','数据集','data','01'], ['models','模型','model','02'],
+        ['compute','计算环境','compute','03'], ['training','训练','train','04'], ['serving','推理试用','serving','05']
+      ];
+      return `<aside class="sidebar" aria-label="模块导航">
+        <div class="workspace-label"><small>WORKSPACE / PERSONAL</small><strong>个人本机控制面</strong></div>
+        <nav class="side-nav">${nav.map(([key,label,iconName,index]) => `<button class="nav-item ${key === 'training' ? 'active' : ''}" type="button" data-nav="${key}">${icon(iconName)}<span>${label}</span><span class="nav-index">${index}</span></button>`).join('')}</nav>
+        <div class="side-nav-divider"></div>
+        <div class="side-caption">EXECUTION CONTEXT</div>
+        <div class="sidebar-foot"><strong>Qwen3-0.6B / RTX 4090</strong><span><i></i>固定运行时 · baseline partial</span><span>原型不连接训练 API</span></div>
+      </aside>`;
+    }
+    function queueRunCard(run, groupTone) {
+      const meta = queueStatus(run);
+      const active = activeRun()?.source === run.source && state.scenario !== 'empty';
+      const progress = run.source === 'previous' ? 100 : run.source === 'current' ? 48 : run.source === 'failed' ? 18 : 0;
+      return `<button class="run-card ${active ? 'active' : ''}" type="button" data-select-run="${run.source}" aria-current="${active ? 'true' : 'false'}">
+        <div class="run-top"><div><h2 class="run-name">${run.title}</h2><p class="run-code">${run.short} / A#${run.attempt}</p></div><span class="status-pill ${meta.tone}">${meta.label}</span></div>
+        <div class="run-progress ${meta.tone === 'success' ? 'success' : meta.tone === 'danger' ? 'failed' : ''}"><i style="width:${progress}%"></i></div>
+        <div class="run-foot"><span>${run.source === 'current' ? `step ${run.step} · ${run.train}` : run.source === 'previous' ? `best ${run.best}` : run.source === 'waiting' ? '尚未绑定实例' : 'image mismatch'}</span><span>${run.updated}</span></div>
+      </button>`;
+    }
+    function ledger() {
+      const q = state.search.toLowerCase();
+      const matches = Object.values(runs).filter(run => !q || `${run.title} ${run.short} ${run.attempt} ${run.dataset}`.toLowerCase().includes(q));
+      const current = matches.find(run => run.source === 'current');
+      const waiting = matches.find(run => run.source === 'waiting');
+      const previous = matches.find(run => run.source === 'previous');
+      const failed = matches.find(run => run.source === 'failed');
+      return `<aside class="ledger" aria-label="训练运行索引">
+        <div class="ledger-head">
+          <div class="ledger-title-row"><div><h2>运行索引</h2><p>RUN QUEUE / ATTEMPT LEDGER</p></div><span class="count-badge">4</span><button class="queue-close" type="button" aria-label="关闭运行索引" data-action="close-queue">${icon('close')}</button></div>
+          <label class="search-box">${icon('search')}<span class="sr-only">搜索训练运行</span><input type="search" id="run-search" value="${esc(state.search)}" placeholder="搜索任务、ID 或错误码"></label>
+          <p class="ledger-note">先看状态，再进入一条运行。任务、Attempt、产物与资源不在这里混写。</p>
+        </div>
+        <div class="queue-groups">
+          ${current ? `<section class="queue-group"><div class="group-head">当前运行<span>1</span></div>${queueRunCard(current)}</section>` : ''}
+          ${waiting ? `<section class="queue-group"><div class="group-head">等待处理<span>1</span></div>${queueRunCard(waiting)}</section>` : ''}
+          ${previous ? `<section class="queue-group"><div class="group-head">最近完成<span>1</span></div>${queueRunCard(previous)}</section>` : ''}
+          ${failed ? `<section class="queue-group"><div class="group-head">需要关注<span>1</span></div>${queueRunCard(failed)}</section>` : ''}
+          ${matches.length ? '' : `<div class="state-board" style="min-height:220px;margin-top:10px"><div class="state-inner"><h2 style="font-size:20px">没有匹配运行</h2><p>调整搜索词查看队列。</p></div></div>`}
+        </div>
+        <div class="ledger-foot">4 / 18 RUNS · SYNC 3s</div>
+      </aside>`;
+    }
+    function stageHeader(run) {
+      if (state.view === 'create') {
+        return `<header class="stage-head"><div class="eyebrow">TRAINING CONTROL / NEW RUN</div><div class="stage-title-row"><div class="stage-title"><h1>新建训练</h1><p>一次冻结输入，一条独立执行线；平台不代购 GPU。</p></div><div class="stage-actions"><button class="button secondary" type="button" data-action="exit-create">${icon('back')}返回运行索引</button></div></div></header>`;
+      }
+      const meta = !run ? {tone: '', label: 'IDLE / 空工作区'} : state.view === 'inference' ? (isTrialError() ? {tone: 'danger', label: 'BLOCKED / 实例未就绪'} : state.trialStopped ? {tone: '', label: 'STOPPED / 已结束'} : {tone: 'success', label: 'READY / 可试用'}) : runStatusMeta(run);
+      if (!run) {
+        return `<header class="stage-head"><div class="eyebrow">TRAINING CONTROL / RUN QUEUE</div><div class="stage-title-row"><div class="stage-title"><h1>选择一条运行</h1><p>状态、证据与下一步从同一条运行展开。</p></div><div class="stage-actions"><button class="queue-toggle" type="button" data-action="toggle-queue">运行索引</button>${statusPill(meta)}</div></div></header>`;
+      }
+      const title = state.view === 'inference' ? '推理验收 · Best Adapter' : run.title;
+      const identifier = state.view === 'inference' ? `TRIAL fdb5a28c · source A#${run.attempt} · ${run.hardware}` : `${run.id} · ${run.hardware}`;
+      const tabs = [['overview','运行'],['metrics','指标'],['logs','日志'],['artifacts','产物'],['inference','试用']];
+      return `<header class="stage-head">
+        <div class="eyebrow">${state.view === 'inference' ? 'INFERENCE TRIAL / CHANNEL 05' : `RUN DETAIL / ATTEMPT #${run.attempt}`}</div>
+        <div class="stage-title-row">
+          <div class="stage-title"><h1>${title}</h1><p>${identifier}</p></div>
+          <div class="stage-actions"><button class="queue-toggle" type="button" data-action="toggle-queue">运行索引</button>${statusPill(meta)}${state.scenario === 'running' && state.view === 'overview' ? `<button class="button secondary small" type="button" data-action="request-cancel">${icon('stop')}请求取消</button>` : ''}<button class="button secondary small" type="button" data-action="refresh">${icon('refresh')}刷新</button></div>
+        </div>
+        <nav class="stage-tabs" aria-label="运行页面">${tabs.map(([key,label]) => `<button class="tab ${state.view === key ? 'active' : ''}" type="button" role="tab" aria-selected="${state.view === key}" data-tab="${key}">${label}${key === 'inference' && !isSuccess() && !isTrialError() ? '<span class="tab-lock">LOCK</span>' : ''}</button>`).join('')}</nav>
+      </header>`;
+    }
+
+    function routeNodeState(index) {
+      if (state.scenario === 'loading' || state.scenario === 'empty') return 'lock';
+      if (state.scenario === 'waiting') return index === 0 ? 'done' : index === 1 ? 'active' : 'lock';
+      if (state.scenario === 'error') return index < 2 ? 'done' : index === 2 ? 'fail' : 'lock';
+      if (state.scenario === 'running') return index < 2 ? 'done' : index === 2 ? 'active' : 'lock';
+      if (state.scenario === 'success') return index < 5 ? 'done' : 'ready';
+      if (state.scenario === 'trial_error') return index < 5 ? 'done' : 'fail';
+      return 'lock';
+    }
+    function route() {
+      const stages = [
+        ['冻结输入','数据、基座与参数锁定'],
+        ['实例核验','镜像、GPU、清理授权'],
+        ['训练执行','日志、Loss 与保存点'],
+        ['产物门禁','Best + Final 成对发布'],
+        ['资源回收','实例删除与租约释放'],
+        ['推理试用','带产物上下文进入验收']
+      ];
+      const labels = {done:'已确认', active:'进行中', ready:'可进入', fail:'已阻断', lock:'未开始'};
+      const details = {
+        waiting: ['已冻结','等待绑定','等待训练','未发布','未开始','门禁关闭'],
+        running: ['已冻结','已核验','step 80 / 168','未发布','运行中','门禁关闭'],
+        success: ['已冻结','已核验','exit 0','2 / 2','已释放','可发起'],
+        error: ['已冻结','运行时失败','未启动','未产生','仍保留','门禁关闭'],
+        trial_error: ['已冻结','已核验','已结束','2 / 2','已释放','加载失败']
+      }[state.scenario] || ['待读取','待读取','待读取','待读取','待读取','待读取'];
+      return `<section class="route-wrap"><div class="route-head"><strong>RUN ROUTE / 同一运行线</strong><span>${state.scenario === 'success' ? '6 / 6 已确认' : state.scenario === 'running' ? '3 / 6 进行中' : state.scenario === 'error' ? '2 / 6 已终止' : state.scenario === 'waiting' ? '2 / 6 等待中' : '等待事实'}</span></div><div class="route">${stages.map(([label,help], index) => { const node = routeNodeState(index); return `<div class="route-node ${node}"><div class="route-index"><b>${node === 'done' ? '✓' : node === 'fail' ? '!' : index + 1}</b><span>${labels[node]}</span></div><strong>${label}</strong><small>${details[index] || help}</small></div>`; }).join('')}</div></section>`;
+    }
+    function metricsRow(run) {
+      const success = state.scenario === 'success';
+      const firstValue = state.scenario === 'waiting' || state.scenario === 'error' ? '—' : success ? String(run.step) : `${run.step}`;
+      const firstNote = state.scenario === 'waiting' ? '尚未绑定实例' : state.scenario === 'error' ? '训练未启动' : success ? 'exit 0 · complete' : 'of 168 · epoch 0.95';
+      const secondValue = state.scenario === 'waiting' || state.scenario === 'error' ? '—' : run.train;
+      const thirdValue = state.scenario === 'waiting' || state.scenario === 'error' ? '—' : run.eval;
+      const fourthValue = state.scenario === 'waiting' || state.scenario === 'error' ? '—' : run.lr;
+      return `<div class="metric-strip">
+        <div class="metric"><small>LATEST STEP</small><strong>${firstValue}</strong><span>${firstNote}</span></div>
+        <div class="metric"><small>TRAIN LOSS</small><strong>${secondValue}</strong><span>${state.scenario === 'success' ? 'final sample' : state.scenario === 'running' ? 'Δ -0.0786' : '未上报'}</span></div>
+        <div class="metric accent"><small>BEST EVAL</small><strong>${state.scenario === 'success' || state.scenario === 'running' ? run.best : '—'}</strong><span>${state.scenario === 'success' || state.scenario === 'running' ? `@ step ${run.bestStep}` : '未上报'}</span></div>
+        <div class="metric"><small>${state.scenario === 'success' ? 'FINAL EVAL' : 'LEARNING RATE'}</small><strong>${state.scenario === 'success' ? run.final : fourthValue}</strong><span>${state.scenario === 'success' ? '最终保存点' : state.scenario === 'waiting' || state.scenario === 'error' ? '未上报' : 'cosine · trainer'}</span></div>
+      </div>`;
+    }
+    function chart(mode = 'normal') {
+      const success = state.scenario === 'success';
+      const height = mode === 'large' ? 300 : 225;
+      const values = metricSamples;
+      const yMin = 0.20, yMax = 0.85;
+      const x = (index) => 56 + index * 150;
+      const y = (value) => 18 + ((yMax - value) / (yMax - yMin)) * (height - 62);
+      const trainPath = values.map((point, index) => `${index === 0 ? 'M' : 'L'}${x(index)} ${y(point.train)}`).join(' ');
+      const evalPath = values.map((point, index) => `${index === 0 ? 'M' : 'L'}${x(index)} ${y(point.eval)}`).join(' ');
+      const bestX = x(3), bestY = y(values[3].eval);
+      return `<svg class="loss-chart" viewBox="0 0 660 ${height}" role="img" aria-label="训练与验证 Loss 采样，Best eval ${state.scenario === 'success' || state.scenario === 'running' ? '0.3218 at step 80' : '尚未上报'}">
+        <defs><linearGradient id="lossArea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#245ad0" stop-opacity=".12"/><stop offset="1" stop-color="#245ad0" stop-opacity="0"/></linearGradient></defs>
+        ${[0.2,0.35,0.5,0.65,0.8].map(value => `<line class="chart-grid" x1="52" x2="632" y1="${y(value)}" y2="${y(value)}"/><text class="chart-axis" x="9" y="${y(value)+3}">${value.toFixed(2)}</text>`).join('')}
+        ${values.map((point, index) => `<line class="chart-grid" x1="${x(index)}" x2="${x(index)}" y1="18" y2="${height - 36}"/><text class="chart-axis" x="${x(index)-7}" y="${height - 16}">${point.step}</text>`).join('')}
+        <line class="chart-marker" x1="${bestX}" x2="${bestX}" y1="18" y2="${height - 36}"/>
+        <path d="${trainPath} L${x(3)} ${height - 36} L${x(0)} ${height - 36} Z" fill="url(#lossArea)" opacity=".7"/>
+        <path class="chart-train" d="${trainPath}"/>
+        <path class="chart-eval" d="${evalPath}"/>
+        ${values.map((point, index) => `<circle class="chart-dot" cx="${x(index)}" cy="${y(point.train)}" r="2.8"/><circle class="chart-dot eval" cx="${x(index)}" cy="${y(point.eval)}" r="2.8"/>`).join('')}
+        <rect x="${bestX - 30}" y="${bestY - 34}" width="62" height="17" rx="1" fill="#fff" stroke="#d1dce2"/>
+        <text class="chart-axis" x="${bestX - 24}" y="${bestY - 22}" style="fill:#5e707a">BEST 0.3218</text>
+      </svg>`;
+    }
+    function chartPanel(large = false) {
+      const success = state.scenario === 'success';
+      return `<section class="section ${large ? 'metrics-chart' : ''}"><div class="section-head"><div><h2>训练信号 / Loss</h2><p>仅显示已上报采样，不补齐未发生的曲线。</p></div><span class="section-meta">4 OBSERVATIONS · STEP 80</span></div><div class="chart-wrap">${chart(large ? 'large' : 'normal')}</div><div class="chart-legend"><span><i></i>Train Loss</span><span class="eval"><i></i>Eval Loss · dashed</span><span>${success ? 'Final 0.3389 另列，不混入验证采样' : '当前最佳验证点 step 80'}</span></div></section>`;
+    }
+    function runBrief(run) {
+      const stage = state.scenario === 'waiting' ? '实例绑定' : state.scenario === 'error' ? '运行时检查失败' : state.scenario === 'success' ? '已结束 · exit 0' : '训练执行';
+      const artifacts = state.scenario === 'success' ? 'Best + Final 2/2' : '未发布';
+      const resource = state.scenario === 'success' ? '实例已删除 · 租约已释放' : state.scenario === 'error' ? '实例仍保留 · 仍计费' : state.scenario === 'waiting' ? '等待手动创建实例' : '1 GPU · 使用中';
+      return `<div class="run-brief"><div><small>当前阶段</small><strong>${stage}</strong><span>${state.scenario === 'error' ? '训练未启动' : state.scenario === 'waiting' ? '平台不购买实例' : 'step 80 / 168'}</span></div><div><small>产物门禁</small><strong>${artifacts}</strong><span>${state.scenario === 'success' ? '成对写入并通过回读' : '训练结束前不发布部分 Adapter'}</span></div><div><small>资源与回收</small><strong>${resource}</strong><span>${run.lease}</span></div></div>`;
+    }
+    function eventList() {
+      const events = state.scenario === 'error' ? [
+        ['15:28:05','bad','运行时预检失败','镜像 img-cuda-12.2 与已验证镜像不一致'],
+        ['15:28:02','warn','实例与清理授权已记录','RTX A5000 · u-4090-03-84bc'],
+        ['15:27:51','','手动实例已绑定','未启动训练进程']
+      ] : state.scenario === 'success' ? [
+        ['11:09:03','','实例已删除、租约已释放','推理 GPU 门禁已打开'],
+        ['11:08:43','','Final Adapter 回读通过','adapter-final-06 · 2 / 2'],
+        ['11:08:41','','Best Adapter 回读通过','adapter-best-06 · step 80'],
+        ['11:08:40','','训练进程退出','exit code 0 · 168 steps']
+      ] : [
+        ['10:32:12','','最新指标已入库','step 80 · train 0.4362 · eval 0.3218'],
+        ['10:28:39','','训练进程已启动','LlamaFactory 0.9.5 · SSH 通道保持连接'],
+        ['10:28:14','','基座指纹核查通过','Qwen3-0.6B-20261102-r1'],
+        ['10:28:11','','数据拆分已冻结','split-4f82b9d1 · 1,116 / 124']
+      ];
+      return `<ul class="event-list">${events.map(([time,tone,title,detail]) => `<li class="event-item ${tone}"><time>${time}</time><i></i><div><strong>${title}</strong><p>${detail}</p></div></li>`).join('')}</ul><div class="event-foot"><button class="button secondary small full" type="button" data-tab="logs">${icon('terminal')}打开运行日志</button></div>`;
+    }
+    function artifactSummary(run) {
+      return `<section class="artifact-summary"><div class="artifact-summary-head"><div><h2>Best / Final 已成对发布</h2><p>产物可用，训练实例已释放；可携带 Best 上下文进入推理。</p></div><strong class="pair-count">2 / 2</strong></div><div class="pair-rows">
+        <div class="pair-row"><span class="pair-role">BEST</span><strong>0.3218</strong><code>adapter-best-0${run.attempt} · step 80 · SHA-256 PASS</code><button class="button secondary small" type="button" data-action="open-artifacts">查看证据</button></div>
+        <div class="pair-row"><span class="pair-role">FINAL</span><strong>0.3389</strong><code>adapter-final-0${run.attempt} · step 168 · SHA-256 PASS</code><button class="button secondary small" type="button" data-action="download">下载</button></div>
+      </div></section>`;
+    }
+    function overviewView(run) {
+      if (state.scenario === 'loading') return loadingBoard();
+      if (state.scenario === 'empty') return emptyBoard();
+      if (state.scenario === 'error') return errorBoard(run);
+      if (state.scenario === 'waiting') return waitingBoard(run);
+      return `${route()}${metricsRow(run)}${runBrief(run)}${state.scenario === 'success' ? artifactSummary(run) : ''}<div class="overview-grid" style="margin-top:14px">${chartPanel()}<section class="section"><div class="section-head"><div><h2>阶段记录</h2><p>每个节点只代表已确认事实。</p></div><span class="section-meta">EVENTS</span></div>${eventList()}</section></div>`;
+    }
+    function loadingBoard() {
+      return `<section class="loading-board" aria-busy="true"><div class="loader"><div class="loader-head"><div class="loader-bars"><span></span><span></span><span></span><span></span></div><strong>正在接入运行事实</strong></div><div class="loader-lines"><i></i><i></i><i></i></div><p style="margin:14px 0 0;color:var(--muted);font-size:9px">ATTEMPT · TELEMETRY · RESOURCE LEASE</p></div></section>`;
+    }
+    function emptyBoard() {
+      return `<section class="state-board"><div class="state-inner"><div class="state-mark">${icon('train')}</div><h2>还没有可验收的训练</h2><p>从已发布数据集和已验证基座开始。新建只生成冻结输入与实例要求，不会购买或预留 GPU。</p><div class="actions"><button class="button" type="button" data-action="new-training">${icon('plus')}创建第一次训练</button><button class="button secondary" type="button" data-nav="datasets">先检查数据集</button></div><div class="state-path"><span>冻结输入</span><span>/</span><span>绑定实例</span><span>/</span><span>训练</span><span>/</span><span>验收</span></div></div></section>`;
+    }
+    function waitingBoard(run) {
+      return `${route()}<section class="state-board" style="min-height:330px;margin-top:14px;border-color:#e1c995;background:#fffaf0"><div class="state-inner"><div class="state-mark" style="color:var(--amber);border-color:#e1c995">${icon('pause')}</div><h2>等待你创建并绑定实例</h2><p>任务与冻结输入已生成。你需要到优云控制台创建 RTX 4090 单卡实例，回到这里绑定实例 ID 并确认平台拥有停止与删除授权。</p><div class="actions"><button class="button" type="button" data-action="request-bind">${icon('compute')}绑定手动实例</button><button class="button secondary" type="button" data-tab="logs">查看冻结记录</button></div><div class="state-path"><span>方案</span><span>qwen3-0.6b-rtx4090-cn-bj2-partial</span><span>·</span><span>不自动购买</span></div></div></section><div style="margin-top:14px">${metricsRow(run)}</div>`;
+    }
+    function errorBoard(run) {
+      return `<section class="error-board"><div class="error-head"><div class="eyebrow">PREFLIGHT / TERMINATED</div><h2>运行时不兼容，训练没有启动</h2><p>Attempt #${run.attempt} · 准备阶段终止 · 未产生 Loss 或 Adapter</p></div><div class="error-grid"><div class="error-copy"><div class="error-code">runtime_incompatible / image_mismatch</div><h3>所选实例与已验证镜像不一致。</h3><p>后端在启动训练前拒绝执行。当前实例仍可能计费，应先保留诊断日志，再删除实例并确认租约释放；然后用同一冻结输入创建新的 Attempt。</p><div class="diff-table"><div class="diff-row head"><span>FIELD</span><span>EXPECTED</span><span>ACTUAL</span></div><div class="diff-row"><span>image</span><span>compshareImage-1fc8…</span><span class="bad">img-cuda-12.2</span></div><div class="diff-row"><span>gpu</span><span>RTX 4090</span><span class="bad">RTX A5000</span></div><div class="diff-row"><span>zone</span><span>cn-bj2-02</span><span>cn-bj2-02</span></div></div></div><div class="recovery"><h3>RECOVERY / 恢复路径</h3><div class="recovery-step"><b>1</b><div><strong>保留诊断证据</strong><span>日志与预检差异已固定，不会被下一次运行覆盖。</span></div></div><div class="recovery-step"><b>2</b><div><strong>确认回收实例</strong><span>停止计费后再开始新的 Attempt。</span></div></div><div class="recovery-step"><b>3</b><div><strong>复用同一冻结输入</strong><span>不重新随机拆分，不修改已验证参数。</span></div></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="button secondary" type="button" data-tab="logs">${icon('terminal')}查看诊断日志</button><button class="button danger" type="button" data-action="request-cleanup">${icon('stop')}结束并回收实例</button></div></div></div></section>`;
+    }
+    function metricsView(run) {
+      if (state.scenario === 'loading') return loadingBoard();
+      if (state.scenario === 'empty') return emptyBoard();
+      if (state.scenario === 'error') return errorBoard(run);
+      if (state.scenario === 'waiting') return waitingBoard(run);
+      return `<div class="metrics-layout">${chartPanel(true)}<div><section class="section"><div class="section-head"><div><h2>采样明细</h2><p>仅使用 trainer metrics 已返回的字段。</p></div><span class="section-meta">4 SAMPLES</span></div><table class="sample-table"><thead><tr><th>Step</th><th>Epoch</th><th>Train</th><th>Eval</th><th>LR</th></tr></thead><tbody>${metricSamples.map(row => `<tr><td>${row.step}</td><td>${row.epoch.toFixed(2)}</td><td>${row.train.toFixed(4)}</td><td>${row.eval.toFixed(4)}</td><td>${row.lr}</td></tr>`).join('')}</tbody></table></section><section class="metrics-note" style="margin-top:14px"><h3>READOUT / 读数边界</h3><dl><dt>Best eval</dt><dd>${run.best} @ step ${run.bestStep}</dd><dt>Final eval</dt><dd>${state.scenario === 'success' ? run.final : '训练结束后另列'}</dd><dt>实时显存</dt><dd>未提供，不画曲线</dd><dt>梯度范数</dt><dd>未提供</dd><dt>任务级准确率</dt><dd>未提供</dd></dl><div class="honesty-note">Loss 下降不代表意图分类正确。产物验收仍需固定问题的推理试用。缺失字段保持缺失，不用装饰性图线补齐。</div></section></div></div>`;
+    }
+    function logsView(run) {
+      if (state.scenario === 'empty') return emptyBoard();
+      if (state.scenario === 'loading') return loadingBoard();
+      const rows = state.scenario === 'success' ? successLogRows : state.scenario === 'error' ? failedLogRows : logRows;
+      const query = state.logQuery.toLowerCase();
+      const filtered = rows.filter(row => (state.logLevel === 'all' || row[1] === state.logLevel) && (!query || row.join(' ').toLowerCase().includes(query)));
+      return `<section class="logs-shell"><div class="logs-toolbar"><label class="sr-only" for="log-search">搜索日志</label><input type="search" id="log-search" value="${esc(state.logQuery)}" placeholder="搜索 step、错误码或消息"><label class="sr-only" for="log-level">日志级别</label><select id="log-level"><option value="all" ${state.logLevel === 'all' ? 'selected' : ''}>全部级别</option><option value="INFO" ${state.logLevel === 'INFO' ? 'selected' : ''}>INFO</option><option value="WARN" ${state.logLevel === 'WARN' ? 'selected' : ''}>WARN</option><option value="ERROR" ${state.logLevel === 'ERROR' ? 'selected' : ''}>ERROR</option></select><label class="follow-toggle"><input type="checkbox" id="follow-logs" ${state.follow ? 'checked' : ''}>跟随最新</label><button class="button secondary small" type="button" data-action="download-logs">${icon('download')}下载</button></div><div class="logs-viewer" role="log" aria-live="off">${filtered.length ? filtered.map(([time,level,source,text]) => `<div class="log-row"><time>${time}</time><span class="level ${level === 'ERROR' ? 'error' : level === 'WARN' ? 'warn' : ''}">${level}</span><span class="source">${source}</span><p>${esc(text)}</p></div>`).join('') : '<div class="log-empty">没有符合筛选条件的日志。</div>'}</div><div class="logs-foot">${filtered.length} / ${rows.length} LINES · ${state.follow ? 'FOLLOW ON' : 'FOLLOW OFF'} · 原型不读取远程日志</div></section>`;
+    }
+    function artifactsView(run) {
+      if (state.scenario === 'empty') return emptyBoard();
+      if (state.scenario === 'loading') return loadingBoard();
+      if (state.scenario === 'error') return `${lockedArtifacts(run, '训练未启动，没有可发布的 Adapter', '运行时预检失败，先保留诊断并回收实例。')}`;
+      if (state.scenario === 'waiting') return `${lockedArtifacts(run, '等待实例绑定，尚未开始训练', '任务已冻结，但只有实例核验通过后才会产生训练产物。')}`;
+      if (state.scenario !== 'success') return `${lockedArtifacts(run, '训练尚未结束，产物门禁锁定', '训练中不会发布部分 Adapter，也不会提前占用推理 GPU。')}`;
+      return `<section class="release-board"><div class="release-head"><div><div class="eyebrow">RELEASE GATE / ATOMIC PAIR</div><h2>Best / Final 已成对发布</h2><p>两份 Adapter 均写入 MinIO 并通过回读校验；训练实例已删除，租约已释放。</p></div><strong class="release-count">2 / 2</strong></div><div class="artifact-rows">
+        <div class="artifact-row"><span class="artifact-role">BEST</span><div><strong>0.3218</strong><small>eval loss · step 80</small></div><dl><dt>Adapter</dt><dd>adapter-best-0${run.attempt}</dd><dt>基座配对</dt><dd>20261102-r1 · PASS</dd><dt>文件校验</dt><dd>manifest + SHA-256 PASS</dd></dl><button class="button small" type="button" data-action="open-inference">用于推理</button></div>
+        <div class="artifact-row"><span class="artifact-role">FINAL</span><div><strong>0.3389</strong><small>eval loss · step 168</small></div><dl><dt>Adapter</dt><dd>adapter-final-0${run.attempt}</dd><dt>基座配对</dt><dd>20261102-r1 · PASS</dd><dt>文件校验</dt><dd>manifest + SHA-256 PASS</dd></dl><button class="button secondary small" type="button" data-action="download">下载包</button></div>
+      </div></section><section class="handoff-panel"><div class="handoff-copy"><h2>把产物交给推理，而不是重新选择</h2><p>从 Best 发起试用会携带来源 Attempt、Adapter 与 role。进入推理页后只核对，不再从全量产物中重复选择。</p><div class="context-chips"><span class="context-chip">attempt=${run.short}</span><span class="context-chip">adapter=adapter-best-0${run.attempt}</span><span class="context-chip">role=best</span><span class="context-chip">base=20261102-r1</span></div></div><div class="handoff-action"><button class="button" type="button" data-action="open-inference">${icon('serving')}用 Best 发起推理</button><button class="button secondary" type="button" data-action="copy-handoff">${icon('copy')}复制交接参数</button><small>独立实例，独立计费；试用结束必须停止并回收。</small></div></section>`;
+    }
+    function lockedArtifacts(run, title, detail) {
+      return `<section class="locked-board"><div class="locked-head"><div><h2>${title}</h2><p>${detail}</p></div><span class="status-pill ${state.scenario === 'error' ? 'danger' : state.scenario === 'waiting' ? 'waiting' : 'running'}">${state.scenario === 'error' ? 'BLOCKED' : state.scenario === 'waiting' ? 'WAITING' : 'LOCKED'}</span></div><div class="locked-pair"><div class="locked-card"><span class="tag">BEST</span><strong>尚未发布</strong><p>验证集最优保存点只有在训练成功且回读校验通过后才可用。</p></div><div class="locked-card"><span class="tag">FINAL</span><strong>尚未发布</strong><p>最终保存点不可替代 Best；两者必须成组验收。</p></div></div><div class="locked-foot">不可用原因：${state.scenario === 'error' ? '运行未进入训练阶段，实例仍需回收。' : state.scenario === 'waiting' ? '实例尚未绑定，训练没有启动。' : '当前训练仍在执行，step 80 / 168。'}</div></section><div class="metricsRow" style="margin-top:14px">${metricsRow(run)}</div>`;
+    }
+    function inferenceView(run) {
+      if (state.scenario === 'loading') return `<section class="loading-board" aria-busy="true"><div class="loader"><div class="loader-head"><div class="loader-bars"><span></span><span></span><span></span><span></span></div><strong>正在创建独立推理实例</strong></div><div class="loader-lines"><i></i><i></i><i></i></div><p style="margin:14px 0 0;color:var(--muted);font-size:9px">BASE · ADAPTER · VLLM HEALTH</p></div></section>`;
+      if (state.scenario === 'empty') return `<section class="state-board"><div class="state-inner"><div class="state-mark">${icon('shield')}</div><h2>还没有可试用的 Adapter</h2><p>完成一次训练并确认 Best / Final 2 / 2 后，才能创建独立推理实例。</p><div class="actions"><button class="button" type="button" data-action="new-training">${icon('plus')}创建训练</button><button class="button secondary" type="button" data-nav="datasets">检查数据</button></div></div></section>`;
+      if (isTrialError()) return `<section class="error-board"><div class="error-head"><div class="eyebrow">INFERENCE / BLOCKED</div><h2>推理实例未就绪</h2><p>Best Adapter 可用，但 vLLM 模型加载失败；没有发出任何推理请求。</p></div><div class="error-grid"><div class="error-copy"><div class="error-code">vllm_model_load_failed</div><h3>实例保留，GPU 仍在计费。</h3><p>先保留模型加载日志，检查基座路径与 Adapter 指纹；修复后重新加载，或结束实例并释放租约。</p><div class="diff-table"><div class="diff-row head"><span>CHECK</span><span>EXPECTED</span><span>ACTUAL</span></div><div class="diff-row"><span>adapter</span><span>adapter-best-06</span><span>present</span></div><div class="diff-row"><span>health</span><span>ready</span><span class="bad">load_failed</span></div><div class="diff-row"><span>request</span><span>idle</span><span>not_sent</span></div></div></div><div class="recovery"><h3>RESOURCE / 安全边界</h3><div class="recovery-step"><b>!</b><div><strong>GPU 计费中</strong><span>不会自动再启动第二个推理实例。</span></div></div><div class="recovery-step"><b>×</b><div><strong>对话证据为空</strong><span>未发出推理请求，不应伪造回答。</span></div></div><button class="button danger" type="button" data-action="request-stop">${icon('stop')}结束并回收实例</button></div></div></section>`;
+      if (!isSuccess()) return `<section class="state-board"><div class="state-inner"><div class="state-mark">${icon('shield')}</div><h2>推理门禁尚未打开</h2><p>${state.scenario === 'waiting' ? '实例还没有绑定，也没有训练产物。' : '训练仍在执行。产物可验收且训练实例释放后，才能进入推理。'}</p><div class="actions"><button class="button" type="button" data-tab="overview">返回运行总览</button><button class="button secondary" type="button" data-tab="logs">查看日志</button></div></div></section>`;
+      if (state.trialStopped) return `<section class="state-board"><div class="state-inner"><div class="state-mark" style="color:var(--green);border-color:#b9d8c6;background:var(--green-soft)">${icon('check')}</div><h2>试用已结束，等待回收确认</h2><p>停止指令已记录。后台将继续确认 vLLM 停止、实例删除与租约释放；历史会话不会被写入正式数据。</p><div class="actions"><button class="button secondary" type="button" data-tab="artifacts">返回产物</button><button class="button" type="button" data-action="new-training">创建新训练</button></div></div></section>`;
+      return `<div class="inference-shell"><section class="chat-panel"><div class="chat-head"><div class="chat-id"><span class="chat-glyph">M</span><div><h2>推理验收 · Best Adapter</h2><p>adapter-best-0${run.attempt} · source A#${run.attempt} · Qwen3-0.6B</p></div></div><span class="status-pill success">READY</span></div><div class="chat-stream" id="chat-stream" aria-live="polite">${state.chat.length ? state.chat.map(message => `<article class="message ${message.role} ${message.partial ? 'partial' : ''}"><span class="message-label">${message.role === 'user' ? 'YOU' : 'MODEL'}</span><div class="message-body"><p>${message.content ? esc(message.content) : (message.role === 'assistant' && state.sending ? '正在生成…' : '')}</p></div></article>`).join('') : `<div class="chat-welcome"><div><div class="chat-welcome-mark">${icon('play')}</div><strong>用真实问题验收这次训练</strong><p>Loss 不是回答质量。检查意图、边界、客服语气与指令遵循；本会话只保留在当前页面。</p><div class="prompt-list"><button class="prompt" type="button" data-prompt="用户说：我要退款，但已经超过七天。请判断意图并给出下一步。">退款 · 超过七天</button><button class="prompt" type="button" data-prompt="用户说：转人工。不要解释。请只返回意图标签。">转人工 · 指令约束</button><button class="prompt" type="button" data-prompt="用户情绪激烈，询问是否可以提供补偿。">投诉 · 情绪边界</button></div></div></div>`}</div><div class="composer"><label class="sr-only" for="chat-input">输入试用问题</label><textarea id="chat-input" placeholder="输入真实客服问题，例如：订单还没发货，我要取消，可以吗？">${esc(state.chatDraft)}</textarea><div class="composer-row"><small>max 512 tokens · temperature 0.7 · session not persisted</small><div class="composer-actions">${state.sending ? `<button class="button secondary" type="button" data-action="stop-generation">${icon('stop')}停止生成</button>` : ''}<button class="button" type="button" data-action="send-chat" ${state.sending ? 'disabled' : ''}>${state.sending ? '生成中…' : '发送'}${icon('arrow')}</button></div></div></div></section><aside><section class="trial-checks"><div class="section-head"><div><h2>验收清单</h2><p>独立推理的硬门禁</p></div><span class="section-meta">1 / 3</span></div><ul class="check-list"><li class="check-item"><b>✓</b><div><strong>Best Adapter 指纹匹配</strong><span>20261102-r1 · adapter-best-0${run.attempt}</span></div></li><li class="check-item"><b>✓</b><div><strong>训练实例已释放</strong><span>GPU 门禁已打开</span></div></li><li class="check-item wait"><b>3</b><div><strong>完成 3 个固定问题</strong><span>当前 ${Math.min(state.chat.filter(item => item.role === 'user').length, 3)} / 3；完成后保留验收证据</span></div></li></ul></section><section class="trial-identity"><div class="section-head"><div><h2>本次对象</h2><p>从产物直接交接</p></div><span class="tag good">BEST</span></div><dl><dt>来源</dt><dd>Attempt #${run.attempt} · step 80</dd><dt>Adapter</dt><dd>adapter-best-0${run.attempt}</dd><dt>试用实例</dt><dd>u-4090-11-c2a1</dd><dt>回收</dt><dd>结束或空闲 15 分钟</dd></dl></section></aside></div>`;
+    }
+    function createView() {
+      if (state.creating) return `<section class="loading-board" aria-busy="true"><div class="loader"><div class="loader-head"><div class="loader-bars"><span></span><span></span><span></span><span></span></div><strong>正在冻结输入并创建 Attempt</strong></div><div class="loader-lines"><i></i><i></i><i></i></div><p style="margin:14px 0 0;color:var(--muted);font-size:9px">SNAPSHOT · TASK · WAITING_INSTANCE</p></div></section>`;
+      const steps = [
+        ['01','选择输入','数据与基座'],
+        ['02','核验方案','实例与运行时'],
+        ['03','锁定参数','可复核的冻结值'],
+        ['04','确认提交','手动算力边界']
+      ];
+      const content = [createInput(), createPlan(), createParams(), createConfirm()][state.wizardStep - 1];
+      const titles = ['先确定这次训练要证明什么','确认这组运行时可执行','把参数变成可复核的冻结值','最后检查一次边界'];
+      const descriptions = [
+        '选择已发布数据集与已验证基座，下一步不再重新猜测兼容性。',
+        '目录只是证据来源，不是自由拼装器。',
+        '除 seed 外，其余值与当前兼容基线严格绑定。',
+        '提交只生成任务与实例要求，不会产生 GPU 费用。'
+      ];
+      return `<div class="create-stage"><div class="create-title-row"><div><div class="eyebrow">NEW TRAINING / CONTROL SHEET 08</div><h1>先冻结，再开始。</h1><p>每个输入都要能复核，每个阶段都只展示已确认事实。</p></div><button class="button secondary" type="button" data-action="exit-create">${icon('back')}返回运行索引</button></div>
+        <div class="create-layout"><nav class="step-rail" aria-label="新建训练步骤">${steps.map(([num,title,sub], index) => `<button class="${state.wizardStep === index + 1 ? 'active' : ''} ${state.wizardStep > index + 1 ? 'done' : ''}" type="button" data-action="wizard-jump" data-step="${index + 1}"><b>${state.wizardStep > index + 1 ? '✓' : num}</b><span><strong>${title}</strong><span>${sub}</span></span></button>`).join('')}<div class="step-rail-foot">提交后任何输入变更都需要新建 Task。不会覆盖本次 Attempt。</div></nav>
+        <section class="create-card"><div class="create-card-head"><small>STEP 0${state.wizardStep} / 04</small><h2>${titles[state.wizardStep - 1]}</h2><p>${descriptions[state.wizardStep - 1]}</p></div><div class="create-body">${content}</div><div class="create-foot"><small>${state.wizardStep === 4 ? '确认手动实例边界后才能提交' : '右侧清单会持续更新'}</small><div class="actions"><button class="button secondary" type="button" data-action="wizard-back">${state.wizardStep === 1 ? '取消' : '上一步'}</button>${state.wizardStep < 4 ? `<button class="button" type="button" data-action="wizard-next">下一步${icon('arrow')}</button>` : `<button class="button" type="button" data-action="wizard-submit">${icon('plus')}创建并冻结</button>`}</div></div></section>
+        ${manifest()}</div></div>`;
+    }
+    function createInput() {
+      return `<div class="error-summary ${state.formError ? 'show' : ''}" id="form-error" role="alert" tabindex="-1"><strong>还有需要完成的内容</strong><p>${esc(state.formError)}</p></div><div class="field ${state.formError && !state.taskName.trim() ? 'invalid' : ''}"><label for="task-name">训练名称</label><input id="task-name" value="${esc(state.taskName)}" placeholder="例如：客服意图 LoRA · 实验 08"><small>只描述本次训练目标；提交后不可修改。</small><span class="field-error">请先为本次训练命名。</span></div><div class="choice-card selected"><span class="choice-radio"></span><div><strong>客服意图训练集 · v3 <span class="tag good">已发布</span></strong><p>SFT · 1,240 条 · 训练 1,116 / 验证 124 · split-4f82b9d1<br>最后校验 11/03 14:08 · 数据哈希 8b4fce91…b0d0f8e7</p></div><button class="button ghost small" type="button" data-action="inspect-data">查看数据</button></div><div class="choice-card selected"><span class="choice-radio"></span><div><strong>Qwen3-0.6B <span class="tag good">唯一兼容基座</span></strong><p>平台托管 · 架构 qwen3 · 指纹 Qwen3-0.6B-20261102-r1<br>与当前训练和推理基线完全匹配</p></div><button class="button ghost small" type="button" data-action="inspect-base">查看指纹</button></div>`;
+    }
+    function createPlan() {
+      return `<div class="boundary-callout">${icon('shield')}<div><strong>已验证训练方案 · 不可逐项拼装</strong><br>当前产品只支持这一组经过实测的运行时组合。目录可见不代表可训练；更换硬件必须先产生新的兼容基线。</div></div><div class="plan-card" style="margin-top:13px"><div class="plan-head"><div><strong>qwen3-0.6b-rtx4090-cn-bj2-partial</strong><p>LlamaFactory 0.9.5 · CUDA 12.4 · baseline partial</p></div><span class="tag warn">PARTIAL</span></div><div class="plan-grid"><div><small>地域 / 可用区</small><span>cn-bj2 / cn-bj2-02</span></div><div><small>GPU</small><span>单卡 RTX 4090</span></div><div><small>CPU / 内存</small><span>12 核 / 64 GB</span></div><div><small>系统盘</small><span>100 GB CLOUD_SSD</span></div><div><small>镜像</small><span class="mono">compshareImage-1fc8fjody17l</span></div><div><small>计费</small><span>后付费 · 你手动创建</span></div></div></div><div class="boundary-callout" style="border-left-color:var(--blue);background:var(--blue-soft)">${icon('compute')}<div><strong>下一步仍是手动算力</strong><br>提交后进入 waiting_instance。你需要在优云控制台创建实例，再回来绑定实例 ID 并授权清理。</div></div>`;
+    }
+    function createParams() {
+      const fields = [['Epochs','1'],['Learning rate','0.0002'],['Cutoff length','512'],['Batch size','1'],['Gradient accumulation','1'],['LoRA rank','8'],['LoRA alpha','16'],['Scheduler','cosine'],['Warmup ratio','0'],['Template','qwen3_nothink'],['Seed','42'],['有效 Batch','1']];
+      return `<p style="margin:0 0 12px;color:var(--muted);font-size:9px">除 seed 外的值来自当前兼容基线。锁定值以只读摘要显示，避免“看似可调、提交后才失败”。</p><div class="param-grid">${fields.map(([label,value], index) => `<div class="param-cell ${index === 10 ? '' : 'locked'}"><small><span>${label}</span><em>${index === 10 ? '可调整' : 'LOCKED'}</em></small><strong>${value}</strong></div>`).join('')}</div><div class="boundary-callout">${icon('shield')}<div>seed 只影响训练随机性。已发布数据版本的训练 / 验证拆分已经冻结，重试不会重新随机拆分。</div></div>`;
+    }
+    function createConfirm() {
+      return `<div class="boundary-callout">${icon('shield')}<div><strong>确认后创建 Task 与 Attempt</strong><br>输入快照将被冻结并计算 SHA-256。此动作不会购买、创建或预留 GPU，也不会立即开始训练。</div></div><div class="review-facts" style="margin-top:12px"><div class="review-fact"><span>任务名称</span><strong>${esc(state.taskName || '未命名')}</strong></div><div class="review-fact"><span>数据版本</span><strong>客服意图训练集 v3</strong></div><div class="review-fact"><span>拆分</span><strong>1,116 / 124 · split-4f82b9d1</strong></div><div class="review-fact"><span>基座</span><strong>Qwen3-0.6B · 20261102-r1</strong></div><div class="review-fact"><span>训练方式</span><strong>SFT + LoRA · 1 epoch · LR 2e-4 · r8</strong></div><div class="review-fact"><span>实例要求</span><strong>RTX 4090 · 单卡 · 由你创建</strong></div><div class="review-fact"><span>初始状态</span><strong>waiting_instance</strong></div></div><div class="boundary-callout" style="border-left-color:var(--red);background:var(--red-soft)">${icon('alert')}<div><strong>平台不代购算力</strong><br>只有实例 Running、清理授权和运行时检查全部通过后，训练才会启动。提交不会产生费用。</div></div>`;
+    }
+    function manifest() {
+      const rows = [
+        ['任务', state.taskName || '未命名'], ['数据','客服意图训练集 · v3'], ['拆分','1,116 / 124 · 10%'],
+        ['基座','Qwen3-0.6B'], ['方案','qwen3-0.6b-rtx4090-cn-bj2-partial'], ['参数','1 epoch · LR 2e-4 · r8'],
+        ['实例','RTX 4090 · 单卡 · 手动创建'], ['清理','手动授权回收']
+      ];
+      return `<aside class="manifest"><div class="manifest-head"><small>IMMUTABLE AFTER SUBMIT</small><strong>本次冻结清单</strong></div><div class="manifest-body">${rows.map(([key,value]) => `<div class="manifest-row"><span>${key}</span><strong>${esc(value)}</strong></div>`).join('')}</div><div class="manifest-foot">提交后这些输入不可编辑。修改任何一项都必须新建 Task。</div></aside>`;
+    }
+
+    function stageBody(run) {
+      if (state.view === 'create') return createView();
+      if (state.view === 'inference') return inferenceView(run);
+      if (!run) return state.view === 'artifacts' ? emptyBoard() : emptyBoard();
+      if (state.view === 'metrics') return metricsView(run);
+      if (state.view === 'logs') return logsView(run);
+      if (state.view === 'artifacts') return artifactsView(run);
+      return overviewView(run);
+    }
+    function gateData(run) {
+      const gates = [
+        ['输入已冻结', state.scenario === 'empty' ? '没有运行' : '1,116 / 124 · split-4f82b9d1', state.scenario === 'empty' ? 'LOCK' : 'DONE', state.scenario === 'empty' ? 'wait' : ''],
+        ['实例核验', state.scenario === 'waiting' ? '等待手动绑定' : state.scenario === 'error' ? '镜像不兼容' : run?.instance || '尚未绑定', state.scenario === 'waiting' ? 'WAIT' : state.scenario === 'error' ? 'FAIL' : 'DONE', state.scenario === 'waiting' ? 'wait' : state.scenario === 'error' ? 'fail' : ''],
+        ['训练执行', state.scenario === 'running' ? 'step 80 / 168' : state.scenario === 'success' ? 'exit 0 · 168 steps' : state.scenario === 'error' ? '未启动' : '等待实例', state.scenario === 'running' ? 'LIVE' : state.scenario === 'success' ? 'DONE' : state.scenario === 'error' ? 'STOP' : 'WAIT', state.scenario === 'running' ? 'wait' : state.scenario === 'error' ? 'fail' : state.scenario === 'success' ? '' : 'wait'],
+        ['Best / Final 产物', state.scenario === 'success' ? '2 / 2 · SHA-256 PASS' : '训练结束前不发布', state.scenario === 'success' ? 'DONE' : 'LOCK', state.scenario === 'success' ? '' : 'wait'],
+        ['实例与租约', state.scenario === 'success' ? '已删除 · 已释放' : state.scenario === 'error' ? '仍保留 · 需回收' : state.scenario === 'waiting' ? '尚未建立' : '运行中 · 仍计费', state.scenario === 'success' ? 'DONE' : state.scenario === 'error' ? 'FAIL' : 'HOLD', state.scenario === 'success' ? '' : state.scenario === 'error' ? 'fail' : 'wait'],
+        ['推理验收', state.scenario === 'success' ? '独立实例可发起' : state.scenario === 'trial_error' ? '模型加载失败' : '门禁关闭', state.scenario === 'success' ? 'READY' : 'LOCK', state.scenario === 'success' ? '' : isTrialError() ? 'fail' : 'wait']
+      ];
+      return gates;
+    }
+    function nextAction(run) {
+      if (state.view === 'inference') {
+        if (isTrialError()) return {label:'结束失败实例并回收', desc:'vLLM 加载失败，实例仍在计费；没有发出任何推理请求。', title:'先安全回收实例', tone:'danger', action:'request-stop', dark:true};
+        if (state.scenario === 'success' && !state.trialStopped) return {label:'结束试用并回收', desc:'完成固定问题后停止 vLLM、删除独立实例并确认租约释放。', title:'这轮验收结束了吗？', tone:'danger', action:'request-stop'};
+        if (state.trialStopped) return {label:'返回产物', desc:'回收结果将由后端确认；历史会话不会写入正式数据。', title:'试用已结束', tone:'', action:'tab-artifacts'};
+      }
+      if (state.scenario === 'running') return {label:'查看实时日志', desc:'训练自然结束后才会成对发布 Best / Final，不提前打开推理门禁。', title:'让训练继续跑完', tone:'', action:'tab-logs'};
+      if (state.scenario === 'waiting') return {label:'绑定手动创建实例', desc:'平台不会代购或预留 GPU。先创建实例，再录入 ID 并授权清理。', title:'下一步需要你的实例', tone:'waiting', action:'request-bind'};
+      if (state.scenario === 'success') return {label:'用 Best 发起推理', desc:'训练实例已释放。交接会携带 attempt、adapter 与 role，不再重复选择。', title:'产物已经可以验收', tone:'success', action:'open-inference'};
+      if (state.scenario === 'error') return {label:'查看诊断并回收', desc:'镜像不兼容，训练未启动；实例仍可能计费，先保留证据再清理。', title:'先处理失败实例', tone:'danger', action:'tab-logs'};
+      if (state.scenario === 'loading') return {label:'等待事实返回', desc:'页面不会用上一份快照冒充当前状态。', title:'正在读取运行事实', tone:'', action:'refresh'};
+      return {label:'创建第一次训练', desc:'从已发布数据与已验证基座开始，只生成冻结输入和实例要求。', title:'空工作区', tone:'', action:'new-training'};
+    }
+    function commandPanel(run) {
+      if (state.view === 'create') return '';
+      const next = nextAction(run);
+      const gates = gateData(run);
+      const meta = !run ? {tone:'',label:'IDLE / 空工作区'} : state.view === 'inference' ? (isTrialError() ? {tone:'danger',label:'BLOCKED / 推理失败'} : state.trialStopped ? {tone:'',label:'STOPPED / 已结束'} : {tone:'success',label:'READY / 可试用'}) : runStatusMeta(run);
+      const instanceLabel = state.view === 'inference' ? '推理实例' : '训练实例';
+      const instanceValue = state.view === 'inference' ? (isTrialError() ? 'u-4090-11-c2a1 · load_failed' : state.trialStopped ? '已请求回收' : 'u-4090-11-c2a1 · ready') : (run?.instance || '尚未绑定');
+      return `<aside class="command"><div class="command-kicker"><span>RUN CONTROL / NEXT</span><i></i></div><h2>${next.title}</h2><div class="next-card ${next.tone}"><span class="next-label">NEXT / 唯一主动作</span><strong>${next.desc}</strong><p>${state.scenario === 'success' && state.view !== 'inference' ? '先确认 Best / Final 均为可用，再进入独立推理。' : state.scenario === 'error' ? '不猜测训练结果，不伪造产物。' : '状态只代表已确认事实，不把请求写成完成。'}</p><button class="button ${next.tone === 'danger' ? 'danger' : ''}" type="button" data-action="${next.action}">${next.label}${icon('arrow')}</button></div>
+        <section class="command-section"><h3>GATE CHAIN / 门禁链</h3><ul class="gate-list">${gates.map(([label,detail,status,tone]) => `<li class="gate-item ${tone}"><b>${tone === 'fail' ? '!' : tone === 'wait' ? '·' : '✓'}</b><div><strong>${label}</strong><span>${detail}</span></div><em>${status}</em></li>`).join('')}</ul></section>
+        <section class="command-section"><h3>RESOURCE / 资源</h3><dl class="command-facts"><dt>${instanceLabel}</dt><dd>${instanceValue}</dd><dt>租约</dt><dd>${state.scenario === 'success' ? 'lease-6c82-3a11 · released' : state.scenario === 'error' ? 'lease-9e11-22c7 · held' : state.scenario === 'waiting' ? '尚未建立' : 'lease-7f2a-4b91 · held'}</dd><dt>计费</dt><dd>${state.scenario === 'success' ? '训练 GPU 已释放' : state.scenario === 'error' ? '仍可能计费' : state.scenario === 'waiting' ? '未产生费用' : '训练 GPU 计费中'}</dd><dt>回收</dt><dd>${state.scenario === 'success' ? '已确认删除' : state.scenario === 'error' ? '等待人工确认' : '成功、失败或取消后执行'}</dd></dl></section>
+        <section class="command-section"><h3>FROZEN / 冻结输入</h3><dl class="command-facts"><dt>数据</dt><dd>客服意图训练集 v3</dd><dt>拆分</dt><dd>1,116 / 124 · split-4f82b9d1</dd><dt>基座</dt><dd>Qwen3-0.6B-20261102-r1</dd><dt>实例要求</dt><dd>RTX 4090 · 单卡</dd></dl><button class="button ghost small" type="button" data-action="copy-manifest" style="margin-top:7px;padding-inline:0">${icon('copy')}复制完整快照</button></section>
+        <div class="boundary-note"><strong>边界声明</strong><br>当前仅有 Qwen3-0.6B / RTX 4090 / 固定运行时组合已验证。目录可见不代表可训练；原型不接后端，不产生 GPU 费用。</div>
+      </aside>`;
+    }
+    function mobileAction(run) {
+      if (state.view === 'create') return '';
+      const next = nextAction(run);
+      return `<div class="mobile-action"><div class="mobile-action-copy"><small>NEXT / 唯一主动作</small><strong>${next.title}</strong></div><button class="button ${next.tone === 'danger' ? 'danger' : ''}" type="button" data-action="${next.action}">${next.label}</button></div>`;
+    }
+    function render() {
+      const run = activeRun();
+      const createMode = state.view === 'create';
+      document.getElementById('app').innerHTML = `${topbar()}<div class="app ${createMode ? 'create-mode' : ''}">${sidebar()}<div class="workspace ${state.queueOpen ? 'queue-open' : ''}" id="workspace">${ledger()}<main class="stage">${createMode ? '' : stageHeader(run)}<div class="stage-body">${stageBody(run)}</div></main>${commandPanel(run)}</div></div>${mobileAction(run)}`;
+      const chat = document.getElementById('chat-input');
+      if (chat && state.chatDraft) chat.value = state.chatDraft;
+      if (state.autoConfirm) {
+        state.autoConfirm = false;
+        setTimeout(() => openDialog('create'), 30);
+      }
+    }
+
+    function dialogShell(kicker, title, body, actions) {
+      return `<div class="dialog-head"><small>${kicker}</small><h2 id="dialog-title">${title}</h2></div><div class="dialog-body">${body}</div><div class="dialog-actions">${actions}</div>`;
+    }
+    function openDialog(type) {
+      const dialog = document.getElementById('action-dialog');
+      let content = '';
+      if (type === 'create') {
+        content = dialogShell('MANUAL COMPUTE / ACKNOWLEDGE','创建任务并冻结输入？','<p>平台将创建一个 Task 与 Attempt，并固定数据版本、基座指纹、参数与实例要求。不会购买、创建或预留 GPU。</p><div class="dialog-note warn">提交后进入 waiting_instance。你需要在优云手动创建实例，再返回绑定实例 ID。</div><div class="review-facts" style="margin-top:12px"><div class="review-fact"><span>初始状态</span><strong>waiting_instance</strong></div><div class="review-fact"><span>任务名称</span><strong>'+esc(state.taskName || '未命名')+'</strong></div><div class="review-fact"><span>输入快照</span><strong>SHA-256 frozen</strong></div></div>','<button class="button secondary" type="button" data-action="close-dialog">再检查一下</button><button class="button" type="button" data-action="confirm-create">创建并冻结</button>');
+      } else if (type === 'bind') {
+        content = dialogShell('MANUAL INSTANCE / BIND','绑定手动创建的训练实例','<p>绑定前请确认实例已 Running，且镜像、GPU 与可用区符合右侧方案。绑定后平台将执行运行时预检。</p><div class="dialog-field"><label for="bind-instance">实例 ID</label><input id="bind-instance" placeholder="例如：u-4090-02-7fca"></div><label class="dialog-check"><input type="checkbox" id="bind-ack">我拥有此实例，授权平台在训练成功、失败或取消后停止并删除。</label><div class="dialog-note warn">平台不会代为购买实例；绑定不会绕过运行时检查。</div>','<button class="button secondary" type="button" data-action="close-dialog">取消</button><button class="button" type="button" data-action="confirm-bind">核验并绑定</button>');
+      } else if (type === 'cancel') {
+        content = dialogShell('DANGER / CONTROLLED STOP','请求取消这次训练？','<p>请求取消不等于训练已停止。平台会等待远程进程退出、实例删除和租约释放，再确认终态。</p><div class="dialog-note warn">当前 step 80。取消不会发布部分 Adapter；已产生的日志、指标与诊断证据仍会保留。</div>','<button class="button secondary" type="button" data-action="close-dialog">继续训练</button><button class="button danger" type="button" data-action="confirm-cancel">请求取消</button>');
+      } else if (type === 'cleanup') {
+        content = dialogShell('RESOURCE RECOVERY / FAILED RUN','回收失败实例并保留证据？','<p>先保留诊断日志，再停止并删除实例，确认租约释放。历史 Attempt 与错误差异不会被删除。</p><div class="dialog-note warn">当前实例可能仍在计费。原型不会调用真实云接口。</div>','<button class="button secondary" type="button" data-action="close-dialog">保留现状</button><button class="button danger" type="button" data-action="confirm-cleanup">确认回收</button>');
+      } else {
+        content = dialogShell('RESOURCE RECLAIM / TRIAL','结束这次推理试用？','<p>停止 vLLM、删除独立推理实例并确认 GPU 租约释放。页面会话将失效，本次验收记录保留。</p><div class="dialog-note">结束后不提供“恢复同一实例”；下一次验收会重新创建独立实例。</div>','<button class="button secondary" type="button" data-action="close-dialog">保持运行</button><button class="button danger" type="button" data-action="confirm-stop">结束并回收</button>');
+      }
+      dialog.innerHTML = content;
+      if (!dialog.open) dialog.showModal();
+    }
+    function closeDialog() {
+      const dialog = document.getElementById('action-dialog');
+      if (dialog.open) dialog.close();
+    }
+    function sendChat(text) {
+      if (!text.trim() || state.sending || state.view !== 'inference' || !isSuccess() || state.trialStopped) return;
+      state.chat = [...state.chat, {role:'user', content:text.trim()}, {role:'assistant', content:'', partial:false}];
+      state.sending = true;
+      state.chatDraft = '';
+      render();
+      const answer = '判断：退款意图，且已超过七天。\n\n下一步：先核对订单签收状态，再转交售后审核。不要直接承诺退款或补偿。建议回复：“我理解您希望尽快处理。由于已超过七天，我先为您核对订单状态，并转交售后专员审核，预计 24 小时内给出处理结果。”';
+      let cursor = 0;
+      clearInterval(state.streamTimer);
+      state.streamTimer = setInterval(() => {
+        if (state.view !== 'inference') {
+          clearInterval(state.streamTimer);
+          state.streamTimer = null;
+          state.sending = false;
+          return;
+        }
+        cursor += Math.max(2, Math.ceil(answer.length / 28));
+        const last = state.chat[state.chat.length - 1];
+        last.content = answer.slice(0, cursor);
+        last.partial = cursor < answer.length;
+        const node = document.querySelector('#chat-stream .message.assistant:last-child .message-body p');
+        if (node) node.textContent = last.content;
+        if (cursor >= answer.length) {
+          clearInterval(state.streamTimer);
+          state.streamTimer = null;
+          state.sending = false;
+          last.partial = false;
+          render();
+        }
+      }, 55);
+    }
+    function stopGeneration() {
+      if (!state.sending) return;
+      clearInterval(state.streamTimer);
+      state.streamTimer = null;
+      state.sending = false;
+      const last = state.chat[state.chat.length - 1];
+      if (last) {
+        last.partial = true;
+        last.content += '\n\n〔已停止生成，以上为部分输出〕';
+      }
+      render();
+      toast('已停止本页流式演示；正式实现仍需向后端确认取消结果。');
+    }
+    function switchTab(view) {
+      state.view = view;
+      state.trialStopped = false;
+      updateUrl();
+      render();
+      window.scrollTo({top:0, behavior:'smooth'});
+    }
+    function handleAction(action) {
+      if (action === 'refresh') { toast('已刷新运行事实；旧快照保留直到新响应确认。'); return; }
+      if (action === 'new-training') { state.wizardStep = 1; state.formError = ''; state.creating = false; setView('create'); return; }
+      if (action === 'exit-create') { if (state.creating) return; setView('overview'); return; }
+      if (action === 'wizard-jump') { return; }
+      if (action === 'wizard-next') {
+        if (state.wizardStep === 1) {
+          const input = document.getElementById('task-name');
+          state.taskName = (input?.value || state.taskName || '').trim();
+          if (!state.taskName) {
+            state.formError = '请先为本次训练命名。';
+            render();
+            setTimeout(() => document.getElementById('form-error')?.focus(), 20);
+            return;
+          }
+          state.formError = '';
+        }
+        state.wizardStep = Math.min(4, state.wizardStep + 1);
+        updateUrl(); render(); window.scrollTo({top:0,behavior:'smooth'}); return;
+      }
+      if (action === 'wizard-back') {
+        if (state.wizardStep === 1) { setView('overview'); return; }
+        state.wizardStep -= 1; updateUrl(); render(); return;
+      }
+      if (action === 'wizard-submit') { openDialog('create'); return; }
+      if (action === 'confirm-create') {
+        closeDialog(); state.creating = true; render();
+        setTimeout(() => {
+          state.creating = false; state.scenario = 'waiting'; state.view = 'overview'; state.wizardStep = 1;
+          updateUrl(); render(); toast('任务已冻结，进入 waiting_instance；请手动创建并绑定实例。');
+        }, 950); return;
+      }
+      if (action === 'request-bind') { openDialog('bind'); return; }
+      if (action === 'confirm-bind') {
+        const id = document.getElementById('bind-instance')?.value.trim();
+        const ack = document.getElementById('bind-ack')?.checked;
+        if (!id || !ack) { toast('请填写实例 ID 并确认清理授权。'); return; }
+        closeDialog(); state.scenario = 'loading'; render();
+        setTimeout(() => { state.scenario = 'running'; state.view = 'overview'; updateUrl(); render(); toast('实例已绑定并进入运行时检查；训练即将开始。'); }, 900);
+        return;
+      }
+      if (action === 'open-inference') { state.scenario = 'success'; state.view = 'inference'; state.trialStopped = false; updateUrl(); render(); window.scrollTo({top:0,behavior:'smooth'}); return; }
+      if (action === 'open-artifacts' || action === 'tab-artifacts') { switchTab('artifacts'); return; }
+      if (action === 'tab-logs') { switchTab('logs'); return; }
+      if (action === 'request-cancel') { openDialog('cancel'); return; }
+      if (action === 'confirm-cancel') { closeDialog(); state.cancelRequested = true; render(); toast('取消请求已记录；等待进程退出、实例删除与租约释放确认。'); return; }
+      if (action === 'request-cleanup') { openDialog('cleanup'); return; }
+      if (action === 'confirm-cleanup') { closeDialog(); state.cleanupRequested = true; render(); toast('回收请求已记录；原型不会调用云接口。'); return; }
+      if (action === 'request-stop') { openDialog('stop'); return; }
+      if (action === 'confirm-stop') { closeDialog(); state.trialStopped = true; render(); toast('结束指令已记录；等待实例删除与租约释放确认。'); return; }
+      if (action === 'send-chat') {
+        const value = document.getElementById('chat-input')?.value || state.chatDraft || '';
+        sendChat(value); return;
+      }
+      if (action === 'stop-generation') { stopGeneration(); return; }
+      if (action === 'download' || action === 'download-logs') { toast(action === 'download-logs' ? '原型：日志下载已模拟，不读取远程文件。' : '原型：Adapter 包校验通过，下载不连接 MinIO。'); return; }
+      if (action === 'copy-handoff') { navigator.clipboard?.writeText('attempt=5bb29e33&adapter=adapter-best-06&role=best').catch(() => {}); toast('交接参数已复制：attempt / adapter / role。'); return; }
+      if (action === 'copy-manifest') { navigator.clipboard?.writeText('客服意图训练集 v3 · Qwen3-0.6B · split-4f82b9d1 · LR 2e-4 · r8').catch(() => {}); toast('冻结快照摘要已复制。'); return; }
+      if (action === 'inspect-data' || action === 'inspect-base') { toast(action === 'inspect-data' ? '数据证据在当前冻结版本中，不再重复选择。' : '基座指纹 Qwen3-0.6B-20261102-r1 与推理基线一致。'); return; }
+      if (action === 'toggle-queue') { state.queueOpen = !state.queueOpen; render(); return; }
+      if (action === 'close-dialog') { closeDialog(); return; }
+      if (action === 'close-queue') { state.queueOpen = false; render(); return; }
+      toast('原型未连接真实后端。');
+    }
+
+    document.addEventListener('click', (event) => {
+      const nav = event.target.closest('[data-nav]');
+      if (nav) {
+        const key = nav.dataset.nav;
+        if (key === 'training') { state.view = state.scenario === 'success' ? 'artifacts' : 'overview'; updateUrl(); render(); }
+        else if (key === 'serving') { state.scenario = 'success'; state.view = 'inference'; state.trialStopped = false; updateUrl(); render(); }
+        else if (key === 'datasets' || key === 'models' || key === 'compute') { toast('原型只覆盖「推理训练」链路；其他模块保持现状。'); }
+        else { toast('工作台总览不在本轮原型范围。'); }
+        return;
+      }
+      const runButton = event.target.closest('[data-select-run]');
+      if (runButton) {
+        const source = runButton.dataset.selectRun;
+        state.scenario = source === 'current' ? 'running' : source === 'previous' ? 'success' : source === 'waiting' ? 'waiting' : 'error';
+        state.view = source === 'previous' ? 'artifacts' : 'overview';
+        state.queueOpen = false;
+        state.trialStopped = false;
+        updateUrl(); render(); window.scrollTo({top:0,behavior:'smooth'}); return;
+      }
+      const tab = event.target.closest('[data-tab]');
+      if (tab) { switchTab(tab.dataset.tab); return; }
+      const prompt = event.target.closest('[data-prompt]');
+      if (prompt) { sendChat(prompt.dataset.prompt); return; }
+      const actionNode = event.target.closest('[data-action]');
+      if (!actionNode) return;
+      if (actionNode.dataset.action === 'wizard-jump') {
+        state.wizardStep = Number(actionNode.dataset.step);
+        updateUrl(); render(); return;
+      }
+      handleAction(actionNode.dataset.action);
+    });
+    document.addEventListener('change', (event) => {
+      if (event.target.id === 'scenario-select') { setScenario(event.target.value); return; }
+      if (event.target.id === 'log-level') { state.logLevel = event.target.value; render(); return; }
+      if (event.target.id === 'follow-logs') { state.follow = event.target.checked; render(); return; }
+    });
+    document.addEventListener('input', (event) => {
+      if (event.target.id === 'run-search') {
+        state.search = event.target.value; render();
+        const input = document.getElementById('run-search');
+        if (input) { input.focus(); input.setSelectionRange(input.value.length, input.value.length); }
+        return;
+      }
+      if (event.target.id === 'log-search') {
+        state.logQuery = event.target.value; render();
+        const input = document.getElementById('log-search');
+        if (input) { input.focus(); input.setSelectionRange(input.value.length, input.value.length); }
+        return;
+      }
+      if (event.target.id === 'task-name') { state.taskName = event.target.value; return; }
+      if (event.target.id === 'chat-input') { state.chatDraft = event.target.value; return; }
+    });
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && state.queueOpen) { state.queueOpen = false; render(); }
+      if (event.key === 'Enter' && (event.ctrlKey || event.metaKey) && event.target.id === 'chat-input') {
+        event.preventDefault();
+        sendChat(event.target.value);
+      }
+    });
+
+    render();
+  </script>
+</body>
+</html>

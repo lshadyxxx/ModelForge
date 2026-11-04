@@ -1,0 +1,595 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <link rel="icon" href="data:,">
+  <title>推理训练 · 设计评审 | ModelForge</title>
+  <style>
+    :root {
+      --paper: #eef1f2;
+      --paper-deep: #e2e7e9;
+      --panel: #fbfcfc;
+      --ink: #12242c;
+      --ink-soft: #344852;
+      --muted: #4b5e67;
+      --faint: #55676f;
+      --line: #c8d3d8;
+      --line-soft: #dde5e8;
+      --navy: #102b36;
+      --navy-deep: #0b2029;
+      --signal: #2a63d6;
+      --rust: #9f432b;
+      --forest: #1f4f3e;
+      --mint: #5bcab2;
+      --display: "Bahnschrift SemiCondensed", "Bahnschrift", "Arial Narrow", "Microsoft YaHei UI", sans-serif;
+      --sans: "Segoe UI", "Microsoft YaHei UI", "PingFang SC", sans-serif;
+      --mono: "Cascadia Code", "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+      --shadow: 0 20px 60px rgba(22, 37, 44, .11);
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      min-width: 320px;
+      color: var(--ink);
+      background:
+        linear-gradient(90deg, rgba(18, 36, 44, .025) 1px, transparent 1px),
+        var(--paper);
+      background-size: 48px 48px, auto;
+      font-family: var(--sans);
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    button, a { font: inherit; }
+    a { color: inherit; }
+    button { cursor: pointer; }
+    img { display: block; max-width: 100%; }
+    :focus-visible { outline: 2px solid var(--signal); outline-offset: 3px; }
+
+    .site-head {
+      min-height: 62px; padding: 0 32px; display: flex; align-items: center; gap: 26px;
+      color: #eef5f7; background: var(--navy-deep); border-bottom: 3px solid var(--rust);
+    }
+    .brand { display: flex; align-items: center; gap: 11px; margin-right: auto; }
+    .brand-mark {
+      width: 32px; height: 32px; display: grid; place-items: center; border: 1px solid #59727c;
+      color: #f0d0b9; font-family: Georgia, serif; font-size: 19px;
+    }
+    .brand strong { display: block; font-size: 14px; letter-spacing: .01em; }
+    .brand small { display: block; margin-top: 1px; color: #8ea2ab; font-family: var(--mono); font-size: 8px; letter-spacing: .11em; }
+    .site-head nav { display: flex; gap: 22px; align-items: center; }
+    .site-head nav a { color: #bfd0d6; font-size: 12px; text-decoration: none; }
+    .site-head nav a:hover { color: #fff; }
+    .stage-tag {
+      min-height: 30px; padding: 0 10px; display: inline-flex; align-items: center;
+      border: 1px solid #536b75; color: #f0d0b9; font-family: var(--mono); font-size: 9px; letter-spacing: .06em;
+    }
+
+    .wrap { width: min(1460px, 100%); margin: 0 auto; padding: 0 34px; }
+    .hero { padding: 56px 0 38px; border-bottom: 1px solid var(--line); }
+    .hero-grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(280px, .5fr); gap: 56px; align-items: end; }
+    .eyebrow {
+      display: flex; align-items: center; gap: 11px;
+      color: var(--rust); font-family: var(--mono); font-size: 10px; letter-spacing: .13em; text-transform: uppercase;
+    }
+    .eyebrow::before { content: ""; width: 28px; height: 1px; background: currentColor; }
+    h1 {
+      max-width: 900px; margin: 16px 0 0; font-family: var(--display);
+      font-size: clamp(48px, 7.5vw, 98px); font-weight: 600; line-height: .93;
+      letter-spacing: -.045em; text-wrap: balance;
+    }
+    h1 em { color: var(--rust); font-style: normal; }
+    .hero-copy { max-width: 760px; margin: 21px 0 0; color: var(--ink-soft); font-size: 15px; line-height: 1.85; }
+    .hero-note {
+      padding: 22px; border-top: 2px solid var(--ink); border-bottom: 1px solid var(--line);
+      background: rgba(251, 252, 252, .56);
+    }
+    .hero-note strong { display: block; font-family: var(--display); font-size: 22px; line-height: 1.25; }
+    .hero-note p { margin: 10px 0 0; color: var(--muted); font-size: 12px; }
+    .hero-note dl { display: grid; grid-template-columns: 1fr 1fr; gap: 0; margin: 20px 0 0; border-top: 1px solid var(--line); }
+    .hero-note dl div { padding: 13px 0; border-bottom: 1px solid var(--line-soft); }
+    .hero-note dl div:nth-child(2n) { padding-left: 15px; border-left: 1px solid var(--line-soft); }
+    .hero-note dt { color: var(--faint); font-family: var(--mono); font-size: 8px; letter-spacing: .06em; }
+    .hero-note dd { margin: 2px 0 0; font-family: var(--mono); font-size: 13px; }
+
+    .section-head {
+      display: flex; align-items: flex-end; justify-content: space-between; gap: 30px;
+      padding: 40px 0 22px; border-bottom: 1px solid var(--line);
+    }
+    .section-head h2 { margin: 0; font-family: var(--display); font-size: 34px; line-height: 1; letter-spacing: -.035em; }
+    .section-head p { margin: 8px 0 0; color: var(--muted); font-size: 12px; }
+    .section-head > span { color: var(--faint); font-family: var(--mono); font-size: 9px; letter-spacing: .08em; white-space: nowrap; }
+
+    .schemes { display: grid; gap: 26px; padding: 30px 0 10px; }
+    .scheme {
+      display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(360px, .8fr);
+      background: var(--panel); border: 1px solid var(--line); box-shadow: var(--shadow);
+    }
+    .scheme.merged { border-top: 4px solid var(--rust); }
+    .scheme.merged .scheme-kicker { color: var(--forest); }
+    .scheme.merged .scheme-kicker::before { background: var(--forest); }
+    .scheme.merged .scheme-flow { padding-inline: 12px; border: 1px solid #ddcdc2; background: #faf4ef; }
+    .scheme-preview { min-width: 0; padding: 18px; border-right: 1px solid var(--line); background: var(--paper-deep); }
+    .scheme-preview-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; margin-bottom: 14px; }
+    .scheme-index { color: var(--faint); font-family: var(--mono); font-size: 11px; letter-spacing: .08em; }
+    .scheme-state {
+      min-height: 27px; display: inline-flex; align-items: center; padding: 0 8px;
+      border: 1px solid var(--line); color: var(--muted); font-family: var(--mono); font-size: 8px; letter-spacing: .07em;
+    }
+    .scheme-state.primary { color: var(--forest); border-color: #a7c0b2; background: #e9f1ec; }
+    .scheme-state.special { color: #256f63; border-color: #8cc2b7; background: #e4f4ef; }
+    .scheme-state.fallback { color: var(--signal); border-color: #aebfe5; background: #edf2fd; }
+    .scheme-state.merged { color: var(--rust); border-color: #d3b09b; background: #f8eee8; }
+    .preview-frame {
+      position: relative; overflow: hidden; min-height: 430px; display: grid; place-items: center;
+      border: 1px solid #b9c5ca; background: #dfe6e9;
+    }
+    .preview-frame::before {
+      content: "PROTOTYPE / LIVE HTML"; position: absolute; top: 9px; left: 10px; z-index: 2;
+      padding: 3px 6px; color: #dbe7ea; background: rgba(10, 25, 32, .8); font-family: var(--mono); font-size: 7px; letter-spacing: .08em;
+    }
+    .preview-frame img { width: 100%; height: auto; max-height: 660px; object-fit: contain; object-position: top center; }
+    .preview-frame.mobile-preview { min-height: 590px; background: #cbd6da; }
+    .preview-frame.mobile-preview img { width: min(390px, 100%); max-height: 590px; object-fit: cover; object-position: top; }
+    .preview-foot { display: flex; justify-content: space-between; gap: 15px; margin-top: 9px; color: var(--faint); font-family: var(--mono); font-size: 8px; }
+    .shot-tabs { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 12px; }
+    .shot-tabs button {
+      min-height: 44px; padding: 0 10px; border: 1px solid var(--line); background: transparent;
+      color: var(--muted); font-size: 10px;
+    }
+    .shot-tabs button:hover { background: #f0f4f5; }
+    .shot-tabs button[aria-selected="true"] { border-color: var(--ink); background: var(--ink); color: #fff; }
+
+    .scheme-copy { padding: 28px 28px 24px; display: flex; flex-direction: column; }
+    .scheme-kicker { display: flex; align-items: center; gap: 9px; color: var(--rust); font-family: var(--mono); font-size: 9px; letter-spacing: .1em; text-transform: uppercase; }
+    .scheme-kicker::before { content: ""; width: 20px; height: 1px; background: currentColor; }
+    .scheme h2 { margin: 9px 0 0; font-family: var(--display); font-size: 45px; line-height: 1; letter-spacing: -.04em; }
+    .scheme h2 span { display: block; margin-top: 6px; color: var(--faint); font-family: var(--mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
+    .scheme-thesis { margin: 17px 0 0; color: var(--ink-soft); font-size: 13px; line-height: 1.8; }
+    .scheme-flow {
+      margin: 18px 0 0; padding: 13px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+      color: var(--muted); font-family: var(--mono); font-size: 9px; line-height: 1.8;
+    }
+    .scheme-flow strong { display: block; margin-bottom: 5px; color: var(--ink); font-size: 8px; letter-spacing: .08em; }
+    .pros-cons { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 17px; }
+    .pros-cons h3 { margin: 0; color: var(--faint); font-family: var(--mono); font-size: 8px; font-weight: 400; letter-spacing: .08em; }
+    .pros-cons ul { margin: 7px 0 0; padding: 0; list-style: none; }
+    .pros-cons li { position: relative; margin-top: 6px; padding-left: 12px; color: var(--muted); font-size: 10px; line-height: 1.65; }
+    .pros-cons li::before { content: ""; position: absolute; left: 0; top: .67em; width: 4px; height: 1px; background: var(--faint); }
+    .scheme-facts { display: grid; grid-template-columns: repeat(3, 1fr); margin: auto 0 0; padding-top: 22px; }
+    .scheme-facts div { padding-right: 12px; padding-bottom: 8px; border-right: 1px solid var(--line); }
+    .scheme-facts div + div { padding-left: 12px; }
+    .scheme-facts div:last-child { border-right: 0; }
+    .scheme-facts dt { color: var(--faint); font-family: var(--mono); font-size: 8px; letter-spacing: .05em; }
+    .scheme-facts dd { margin: 4px 0 0; font-size: 11px; line-height: 1.4; }
+    .scheme-links { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 17px; }
+    .scheme-links a {
+      min-height: 42px; padding: 0 13px; display: inline-flex; align-items: center; gap: 7px;
+      border: 1px solid var(--ink); background: var(--ink); color: #fff; text-decoration: none; font-size: 11px; font-weight: 600;
+    }
+    .scheme-links a.secondary { color: var(--ink); background: transparent; border-color: var(--line); font-weight: 500; }
+    .scheme-links a:hover { background: var(--rust); border-color: var(--rust); color: #fff; }
+
+    .decision {
+      margin: 42px 0 0; display: grid; grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr);
+      color: #eaf2f4; background: var(--navy); border-top: 4px solid var(--rust);
+    }
+    .decision-lead { padding: 34px; border-right: 1px solid #34515c; }
+    .decision-lead .eyebrow { color: #e3a486; }
+    .decision-lead h2 { margin: 13px 0 0; font-family: var(--display); font-size: 55px; line-height: .96; letter-spacing: -.04em; }
+    .decision-lead p { max-width: 440px; margin: 15px 0 0; color: #aabdc4; font-size: 12px; line-height: 1.8; }
+    .decision-body { padding: 34px; }
+    .decision-body > p { margin: 0; color: #aabdc4; font-size: 13px; line-height: 1.85; }
+    .mix { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; margin-top: 22px; background: #3b5560; }
+    .mix article { padding: 16px; background: #153541; }
+    .mix small { color: #a8bec7; font-family: var(--mono); font-size: 11px; letter-spacing: .06em; }
+    .mix strong { display: block; margin-top: 7px; color: #eef6f7; font-family: var(--display); font-size: 21px; line-height: 1.15; }
+    .mix p { margin: 5px 0 0; color: #c3d5dc; font-size: 12px; line-height: 1.6; }
+    .next-path { margin-top: 24px; padding-top: 19px; border-top: 1px solid #34515c; }
+    .next-path h3 { margin: 0 0 10px; color: #d6e3e7; font-family: var(--mono); font-size: 11px; font-weight: 400; letter-spacing: .08em; }
+    .next-path ol { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin: 0; padding: 0; list-style: none; counter-reset: step; }
+    .next-path li { counter-increment: step; color: #c3d5dc; font-size: 12px; line-height: 1.65; }
+    .next-path li::before { content: "0" counter(step); display: block; margin-bottom: 4px; color: #e3a486; font-family: var(--mono); font-size: 11px; }
+
+    .evidence { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: 26px; padding: 28px 0 0; }
+    .evidence-copy { padding: 22px; background: var(--panel); border: 1px solid var(--line); }
+    .evidence-copy h2 { margin: 0; font-family: var(--display); font-size: 30px; letter-spacing: -.03em; }
+    .evidence-copy > p { margin: 10px 0 0; color: var(--muted); font-size: 12px; line-height: 1.8; }
+    .evidence-list { margin-top: 18px; border-top: 1px solid var(--line); }
+    .evidence-list div { display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 10px; padding: 11px 0; border-bottom: 1px solid var(--line-soft); }
+    .evidence-list b { color: var(--rust); font-family: var(--mono); font-size: 9px; font-weight: 400; }
+    .evidence-list span { color: var(--muted); font-size: 11px; }
+    .baseline-stack { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .baseline-stack figure { margin: 0; border: 1px solid var(--line); background: var(--panel); }
+    .baseline-stack img { width: 100%; height: 300px; object-fit: cover; object-position: top; }
+    .baseline-stack figcaption { display: flex; justify-content: space-between; gap: 10px; padding: 9px 10px; color: var(--muted); font-size: 9px; }
+    .baseline-stack figcaption span:last-child { color: var(--faint); font-family: var(--mono); font-size: 8px; }
+
+    .boundary {
+      display: flex; align-items: center; justify-content: space-between; gap: 22px;
+      margin: 30px 0 0; padding: 17px 19px; border: 1px solid #d3bdae; background: #f8eee8;
+    }
+    .boundary strong { color: var(--rust); font-family: var(--mono); font-size: 9px; letter-spacing: .06em; }
+    .boundary p { margin: 0; color: #745949; font-size: 11px; line-height: 1.7; }
+    .boundary a { flex: 0 0 auto; min-height: 42px; padding: 0 13px; display: inline-flex; align-items: center; border: 1px solid var(--rust); color: var(--rust); text-decoration: none; font-size: 10px; font-weight: 600; }
+
+    footer {
+      display: flex; justify-content: space-between; gap: 20px; margin-top: 52px; padding: 22px 0 36px;
+      border-top: 1px solid var(--line); color: var(--faint); font-family: var(--mono); font-size: 8px; letter-spacing: .04em;
+    }
+
+    dialog {
+      width: min(1500px, calc(100vw - 24px)); max-height: calc(100vh - 24px); padding: 0;
+      border: 1px solid #8b9ba2; background: #e9eef0; color: var(--ink); box-shadow: 0 30px 100px rgba(0,0,0,.3);
+    }
+    dialog::backdrop { background: rgba(7, 18, 23, .72); backdrop-filter: blur(3px); }
+    .lightbox-head { display: flex; align-items: center; justify-content: space-between; gap: 15px; padding: 10px 12px; border-bottom: 1px solid var(--line); background: var(--panel); }
+    .lightbox-head strong { font-size: 11px; }
+    .lightbox-head button { min-width: 40px; min-height: 36px; border: 1px solid var(--line); background: transparent; }
+    dialog img { width: 100%; max-height: calc(100vh - 86px); object-fit: contain; background: #ccd6d9; }
+
+    @media (max-width: 1080px) {
+      .hero-grid, .scheme, .decision, .evidence { grid-template-columns: 1fr; }
+      .scheme-preview { border-right: 0; border-bottom: 1px solid var(--line); }
+      .decision-lead { border-right: 0; border-bottom: 1px solid #34515c; }
+      .preview-frame { min-height: 360px; }
+      .preview-frame.mobile-preview { min-height: 560px; }
+    }
+    @media (max-width: 760px) {
+      .site-head { flex-wrap: wrap; padding: 9px 16px; gap: 8px 15px; }
+      .site-head nav { order: 3; width: 100%; justify-content: space-between; gap: 8px; padding-bottom: 4px; }
+      .site-head nav a { min-height: 44px; display: inline-flex; align-items: center; font-size: 10px; }
+      .stage-tag { margin-left: auto; }
+      .wrap { padding-inline: 15px; }
+      .hero { padding-top: 34px; }
+      h1 { font-size: clamp(36px, 11.5vw, 52px); line-height: .98; }
+      .hero-copy { font-size: 13px; }
+      .hero-note { padding: 17px; }
+      .section-head { align-items: flex-start; flex-direction: column; gap: 8px; padding-top: 30px; }
+      .section-head h2 { font-size: 28px; }
+      .scheme-preview, .scheme-copy { padding: 14px; }
+      .scheme h2 { font-size: 40px; }
+      .pros-cons { grid-template-columns: 1fr; gap: 12px; }
+      .scheme-facts { grid-template-columns: 1fr; padding-top: 17px; }
+      .scheme-facts div, .scheme-facts div + div { padding: 9px 0; border-right: 0; border-bottom: 1px solid var(--line-soft); }
+      .scheme-facts div:last-child { border-bottom: 0; }
+      .scheme-links a { flex: 1 1 100%; justify-content: center; }
+      .decision-lead, .decision-body { padding: 22px; }
+      .decision-lead h2 { font-size: 43px; }
+      .mix { grid-template-columns: 1fr; }
+      .next-path ol { grid-template-columns: 1fr; gap: 12px; }
+      .baseline-stack { grid-template-columns: 1fr; }
+      .baseline-stack img { height: auto; max-height: 360px; }
+      .boundary { align-items: flex-start; flex-direction: column; }
+      .boundary a { width: 100%; justify-content: center; }
+      footer { flex-direction: column; gap: 7px; }
+      .preview-frame { min-height: 230px; }
+      .preview-frame.mobile-preview { min-height: 500px; }
+      .scroll-hint { display: block; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; animation: none !important; }
+    }
+    /* Keep review labels readable after the responsive rules cascade. */
+    .brand small,
+    .stage-tag,
+    .hero-note dt,
+    .section-head > span,
+    .scheme-state,
+    .preview-frame::before,
+    .preview-foot,
+    .scheme-kicker,
+    .scheme-flow strong,
+    .pros-cons h3,
+    .scheme-facts dt,
+    .evidence-list b,
+    .baseline-stack figcaption,
+    .baseline-stack figcaption span:last-child,
+    .boundary strong {
+      font-size: 11px;
+    }
+    .site-head nav a,
+    .shot-tabs button,
+    .scheme-flow,
+    .pros-cons li,
+    .mix small,
+    .mix p,
+    .next-path h3,
+    .next-path li,
+    .next-path li::before,
+    .evidence-list span,
+    .boundary p,
+    .boundary a,
+    footer {
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <header class="site-head">
+    <a class="brand" href="#" aria-label="回到评审页顶部">
+      <span class="brand-mark">M</span>
+      <span><strong>ModelForge</strong><small>DESIGN REVIEW / 2026.11.04</small></span>
+    </a>
+    <nav aria-label="评审页导航">
+      <a href="#merged">合并版</a>
+      <a href="#directions">原始方向</a>
+      <a href="#decision">最终决策</a>
+      <a href="#evidence">诊断依据</a>
+      <a href="README.md">完整文档</a>
+    </nav>
+    <span class="stage-tag">STATIC PROTOTYPE</span>
+  </header>
+
+  <main class="wrap" id="main">
+    <section class="hero">
+      <div class="hero-grid">
+        <div>
+          <h1>把「训练成功」<br>和「<em>可以用</em>」分开。</h1>
+          <p class="hero-copy">从真实训练工作台与推理试用页出发，重画冻结输入、手动实例、Best / Final 发布、资源回收与独立推理验收。这里保留三套探索，并把最终取舍合成一套可交互的 F4 合流台。</p>
+        </div>
+        <aside class="hero-note" aria-label="评审摘要">
+          <strong>3 套探索<br>1 版合并落地</strong>
+          <p>F4 合流台把 F1 的验收主线、F3 的控制面纪律和 F2 的证据密度合成一套可交互原型。</p>
+          <dl>
+            <div><dt>TRAIN / VAL</dt><dd>1,116 / 124</dd></div>
+            <div><dt>BASE</dt><dd>Qwen3-0.6B</dd></div>
+            <div><dt>BEST EVAL</dt><dd>0.3218</dd></div>
+            <div><dt>PAIR GATE</dt><dd>2 / 2</dd></div>
+          </dl>
+        </aside>
+      </div>
+    </section>
+
+    <section id="directions">
+      <div class="section-head">
+        <div><h2>合并版与原始方向</h2><p>先看推荐落地版，再回看三套探索各自贡献了什么。切换缩略图可查看关键页面。</p></div>
+        <span>F4 + 01 — 03 / COMPARE</span>
+      </div>
+
+      <div class="schemes">
+        <article class="scheme merged" id="merged" data-scheme="f4">
+          <div class="scheme-preview">
+            <div class="scheme-preview-top"><span class="scheme-index">F4 / FORGE RELAY · MERGED</span><span class="scheme-state merged">RECOMMENDED TO BUILD</span></div>
+            <div class="preview-frame" data-frame>
+              <img data-preview src="review/showcase/02-f4-relay-success-1440.png" alt="F4 合流台训练成功验收页">
+            </div>
+            <div class="preview-foot"><span data-caption>成功验收 · 发布回执</span><span data-size>1440 × 1000</span></div>
+            <div class="shot-tabs" role="tablist" aria-label="合流台页面截图">
+              <button type="button" role="tab" aria-selected="true" data-shot="review/showcase/02-f4-relay-success-1440.png" data-title="成功验收 · 发布回执" data-size="1440 × 1000">验收</button>
+              <button type="button" role="tab" aria-selected="false" data-shot="review/showcase/01-f4-relay-running-1440.png" data-title="训练执行 · 进行中" data-size="1440 × 1000">运行</button>
+              <button type="button" role="tab" aria-selected="false" data-shot="review/showcase/03-f4-relay-artifacts-1440.png" data-title="产物门禁 · Best / Final 2/2" data-size="1440 × 1000">产物</button>
+              <button type="button" role="tab" aria-selected="false" data-shot="review/showcase/04-f4-relay-create-1440.png" data-title="新建训练 · 冻结确认" data-size="1440 × 1000">创建</button>
+              <button type="button" role="tab" aria-selected="false" data-shot="review/showcase/05-f4-relay-inference-1440.png" data-title="推理验收 · 带上下文交接" data-size="1440 × 1000">推理</button>
+              <button type="button" role="tab" aria-selected="false" data-shot="review/showcase/06-f4-relay-mobile-390.png" data-title="移动端 · 发布回执" data-size="390 × 844">移动</button>
+            </div>
+          </div>
+          <div class="scheme-copy">
+            <div class="scheme-kicker">Merged production direction</div>
+            <h2>合流台<span>Forge Relay</span></h2>
+            <p class="scheme-thesis">把 F1 的“训练成功不等于可以用”变成贯穿所有页面的验收轨：F3 提供稳定的主从控制面，铜色发布回执集中交代进程、产物与资源三项事实，推理页接收同一份交接合同。</p>
+            <div class="scheme-flow"><strong>CORE ROUTE</strong>冻结输入 → 实例核验 → 训练执行 → 产物 2/2 → 资源回收 → 独立推理</div>
+            <div class="pros-cons">
+              <div><h3>成立之处</h3><ul><li>保留 F3 的生产结构，同时建立训练子域自己的识别度。</li><li>发布回执把进程退出、产物可用、GPU 释放拆开又收拢。</li><li>Attempt / Adapter / role / base 进入 URL，刷新后仍可恢复。</li></ul></div>
+              <div><h3>取舍</h3><ul><li>暖色只集中在发布回执，避免整站换肤。</li><li>验收轨常驻页头，会占用一部分纵向空间。</li><li>仍需真实路由合同与后端字段才能进入正式实现。</li></ul></div>
+            </div>
+            <dl class="scheme-facts"><div><dt>实现成本</dt><dd>中</dd></div><div><dt>最适合</dt><dd>生产首版 / 连续验收</dd></div><div><dt>结论</dt><dd>推荐落地</dd></div></dl>
+            <div class="scheme-links"><a href="forge-relay.html">打开合并版 <span aria-hidden="true">↗</span></a><a class="secondary" href="forge-relay.html?scenario=success">直达发布回执</a></div>
+          </div>
+        </article>
+
+        <article class="scheme" data-scheme="f1">
+          <div class="scheme-preview">
+            <div class="scheme-preview-top"><span class="scheme-index">01 / FORGE RUNWAY</span><span class="scheme-state primary">CONCEPT NORTH STAR</span></div>
+            <div class="preview-frame" data-frame>
+              <img data-preview src="review/showcase/01-f1-runway-running-1440.png" alt="F1 铸程线训练执行页">
+            </div>
+            <div class="preview-foot"><span data-caption>训练执行 · 运行中</span><span data-size>1440 × 1000</span></div>
+            <div class="shot-tabs" role="tablist" aria-label="铸程线页面截图">
+              <button type="button" role="tab" aria-selected="true" data-shot="review/showcase/01-f1-runway-running-1440.png" data-title="训练执行 · 运行中" data-size="1440 × 1000">运行</button>
+              <button type="button" role="tab" aria-selected="false" data-shot="review/showcase/02-f1-runway-success-1440.png" data-title="产物验收 · Best / Final 2/2" data-size="1440 × 1000">产物</button>
+              <button type="button" role="tab" aria-selected="false" data-shot="review/showcase/03-f1-runway-create-1440.png" data-title="新建训练 · 冻结确认" data-size="1440 × 1000">创建</button>
+              <button type="button" role="tab" aria-selected="false" data-shot="review/showcase/04-f1-runway-inference-1440.png" data-title="推理验收 · 对话证据" data-size="1440 × 1000">推理</button>
+              <button type="button" role="tab" aria-selected="false" data-shot="review/showcase/05-f1-runway-mobile-390.png" data-title="移动端 · 运行总览" data-size="390 × 844">移动</button>
+            </div>
+          </div>
+          <div class="scheme-copy">
+            <div class="scheme-kicker">Editorial lifecycle</div>
+            <h2>铸程线<span>Forge Runway</span></h2>
+            <p class="scheme-thesis">把一次微调当成可验收的产线。暖纸、森林绿与铜色让训练从普通后台里站出来；生命周期轨道和唯一的下一步把训练、产物、回收与试用连成一条线。</p>
+            <div class="scheme-flow"><strong>CORE ROUTE</strong>冻结输入 → 实例核验 → 训练执行 → 产物 2/2 → 实例释放 → 独立试用</div>
+            <div class="pros-cons">
+              <div><h3>成立之处</h3><ul><li>最有产品识别度，交接本身就是视觉结构。</li><li>产物组、GPU 释放和推理动作能同时被读到。</li><li>空 / 等待 / 失败态也能沿用同一条产线。</li></ul></div>
+              <div><h3>代价</h3><ul><li>暖纸与绿铜和现有蓝白壳层存在品牌断层。</li><li>大 hero 会压缩高频工作区，生产版需折叠。</li><li>异步分支必须显式插入，不能被线性轨道吞掉。</li></ul></div>
+            </div>
+            <dl class="scheme-facts"><div><dt>实现成本</dt><dd>中高</dd></div><div><dt>最适合</dt><dd>首次验收 / 连续追踪</dd></div><div><dt>结论</dt><dd>概念主线</dd></div></dl>
+            <div class="scheme-links"><a href="forge-runway.html">打开可交互原型 <span aria-hidden="true">↗</span></a><a class="secondary" href="forge-runway.html?scenario=success">直达产物验收</a></div>
+          </div>
+        </article>
+
+        <article class="scheme" data-scheme="f2">
+          <div class="scheme-preview">
+            <div class="scheme-preview-top"><span class="scheme-index">02 / SIGNAL DECK</span><span class="scheme-state special">SPECIALIST VIEW</span></div>
+            <div class="preview-frame" data-frame>
+              <img data-preview src="review/showcase/01-f2-signal-running-1440.png" alt="F2 信号舱训练监控页">
+            </div>
+            <div class="preview-foot"><span data-caption>训练执行 · 运行中</span><span data-size>1440 × 1000</span></div>
+            <div class="shot-tabs" role="tablist" aria-label="信号舱页面截图">
+              <button type="button" role="tab" aria-selected="true" data-shot="review/showcase/01-f2-signal-running-1440.png" data-title="训练执行 · 运行中" data-size="1440 × 1000">运行</button>
+              <button type="button" role="tab" aria-selected="false" data-shot="review/showcase/02-f2-signal-success-1440.png" data-title="产物门禁 · 2/2 可发布" data-size="1440 × 1000">产物</button>
+              <button type="button" role="tab" aria-selected="false" data-shot="review/showcase/03-f2-signal-create-1440.png" data-title="新建训练 · 确认并冻结" data-size="1440 × 1000">创建</button>
+              <button type="button" role="tab" aria-selected="false" data-shot="review/showcase/04-f2-signal-inference-1440.png" data-title="推理通道 · 对话验收" data-size="1440 × 1000">推理</button>
+              <button type="button" role="tab" aria-selected="false" data-shot="review/showcase/05-f2-signal-mobile-390.png" data-title="移动端 · 产物门禁" data-size="390 × 844">移动</button>
+            </div>
+          </div>
+          <div class="scheme-copy">
+            <div class="scheme-kicker">Observability cockpit</div>
+            <h2>信号舱<span>Signal Deck</span></h2>
+            <p class="scheme-thesis">训练是信号，不是表单。石墨底、薄荷信号色和三层指令舱把运行索引、Loss、日志、门禁链和资源事实压进同一视野，面向需要持续盯盘的人。</p>
+            <div class="scheme-flow"><strong>CORE ROUTE</strong>选 Run → 读信号 → 切产物门禁 → 携带证据进入验收</div>
+            <div class="pros-cons">
+              <div><h3>成立之处</h3><ul><li>专家视角的信息密度最高，图表是真正主角。</li><li>资源、门禁和下一步并列，适合异常值守。</li><li>证据检查器能自然承接产物与试用。</li></ul></div>
+              <div><h3>代价</h3><ul><li>深色整页会与现有浅色产品割裂。</li><li>移动端重排成本最高。</li><li>监控感容易盖过创建、回收和首次使用。</li></ul></div>
+            </div>
+            <dl class="scheme-facts"><div><dt>实现成本</dt><dd>高</dd></div><div><dt>最适合</dt><dd>高频观察 / 异常分析</dd></div><div><dt>结论</dt><dd>分析子视图</dd></div></dl>
+            <div class="scheme-links"><a href="signal-deck.html">打开可交互原型 <span aria-hidden="true">↗</span></a><a class="secondary" href="signal-deck.html?scenario=success">直达产物门禁</a></div>
+          </div>
+        </article>
+
+        <article class="scheme" data-scheme="f3">
+          <div class="scheme-preview">
+            <div class="scheme-preview-top"><span class="scheme-index">03 / FORGE BENCH</span><span class="scheme-state fallback">PRODUCTION FALLBACK</span></div>
+            <div class="preview-frame" data-frame>
+              <img data-preview src="review/showcase/01-f3-bench-running-1440.png" alt="F3 铸造台训练控制页">
+            </div>
+            <div class="preview-foot"><span data-caption>训练执行 · 运行中</span><span data-size>1440 × 1000</span></div>
+            <div class="shot-tabs" role="tablist" aria-label="铸造台页面截图">
+              <button type="button" role="tab" aria-selected="true" data-shot="review/showcase/01-f3-bench-running-1440.png" data-title="训练执行 · 运行中" data-size="1440 × 1000">运行</button>
+              <button type="button" role="tab" aria-selected="false" data-shot="review/showcase/02-f3-bench-success-1440.png" data-title="产物验收 · 成对发布" data-size="1440 × 1000">产物</button>
+              <button type="button" role="tab" aria-selected="false" data-shot="review/showcase/03-f3-bench-create-1440.png" data-title="新建训练 · 冻结确认" data-size="1440 × 1000">创建</button>
+              <button type="button" role="tab" aria-selected="false" data-shot="review/showcase/04-f3-bench-inference-1440.png" data-title="推理验收 · 对话与回收" data-size="1440 × 1000">推理</button>
+              <button type="button" role="tab" aria-selected="false" data-shot="review/showcase/05-f3-bench-mobile-390.png" data-title="移动端 · 产物验收" data-size="390 × 844">移动</button>
+            </div>
+          </div>
+          <div class="scheme-copy">
+            <div class="scheme-kicker">Control plane discipline</div>
+            <h2>铸造台<span>Forge Bench</span></h2>
+            <p class="scheme-thesis">沿用现有产品的冷白、石墨和钴蓝，以主从台账 + 控制单驱动。它不追求第一个记住的画面，而是把运行、证据和底部主动作稳定地放在熟悉的位置。</p>
+            <div class="scheme-flow"><strong>CORE ROUTE</strong>运行索引 → 选中 Attempt → 五页签 → 冻结快照 → 固定主动作</div>
+            <div class="pros-cons">
+              <div><h3>成立之处</h3><ul><li>与当前产品最接近，迁移阻力最小。</li><li>桌面和移动端结构最稳，能先做生产落地。</li><li>台账、门禁链和冻结清单复用性高。</li></ul></div>
+              <div><h3>代价</h3><ul><li>差异度最低，容易回到普通控制台。</li><li>微字和密度偏高，需要进一步压缩。</li><li>训练→推理的连续性依赖约定，而非叙事。</li></ul></div>
+            </div>
+            <dl class="scheme-facts"><div><dt>实现成本</dt><dd>低到中</dd></div><div><dt>最适合</dt><dd>日常值守 / 快速交付</dd></div><div><dt>结论</dt><dd>生产底座</dd></div></dl>
+            <div class="scheme-links"><a href="forge-bench.html">打开可交互原型 <span aria-hidden="true">↗</span></a><a class="secondary" href="forge-bench.html?scenario=success&view=artifacts">直达产物验收</a></div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="decision">
+      <div class="section-head">
+        <div><h2>最终决策</h2><p>上一轮结论已经收敛为 F4：统一验收叙事，但不让暖色接管整个产品。</p></div>
+        <span>MERGED / REVIEW SYNTHESIS</span>
+      </div>
+      <div class="decision">
+        <div class="decision-lead">
+          <h2>F4 已合流。<br>F1 做主线。<br>F3 做落地。</h2>
+          <p>合并版已经把训练、产物验收、资源释放和推理交接接成同一对象；视觉识别集中在发布回执，不再要求全站迁移到暖纸风格。</p>
+        </div>
+        <div class="decision-body">
+          <p><strong style="color:#fff">合并结果：</strong>F4 用 F1 的生命周期、对象证据和唯一主动作重画任务线；用 F3 的主从台账、控制单、门禁链和移动固定动作承接生产结构；把 F2 的 Loss、采样边界与证据密度留在分析与异常视图里。<a href="forge-relay.html" style="color:#f0c4a9">打开合并版原型 ↗</a></p>
+          <div class="mix">
+            <article><small>FROM F1</small><strong>主线与识别度</strong><p>产线式阶段轨、组级验收、训练→推理的交接叙述。</p></article>
+            <article><small>FROM F3</small><strong>组件纪律</strong><p>主从台账、紧凑控制单、门禁链和固定移动端主动作栏。</p></article>
+            <article><small>FROM F2</small><strong>证据密度</strong><p>信号图、报告边界、证据检查器，只在需要的地方加。</p></article>
+          </div>
+          <div class="next-path">
+            <h3>NEXT ROUND / 先做三件事</h3>
+            <ol>
+              <li>冻结跨页合同：Attempt、Adapter、Role、Base fingerprint；Serving 支持稳定 Trial 深链。</li>
+              <li>把训练结果、产物 2/2、租约释放拆为三项事实，禁止一个绿色状态代替全部。</li>
+              <li>先在生产壳层中实现 F3 级组件，再逐页叠加 F1 的生命周期与主动作。</li>
+            </ol>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="evidence">
+      <div class="section-head">
+        <div><h2>诊断依据</h2><p>真实界面看到的不是“卡片不好看”，而是同一任务被拆成多次重复选择。</p></div>
+        <span>LIVE UI / CODE</span>
+      </div>
+      <div class="evidence">
+        <div class="evidence-copy">
+          <h2>现状的 6 个断点</h2>
+          <p>训练模块已经能真实运行，但它在成功之后与“推理试用”没有共享同一份上下文；用户必须重新建立对对象的信心。</p>
+          <div class="evidence-list">
+            <div><b>01</b><span>“用于推理试用”只跳到 `#serving`，不带 Attempt、Adapter、Role、基座指纹。</span></div>
+            <div><b>02</b><span>Trial 选择只存在 React state；刷新后 URL 不恢复当前试用。</span></div>
+            <div><b>03</b><span>创建、历史、详情、对话和参数都堆在一个纵向页面里。</span></div>
+            <div><b>04</b><span>训练进程成功、Best / Final 2/2、GPU 租约释放没有形成同一张“验收单”。</span></div>
+            <div><b>05</b><span>训练工作台首屏同时争夺注意力的是摘要、当前 Run、图表、关注项、事实和台账。</span></div>
+            <div><b>06</b><span>训练与推理视觉语言不同，交接看起来像离开产品又回来。</span></div>
+          </div>
+        </div>
+        <div class="baseline-stack" aria-label="现状真实截图">
+          <figure><img src="review/baseline/workbench-1440.png" alt="现状训练工作台桌面截图"><figcaption><span>当前训练工作台</span><span>1440</span></figcaption></figure>
+          <figure><img src="review/baseline/serving-detail-1440.png" alt="现状推理试用详情桌面截图"><figcaption><span>当前推理试用详情</span><span>1440</span></figcaption></figure>
+          <figure><img src="review/baseline/workbench-390.png" alt="现状训练工作台移动端截图"><figcaption><span>当前训练工作台</span><span>390</span></figcaption></figure>
+          <figure><img src="review/baseline/serving-detail-390.png" alt="现状推理试用详情移动端截图"><figcaption><span>当前推理试用详情</span><span>390</span></figcaption></figure>
+        </div>
+      </div>
+      <div class="boundary">
+        <div><strong>BOUNDARY / 原型边界</strong><p>不改正式业务逻辑、不接后端、不提交 Git、不部署。截图中的训练、GPU、MinIO、vLLM 均为原型状态，不代表真实执行验收。</p></div>
+        <a href="README.md">阅读完整验证与取舍</a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="wrap">
+    <span>MODELFORGE · INFERENCE TRAINING REDESIGN · REVIEW SHEET 11.04</span>
+    <span>STATIC HTML PROTOTYPES / HEADLESS PLAYWRIGHT CAPTURES</span>
+  </footer>
+
+  <dialog id="lightbox" aria-label="截图预览">
+    <div class="lightbox-head"><strong id="lightbox-title">截图预览</strong><button type="button" id="lightbox-close" aria-label="关闭截图预览">关闭</button></div>
+    <img id="lightbox-image" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==" alt="">
+  </dialog>
+
+  <script>
+    document.querySelectorAll('.scheme').forEach((card) => {
+      const frame = card.querySelector('[data-frame]');
+      const image = card.querySelector('[data-preview]');
+      const caption = card.querySelector('[data-caption]');
+      const size = card.querySelector('[data-size]');
+      card.querySelectorAll('[data-shot]').forEach((button) => {
+        button.addEventListener('click', () => {
+          card.querySelectorAll('[data-shot]').forEach((item) => item.setAttribute('aria-selected', 'false'));
+          button.setAttribute('aria-selected', 'true');
+          image.src = button.dataset.shot;
+          image.alt = button.dataset.title;
+          caption.textContent = button.dataset.title;
+          size.textContent = button.dataset.size;
+          frame.classList.toggle('mobile-preview', button.dataset.size.startsWith('390'));
+        });
+      });
+      image.addEventListener('click', () => {
+        const dialog = document.getElementById('lightbox');
+        const preview = document.getElementById('lightbox-image');
+        document.getElementById('lightbox-title').textContent = caption.textContent;
+        preview.src = image.src;
+        preview.alt = image.alt;
+        dialog.showModal();
+      });
+      image.style.cursor = 'zoom-in';
+    });
+
+    if (window.matchMedia('(max-width: 760px)').matches) {
+      document.querySelectorAll('.scheme').forEach((card) => {
+        const mobileShot = card.querySelector('[data-shot][data-size^="390"]');
+        if (mobileShot) mobileShot.click();
+      });
+    }
+
+    const dialog = document.getElementById('lightbox');
+    function closeLightbox() {
+      dialog.close();
+      document.getElementById('lightbox-image').removeAttribute('src');
+    }
+    document.getElementById('lightbox-close').addEventListener('click', closeLightbox);
+    dialog.addEventListener('click', (event) => {
+      if (event.target === dialog) closeLightbox();
+    });
+    dialog.addEventListener('cancel', (event) => {
+      event.preventDefault();
+      closeLightbox();
+    });
+  </script>
+</body>
+</html>
