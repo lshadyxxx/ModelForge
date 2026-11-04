@@ -116,6 +116,7 @@ export function ResourceMarket({
   const quotedCount = options.filter(
     (option) => option.quote?.state === 'available',
   ).length;
+  const gpuCount = new Set(options.map((option) => option.gpuType)).size;
   const selected = sortedOptions.find((item) => item.id === selectedId) ?? sortedOptions[0];
   const visibleOptions = sortedOptions.slice(0, visibleCount);
   useEffect(() => {
@@ -286,13 +287,14 @@ export function ResourceMarket({
         <div className="mf-market-results-head">
           <div>
             <strong id="mf-market-result-title">
-              {loading ? '正在刷新真实资源目录' : `${options.length} 个单卡配置`}
+              {loading ? '正在刷新真实资源目录' : `${options.length} 个硬件组合`}
             </strong>
             <small>
               {queryTime
                 ? `目录查询：${new Date(queryTime).toLocaleString('zh-CN', { hour12: false })}`
                 : '尚未取得目录查询时间'}
               {stale ? ' · 当前筛选条件已变化，旧结果不会被采用' : ''}
+              {loading ? '' : ` · ${gpuCount} 种 GPU · 运行镜像在创建向导中选择`}
             </small>
           </div>
           <div className="mf-segment-control" role="group" aria-label="目录排序">
@@ -331,7 +333,7 @@ export function ResourceMarket({
             ? '正在加载资源市场目录'
             : error
               ? '资源市场目录加载失败'
-              : `资源市场共 ${options.length} 个配置`}
+              : `资源市场共 ${options.length} 个硬件组合`}
         </span>
 
         {error && (
@@ -458,7 +460,7 @@ export function ResourceMarket({
         {!error && !loading && sortedOptions.length > visibleOptions.length && (
           <div className="mf-market-more">
             <span>
-              已显示 {visibleOptions.length} / {sortedOptions.length} 个配置
+              已显示 {visibleOptions.length} / {sortedOptions.length} 个硬件组合
             </span>
             <button
               type="button"

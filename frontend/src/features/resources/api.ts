@@ -4,7 +4,7 @@ export type Directory<T> = {items: T[]; total: number; state: 'ready' | 'empty' 
 export type Configuration = {configured: boolean; default_region: string | null; mode: 'read_only'};
 export type Zone = {Region: string; Zone: string; Describe: string; IsPod: boolean};
 export type Specification = {Name: string; Zone: string; Status: string; Description: string; GraphicsMemory: {Value: number}; MachineSizes: {Gpu: number; Collection: {Cpu: number; Memory: number[]; MinimalCpuPlatform: string[]}[]}[]; Disks: {Name: string; BootDisk: {Name: string; MinimalSize: number | null; MaximalSize: number | null}[]}[]; CpuPlatforms: Record<string, string[]>};
-export type Image = {CompShareImageId: string; Name: string; ImageType: string; Status: string; Author: string; Tags: string[]};
+export type Image = {CompShareImageId: string; Name: string; ImageType: string; Status: string; Author: string; Tags: string[]; Description?: string};
 export type PublicModel = {Name: string; Path: string; Size: string; Tag: string};
 export type Capacity = {Gpu: number; Cpu: number; Mem: number; ResourceEnough: boolean};
 

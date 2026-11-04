@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import type { Image } from '../api';
 import { ComputeIcon } from './ComputeIcon';
 import { CreateEnvironmentWizard } from './CreateEnvironmentWizard';
 import type {
@@ -26,7 +27,55 @@ import { normalizeQuote, unavailableQuote } from './compute-model';
 import './compute-workbench.css';
 
 type Tab = 'market' | 'console';
-type Scenario = 'ready' | 'loading' | 'empty' | 'error';
+type Scenario = 'ready' | 'loading' | 'empty' | 'error' | 'truncated';
+
+const fixtureImages: Image[] = [
+  {
+    CompShareImageId: 'fixture-image-torch',
+    Name: 'Ubuntu-nvidia 22.04',
+    ImageType: 'System',
+    Status: 'Available',
+    Author: 'fixture',
+    Tags: ['Linux'],
+    Description: '本地夹具系统镜像，不代表真实兼容基线',
+  },
+  {
+    CompShareImageId: 'fixture-image-vllm',
+    Name: 'vLLM Runtime 0.9',
+    ImageType: 'App',
+    Status: 'Available',
+    Author: 'fixture',
+    Tags: ['推理服务'],
+    Description: '本地夹具应用镜像',
+  },
+  {
+    CompShareImageId: 'fixture-image-cpu',
+    Name: 'Ubuntu 22.04 CPU',
+    ImageType: 'System',
+    Status: 'Available',
+    Author: 'fixture',
+    Tags: ['Linux'],
+    Description: '本地夹具 CPU 镜像',
+  },
+  {
+    CompShareImageId: 'fixture-image-offline',
+    Name: 'PyTorch:24.04-py3',
+    ImageType: 'App',
+    Status: 'Offline',
+    Author: 'fixture',
+    Tags: ['训练框架'],
+    Description: '用于验证下线状态不可选',
+  },
+  {
+    CompShareImageId: 'fixture-image-offline-system',
+    Name: 'Ubuntu 20.04 legacy',
+    ImageType: 'System',
+    Status: 'Offline',
+    Author: 'fixture',
+    Tags: ['Linux'],
+    Description: '用于验证系统目录下线状态不可选',
+  },
+];
 
 const now = new Date();
 const isoMinutesAgo = (minutes: number) =>
@@ -470,6 +519,13 @@ export function ComputeFixturePreview() {
     scenario === 'empty' || scenario === 'error' || scenario === 'loading'
       ? []
       : filtered;
+  const wizardImageType = wizard?.imageType ?? 'System';
+  const visibleFixtureImages =
+    scenario === 'empty' || scenario === 'error' || scenario === 'loading'
+      ? []
+      : fixtureImages.filter((image) => image.ImageType === wizardImageType);
+  const fixtureImageTotal =
+    scenario === 'truncated' ? 120 : visibleFixtureImages.length;
   const attentionCount = environments.filter(
     (environment) =>
       environment.statusTone === 'danger'
@@ -583,12 +639,13 @@ export function ComputeFixturePreview() {
           <strong>状态演练</strong>
         </span>
         <div className="mf-segment-control" role="group" aria-label="目录状态演练">
-          {(['ready', 'loading', 'empty', 'error'] as const).map((state) => (
+          {(['ready', 'loading', 'empty', 'error', 'truncated'] as const).map((state) => (
             <button
               type="button"
               key={state}
               aria-pressed={scenario === state}
               onClick={() => setScenario(state)}
+              data-fixture-image-state={state}
             >
               {
                 {
@@ -596,6 +653,7 @@ export function ComputeFixturePreview() {
                   loading: '加载',
                   empty: '空',
                   error: '错误',
+                  truncated: '截断',
                 }[state]
               }
             </button>
@@ -685,12 +743,23 @@ export function ComputeFixturePreview() {
       {wizard && (
         <CreateEnvironmentWizard
           options={filtered}
-          initialOption={wizard}
+          initialDraft={{
+            option: wizard,
+            imageId: wizard.imageId,
+            bootDiskGb: wizard.diskMinGiB ?? 60,
+          }}
           configuration={configuration}
-          imageOptions={[
-            { id: 'fixture-image-torch', name: 'Ubuntu-nvidia 22.04' },
-            { id: 'fixture-image-vllm', name: 'vLLM Runtime 0.9' },
-          ]}
+          images={visibleFixtureImages}
+          imageType={wizardImageType}
+          imagesLoading={scenario === 'loading'}
+          imagesError={
+            scenario === 'error'
+              ? '夹具：运行镜像目录读取失败，可重试；未使用旧结果。'
+              : ''
+          }
+          imagesStale={false}
+          imageTotal={fixtureImageTotal}
+          onRetryImages={() => undefined}
           onClose={() => setWizard(null)}
           onCheckInventory={checkInventory}
           onCreate={async (payload): Promise<CreateAccepted> => ({

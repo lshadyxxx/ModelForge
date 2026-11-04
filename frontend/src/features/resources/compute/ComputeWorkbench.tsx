@@ -20,6 +20,10 @@ import {
 } from '../api';
 import { ComputeIcon } from './ComputeIcon';
 import { CreateEnvironmentWizard } from './CreateEnvironmentWizard';
+import {
+  buildCatalogOptions,
+  type EnvironmentDraft,
+} from './compute-catalog';
 import type {
   CreateAccepted,
   CreateEnvironmentPayload,
@@ -41,14 +45,13 @@ import { toConfigurationView, toEnvironmentView } from './compute-adapters';
 import {
   normalizeQuote,
   type ComputeEnvironmentCollection,
-  type ComputeQuote,
 } from './compute-model';
 import {
-  ResourceMarket,
   type ComputeCatalogOption,
   type MarketAvailability,
   type MarketFilters,
 } from './ResourceMarket';
+import { ResourceConfigurator } from './ResourceConfigurator';
 import type {
   ActionDialogState,
   ComputeAction,
@@ -87,96 +90,12 @@ function sleep(milliseconds: number) {
   return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
 }
 
-function unique(values: Array<string | null | undefined>): string[] {
-  return [...new Set(values.filter((value): value is string => Boolean(value)))];
-}
-
 function optionValue(value: string, label: string) {
   return { value, label };
 }
 
-function allowedDisk(specification: Specification) {
-  const disks = specification.Disks.flatMap((group) => group.BootDisk);
-  return (
-    disks.find(
-      (disk) => disk.Name === 'CLOUD_SSD' || disk.Name === 'CLOUD_RSSD',
-    ) ?? null
-  );
-}
-
-function allowedCpuPlatform(
-  platforms: string[],
-  fallback: string[],
-): 'Auto' | 'Intel/Auto' | 'Amd/Auto' {
-  const values = new Set([...platforms, ...fallback]);
-  if (values.has('Auto')) return 'Auto';
-  if (values.has('Intel/Auto')) return 'Intel/Auto';
-  if (values.has('Amd/Auto')) return 'Amd/Auto';
-  return 'Auto';
-}
-
-function buildOptions(
-  specifications: Specification[],
-  images: Image[],
-  region: string,
-  zone: string,
-): ComputeCatalogOption[] {
-  const options: ComputeCatalogOption[] = [];
-  for (const specification of specifications) {
-    if (specification.Zone && specification.Zone !== zone) continue;
-    const disk = allowedDisk(specification);
-    if (!disk) continue;
-    for (const machine of specification.MachineSizes.filter(
-      (item) => item.Gpu === 1,
-    )) {
-      for (const combination of machine.Collection) {
-        for (const memoryGiB of combination.Memory) {
-          for (const image of images) {
-            options.push({
-              id: [
-                region,
-                specification.Zone,
-                specification.Name,
-                machine.Gpu,
-                combination.Cpu,
-                memoryGiB,
-                image.CompShareImageId,
-                disk.Name,
-              ].join('|'),
-              region,
-              zone: specification.Zone,
-              zoneLabel: specification.Zone,
-              gpuType: specification.Name,
-              graphicsMemoryGb: specification.GraphicsMemory.Value,
-              cpu: combination.Cpu,
-              memoryGiB,
-              cpuPlatform: allowedCpuPlatform(
-                combination.MinimalCpuPlatform,
-                Object.keys(specification.CpuPlatforms).flatMap((vendor) =>
-                  specification.CpuPlatforms[vendor].map(
-                    (platform) => `${vendor}/${platform}`,
-                  ),
-                ),
-              ),
-              imageId: image.CompShareImageId,
-              imageName: image.Name,
-              imageType: image.ImageType,
-              diskType: disk.Name,
-              diskMinGiB: disk.MinimalSize ?? undefined,
-              diskMaxGiB: disk.MaximalSize ?? undefined,
-              chargeType: 'Postpay',
-              availability:
-                specification.Status === 'SoldOut' ? 'out_of_stock' : 'unknown',
-              availabilityLabel:
-                specification.Status === 'SoldOut' ? '目录显示售罄' : '尚未查库存',
-              compatibility: 'unverified',
-            });
-          }
-        }
-      }
-    }
-  }
-  return options;
+function regionLabel(zone: Zone): string {
+  return zone.Describe.replace(/\s*[A-Za-z]$/, '').trim() || zone.Region;
 }
 
 function applyMarketFilters(
@@ -193,8 +112,18 @@ function applyMarketFilters(
       return false;
     }
     if (filters.imageName && option.imageName !== filters.imageName) return false;
-    if (filters.price === 'available' && !option.quote) return false;
-    if (filters.price === 'pending' && option.quote) return false;
+    if (
+      filters.price === 'available'
+      && option.quote?.state !== 'available'
+    ) {
+      return false;
+    }
+    if (
+      filters.price === 'pending'
+      && option.quote?.state === 'available'
+    ) {
+      return false;
+    }
     const state = availability[option.id] ?? option.availability;
     if (filters.stock !== 'all' && state !== filters.stock) return false;
     return true;
@@ -213,6 +142,7 @@ export function ComputeWorkbench() {
   const [filters, setFilters] = useState<MarketFilters>(emptyFilters);
   const [specifications, setSpecifications] = useState<Specification[]>([]);
   const [images, setImages] = useState<Image[]>([]);
+  const [imageTotal, setImageTotal] = useState(0);
   const [catalogLoading, setCatalogLoading] = useState(false);
   const [catalogError, setCatalogError] = useState('');
   const [catalogFetchedAt, setCatalogFetchedAt] = useState<string>();
@@ -221,16 +151,12 @@ export function ComputeWorkbench() {
   const [availability, setAvailability] = useState<
     Record<string, MarketAvailability>
   >({});
-  const [quotes, setQuotes] = useState<Record<string, ComputeQuote>>({});
-  const [capacityCheckedAt, setCapacityCheckedAt] = useState<
-    Record<string, string>
-  >({});
-  const [capacityCheckingId, setCapacityCheckingId] = useState('');
   const [selectedId, setSelectedId] = useState('');
   const [wizardOpen, setWizardOpen] = useState(false);
-  const [wizardOption, setWizardOption] = useState<ComputeCatalogOption | null>(
-    null,
-  );
+  const [wizardDraft, setWizardDraft] = useState<EnvironmentDraft | null>(null);
+  const [wizardInventory, setWizardInventory] = useState<InventoryCheck>({
+    state: 'unknown',
+  });
   const [trackedEnvironmentId, setTrackedEnvironmentId] = useState('');
   const [environments, setEnvironments] = useState<ComputeEnvironmentView[]>([]);
   const [environmentCollection, setEnvironmentCollection] =
@@ -392,6 +318,7 @@ export function ComputeWorkbench() {
     if (!filters.region) {
       setSpecifications([]);
       setImages([]);
+      setImageTotal(0);
       setCatalogSnapshot(null);
       return;
     }
@@ -424,6 +351,7 @@ export function ComputeWorkbench() {
         startTransition(() => {
           setSpecifications(specResult.items);
           setImages(imageResult.items);
+          setImageTotal(imageResult.total);
           setCatalogFetchedAt(specResult.fetched_at);
           setCatalogSnapshot({
             region: filters.region,
@@ -436,6 +364,7 @@ export function ComputeWorkbench() {
         if (controller.signal.aborted) return;
         setSpecifications([]);
         setImages([]);
+        setImageTotal(0);
         setCatalogError(
           `${messageOf(error)} 未保留不一致的旧筛选结果，请刷新后重试。`,
         );
@@ -453,8 +382,8 @@ export function ComputeWorkbench() {
     () => {
       const relevantImages = filters.imageName
         ? images.filter((image) => image.Name === filters.imageName)
-        : images.slice(0, 12);
-      return buildOptions(
+        : images;
+      return buildCatalogOptions(
         specifications,
         relevantImages,
         catalogSnapshot?.region ?? filters.region,
@@ -462,7 +391,6 @@ export function ComputeWorkbench() {
       ).map((option) => ({
         ...option,
         availability: availability[option.id] ?? option.availability,
-        capacityCheckedAt: capacityCheckedAt[option.id],
         availabilityLabel:
           availability[option.id] === 'available'
             ? '查询时有库存'
@@ -471,17 +399,14 @@ export function ComputeWorkbench() {
               : availability[option.id] === 'unknown'
                 ? '尚未查库存'
                 : option.availabilityLabel,
-        quote: quotes[option.id],
       }));
     },
     [
       availability,
-      capacityCheckedAt,
       catalogSnapshot?.region,
       filters.imageName,
       filters.region,
       images,
-      quotes,
       specifications,
     ],
   );
@@ -503,8 +428,6 @@ export function ComputeWorkbench() {
     );
   }, [marketOptions]);
 
-  const selectedOption =
-    marketOptions.find((option) => option.id === selectedId) ?? marketOptions[0];
   const catalogStale = Boolean(
     catalogSnapshot
     && (
@@ -515,12 +438,17 @@ export function ComputeWorkbench() {
   );
 
   const regionOptions = useMemo(
-    () => [
-      optionValue('', '请选择地域'),
-      ...unique(zones.map((zone) => zone.Region)).map((region) =>
-        optionValue(region, region),
-      ),
-    ],
+    () => {
+      const seen = new Set<string>();
+      return [
+        optionValue('', '请选择地域'),
+        ...zones.flatMap((zone) => {
+          if (seen.has(zone.Region)) return [];
+          seen.add(zone.Region);
+          return [optionValue(zone.Region, regionLabel(zone))];
+        }),
+      ];
+    },
     [zones],
   );
   const zoneOptions = useMemo(
@@ -531,45 +459,12 @@ export function ComputeWorkbench() {
         .map((zone) =>
           optionValue(
             zone.Zone,
-            `${zone.Describe} · ${zone.Zone}${zone.IsPod ? ' · 容器' : ''}`,
+            `${zone.Describe} · ${zone.Zone}`,
           ),
         ),
     ],
     [filters.region, zones],
   );
-  const gpuOptions = useMemo(
-    () => [
-      optionValue('', '全部 GPU'),
-      ...unique(baseOptions.map((option) => option.gpuType)).map((gpuType) =>
-        optionValue(gpuType, gpuType),
-      ),
-    ],
-    [baseOptions],
-  );
-  const cpuMemoryOptions = useMemo(
-    () => [
-      optionValue('', '全部 CPU / 内存'),
-      ...unique(
-        baseOptions.map(
-          (option) => `${option.cpu}|${option.memoryGiB}`,
-        ),
-      ).map((value) => {
-        const [cpu, memory] = value.split('|');
-        return optionValue(value, `${cpu} 核 / ${memory} GiB`);
-      }),
-    ],
-    [baseOptions],
-  );
-  const imageNameOptions = useMemo(
-    () => [
-      optionValue('', '全部运行镜像'),
-      ...images.map((image) =>
-        optionValue(image.Name, `${image.Name} · ${image.ImageType}`),
-      ),
-    ],
-    [images],
-  );
-
   const environmentSummary = useMemo(() => ({
     total: environments.length,
     running: environments.filter((environment) => environment.status === 'running').length,
@@ -618,6 +513,15 @@ export function ComputeWorkbench() {
       bootDiskGb: number;
       signal: AbortSignal;
     }): Promise<InventoryCheck> => {
+      const requestController = new AbortController();
+      let timedOut = false;
+      const forwardAbort = () => requestController.abort();
+      if (signal.aborted) requestController.abort();
+      else signal.addEventListener('abort', forwardAbort, { once: true });
+      const timeout = window.setTimeout(() => {
+        timedOut = true;
+        requestController.abort();
+      }, 45_000);
       try {
         const result = await api<{
           items: Capacity[];
@@ -642,7 +546,7 @@ export function ComputeWorkbench() {
               },
             ],
           }),
-          signal,
+          signal: requestController.signal,
         });
         const exact = result.items.find(
           (item) =>
@@ -653,67 +557,43 @@ export function ComputeWorkbench() {
         const state: InventoryCheck['state'] = exact?.ResourceEnough
           ? 'available'
           : 'out_of_stock';
+        if (signal.aborted) throw new Error('库存查询已取消');
         setAvailability((current) => ({
           ...current,
           [option.id]: state,
         }));
         const quote = normalizeQuote(result.quote);
-        setQuotes((current) => ({
-          ...current,
-          [option.id]: quote,
-        }));
-        setCapacityCheckedAt((current) => ({
-          ...current,
-          [option.id]: result.fetched_at,
-        }));
         return {
           state,
           checkedAt: result.fetched_at,
           quote,
         };
       } catch (error) {
+        if (signal.aborted) throw error;
         setAvailability((current) => ({
           ...current,
           [option.id]: 'unknown',
         }));
+        if (timedOut) {
+          return {
+            state: 'error',
+            error:
+              '库存与报价查询超过 45 秒，结果不可确认；不会据此推断有货，请稍后重试。',
+            quote: normalizeQuote(null),
+          };
+        }
         return {
           state: 'error',
           error: `${messageOf(error)} 库存不可确认，不能推断有货或无货。`,
           quote: normalizeQuote(null),
         };
+      } finally {
+        window.clearTimeout(timeout);
+        signal.removeEventListener('abort', forwardAbort);
       }
     },
     [],
   );
-
-  const checkMarketSelection = useCallback(async () => {
-    if (!selectedOption) return;
-    const option = selectedOption;
-    setCapacityCheckingId(option.id);
-    const result = await checkInventory({
-      option,
-      imageId: option.imageId,
-      bootDiskGb: option.diskMinGiB ?? 60,
-      signal: new AbortController().signal,
-    });
-    if (result.state === 'available') {
-      notify(
-        'ok',
-        `${option.gpuType} 的库存与官方报价已核对；快照不保留资源。`,
-      );
-    } else if (result.state === 'out_of_stock') {
-      notify(
-        'ok',
-        `${option.gpuType} 在本次查询时库存不足；请刷新或选择其他配置。`,
-      );
-    } else {
-      notify(
-        'error',
-        result.error ?? '库存与报价不可确认，不能推断为有货。',
-      );
-    }
-    setCapacityCheckingId('');
-  }, [checkInventory, notify, selectedOption]);
 
   const pollEnvironment = useCallback(
     async (environmentId: string) => {
@@ -845,13 +725,12 @@ export function ComputeWorkbench() {
     [actionDialog, configuration, notify, pollEnvironment],
   );
 
-  const onOpenWizard = (option?: ComputeCatalogOption) => {
-    const target = option ?? selectedOption;
-    if (!target) {
-      notify('error', '当前没有可用的真实目录配置，无法进入创建向导。');
-      return;
-    }
-    setWizardOption(target);
+  const onOpenWizard = (
+    draft: EnvironmentDraft,
+    inventory: InventoryCheck,
+  ) => {
+    setWizardDraft(draft);
+    setWizardInventory(inventory);
     setWizardOpen(true);
   };
 
@@ -882,8 +761,8 @@ export function ComputeWorkbench() {
           </span>
           <h1>计算环境</h1>
           <p>
-            在资源市场核对真实目录与库存快照，在实例控制台跟踪生命周期、GPU
-            租约、任务关联、清理事实与异常。
+            按真实资源目录组装单卡环境；库存、官方报价与兼容性分别核对，
+            创建后在实例控制台跟踪生命周期、GPU 租约与清理事实。
           </p>
         </div>
         <div className="mf-compute-heading-actions">
@@ -895,15 +774,6 @@ export function ComputeWorkbench() {
           >
             <ComputeIcon name="refresh" />
             {catalogLoading || zonesLoading ? '同步中' : '刷新事实'}
-          </button>
-          <button
-            type="button"
-            className="mf-primary"
-            onClick={() => onOpenWizard()}
-            disabled={!selectedOption}
-          >
-            <ComputeIcon name="plus" />
-            新建计算环境
           </button>
         </div>
       </header>
@@ -953,52 +823,6 @@ export function ComputeWorkbench() {
         </span>
       </div>
 
-      <section className="mf-compute-metrics" aria-label="计算环境关键指标">
-        <article className="mf-compute-metric">
-          <span>实例总数</span>
-          <strong>{environmentSummary.total}</strong>
-          <small>
-            {environmentSummary.running} 运行 · {environmentSummary.transitioning}{' '}
-            变更中 · {environmentSummary.stopped} 已停止
-          </small>
-        </article>
-        <article
-          className={
-            environmentSummary.attention
-              ? 'mf-compute-metric attention'
-              : 'mf-compute-metric'
-          }
-        >
-          <span>需要核对</span>
-          <strong>{environmentSummary.attention}</strong>
-          <small>失败、不可用、未知、租约或清理异常</small>
-        </article>
-        <article className="mf-compute-metric">
-          <span>目录配置</span>
-          <strong>{marketOptions.length}</strong>
-          <small>
-            {catalogFetchedAt
-              ? `查询 ${new Date(catalogFetchedAt).toLocaleTimeString('zh-CN', {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                  hour12: false,
-                })}`
-              : '尚未取得目录查询时间'}
-          </small>
-        </article>
-        <article className="mf-compute-metric ownership">
-          <div>
-            <span>资源归属</span>
-            <strong>个人工作空间</strong>
-            <small>训练与推理共用 GPU 租约边界</small>
-          </div>
-          <b aria-label={`${heldLeaseCount} 个 GPU 租约持有中`}>
-            <span>{heldLeaseCount}</span>
-            <small>GPU 租约</small>
-          </b>
-        </article>
-      </section>
-
       {(environmentCollection?.degraded
         || environmentCollection?.sourceState === 'stale'
         || (environmentCollection?.warnings.length ?? 0) > 0) && (
@@ -1043,7 +867,7 @@ export function ComputeWorkbench() {
           onKeyDown={(event) => handleTabKey(event, 'market')}
         >
           <ComputeIcon name="grid" />
-          资源市场
+          资源与配置
           <span className="mf-compute-tab-count">{marketOptions.length}</span>
         </button>
         <button
@@ -1065,7 +889,7 @@ export function ComputeWorkbench() {
             </span>
           )}
         </button>
-        <small>只读目录 · 库存快照 · 写入能力由服务端控制</small>
+        <small>目录可见 ≠ 库存可用 ≠ 兼容已验证</small>
       </nav>
 
       {tab === 'market' ? (
@@ -1074,7 +898,7 @@ export function ComputeWorkbench() {
           role="tabpanel"
           aria-labelledby="mf-tab-market"
         >
-          <ResourceMarket
+          <ResourceConfigurator
             options={marketOptions}
             selectedId={selectedId}
             onSelect={setSelectedId}
@@ -1082,20 +906,14 @@ export function ComputeWorkbench() {
             onFiltersChange={setFilters}
             regionOptions={regionOptions}
             zoneOptions={zoneOptions}
-            gpuOptions={gpuOptions}
-            cpuMemoryOptions={cpuMemoryOptions}
-            imageTypeOptions={[
-              optionValue('System', '系统镜像'),
-              optionValue('App', '应用镜像'),
-            ]}
-            imageNameOptions={imageNameOptions}
+            images={images}
+            imageTotal={imageTotal}
             loading={catalogLoading || zonesLoading}
             error={catalogError || zonesError}
             stale={catalogStale}
             queryTime={catalogFetchedAt}
             configuration={configuration}
-            checking={capacityCheckingId === selectedOption?.id}
-            onCheck={() => void checkMarketSelection()}
+            onCheck={checkInventory}
             onRetry={() => setCatalogReloadKey((value) => value + 1)}
             onCreate={onOpenWizard}
             onClearFilters={() =>
@@ -1113,6 +931,58 @@ export function ComputeWorkbench() {
           role="tabpanel"
           aria-labelledby="mf-tab-console"
         >
+          <section
+            className="mf-compute-metrics"
+            aria-label="计算环境关键指标"
+          >
+            <article className="mf-compute-metric">
+              <span>实例总数</span>
+              <strong>{environmentSummary.total}</strong>
+              <small>
+                {environmentSummary.running} 运行 ·{' '}
+                {environmentSummary.transitioning} 变更中 ·{' '}
+                {environmentSummary.stopped} 已停止
+              </small>
+            </article>
+            <article
+              className={
+                environmentSummary.attention
+                  ? 'mf-compute-metric attention'
+                  : 'mf-compute-metric'
+              }
+            >
+              <span>需要核对</span>
+              <strong>{environmentSummary.attention}</strong>
+              <small>失败、不可用、未知、租约或清理异常</small>
+            </article>
+            <article className="mf-compute-metric">
+              <span>硬件组合</span>
+              <strong>{marketOptions.length}</strong>
+              <small>
+                {catalogFetchedAt
+                  ? `目录查询 ${new Date(catalogFetchedAt).toLocaleTimeString(
+                      'zh-CN',
+                      {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        hour12: false,
+                      },
+                    )}`
+                  : '尚未取得目录查询时间'}
+              </small>
+            </article>
+            <article className="mf-compute-metric ownership">
+              <div>
+                <span>资源归属</span>
+                <strong>个人工作空间</strong>
+                <small>训练与推理共用 GPU 租约边界</small>
+              </div>
+              <b aria-label={`${heldLeaseCount} 个 GPU 租约持有中`}>
+                <span>{heldLeaseCount}</span>
+                <small>GPU 租约</small>
+              </b>
+            </article>
+          </section>
           <InstanceConsole
             environments={environments}
             loading={environmentsLoading}
@@ -1128,29 +998,23 @@ export function ComputeWorkbench() {
         </section>
       )}
 
-      {wizardOpen && wizardOption && (
+      {wizardOpen && wizardDraft && (
         <CreateEnvironmentWizard
           options={marketOptions}
-          initialOption={wizardOption}
+          initialDraft={wizardDraft}
+          initialInventory={wizardInventory}
           configuration={configuration}
-          imageOptions={[
-            ...new Map(
-              marketOptions
-                .filter(
-                  (option) =>
-                    option.region === wizardOption.region
-                    && option.zone === wizardOption.zone
-                    && option.gpuType === wizardOption.gpuType,
-                )
-                .map((option) => [
-                  option.imageId,
-                  { id: option.imageId, name: option.imageName },
-                ]),
-            ).values(),
-          ]}
+          images={images}
+          imageType={filters.imageType}
+          imagesLoading={catalogLoading}
+          imagesError={catalogError}
+          imagesStale={catalogStale}
+          imageTotal={imageTotal}
+          onRetryImages={() => setCatalogReloadKey((value) => value + 1)}
           onClose={() => {
             setWizardOpen(false);
-            setWizardOption(null);
+            setWizardDraft(null);
+            setWizardInventory({ state: 'unknown' });
           }}
           onCheckInventory={checkInventory}
           onCreate={createEnvironment}

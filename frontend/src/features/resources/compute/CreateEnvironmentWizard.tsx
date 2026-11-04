@@ -1,10 +1,24 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import type { Image } from '../api';
 import { ComputeIcon } from './ComputeIcon';
 import { ComputeDialog } from './ComputeDialog';
 import { ComputeStatusBadge } from './ComputeStatusBadge';
 import { secureRequestId } from './compute-api';
 import { unavailableQuote, type ComputeQuote } from './compute-model';
 import { quoteObservedAt, quoteRate } from './compute-quote';
+import {
+  selectionKey,
+  type EnvironmentDraft,
+} from './compute-catalog';
+import { ImageCatalogPicker } from './ImageCatalogPicker';
+import {
+  imageAvailability,
+  imageFamily,
+  imageMonogram,
+  imagePlatform,
+  imageTypeLabel,
+  resolveImageSelection,
+} from './image-catalog';
 import type { ComputeCatalogOption } from './ResourceMarket';
 import type {
   ComputeConfigurationView,
@@ -80,18 +94,32 @@ function runwayState(
 
 export function CreateEnvironmentWizard({
   options,
-  initialOption,
+  initialDraft,
+  initialInventory = { state: 'unknown' },
   configuration,
-  imageOptions,
+  images,
+  imageType,
+  imagesLoading,
+  imagesError = '',
+  imagesStale = false,
+  imageTotal,
+  onRetryImages,
   onClose,
   onCheckInventory,
   onCreate,
   trackedEnvironment,
 }: {
   options: ComputeCatalogOption[];
-  initialOption: ComputeCatalogOption;
+  initialDraft: EnvironmentDraft;
+  initialInventory?: InventoryCheck;
   configuration: ComputeConfigurationView | null;
-  imageOptions: Array<{ id: string; name: string }>;
+  images: Image[];
+  imageType: string;
+  imagesLoading: boolean;
+  imagesError?: string;
+  imagesStale?: boolean;
+  imageTotal?: number;
+  onRetryImages: () => void;
   onClose: () => void;
   onCheckInventory: (payload: {
     option: ComputeCatalogOption;
@@ -102,7 +130,8 @@ export function CreateEnvironmentWizard({
   onCreate: (payload: CreateEnvironmentPayload) => Promise<CreateAccepted>;
   trackedEnvironment: ComputeEnvironmentView | null;
 }) {
-  const [step, setStep] = useState(1);
+  const initialOption = initialDraft.option;
+  const [step, setStep] = useState(2);
   const [selectedId, setSelectedId] = useState(initialOption.id);
   const selected =
     options.find((option) => option.id === selectedId) ?? initialOption;
@@ -115,30 +144,87 @@ export function CreateEnvironmentWizard({
     [selected.gpuType],
   );
   const [name, setName] = useState(defaultName);
-  const [imageId, setImageId] = useState(
-    initialOption.imageId || imageOptions[0]?.id || '',
+  const [imageId, setImageId] = useState(() =>
+    resolveImageSelection(images, [
+      initialDraft.imageId,
+      initialOption.imageId,
+    ]),
   );
-  const [bootDiskGb, setBootDiskGb] = useState(initialOption.diskMinGiB ?? 60);
+  const [imagePickerOpen, setImagePickerOpen] = useState(false);
+  const [imageAnnouncement, setImageAnnouncement] = useState('');
+  const [bootDiskGb, setBootDiskGb] = useState(initialDraft.bootDiskGb);
   const [acknowledged, setAcknowledged] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [inventory, setInventory] = useState<InventoryCheck>({
-    state: 'unknown',
-  });
+  const [inventory, setInventory] = useState<InventoryCheck>(initialInventory);
   const [accepted, setAccepted] = useState<CreateAccepted | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [requestId] = useState(() => secureRequestId());
   const errorSummary = useRef<HTMLDivElement>(null);
+  const imageBrowseRef = useRef<HTMLButtonElement>(null);
   const inventoryController = useRef<AbortController | null>(null);
+  const initialSelectionKey = useRef(selectionKey(initialDraft));
+  const useInitialInventory = useRef(
+    initialInventory.state === 'available'
+    || initialInventory.state === 'out_of_stock',
+  );
+  const selectedImage =
+    images.find((image) => image.CompShareImageId === imageId) ?? null;
+  const selectedImageAvailability = selectedImage
+    ? imageAvailability(selectedImage)
+    : null;
+  const selectedImageFamily = selectedImage
+    ? selectedImage.ImageType === 'App'
+      ? imageFamily(selectedImage).label
+      : imagePlatform(selectedImage).label
+    : '';
 
   useEffect(() => {
-    if (!imageOptions.some((image) => image.id === imageId)) {
-      setImageId(imageOptions[0]?.id ?? '');
+    const nextImageId = resolveImageSelection(images, [
+      imageId,
+      initialDraft.imageId,
+      selected.imageId,
+    ]);
+    if (nextImageId !== imageId) {
+      setImageId(nextImageId);
+      setInventory({ state: 'unknown' });
     }
-  }, [imageId, imageOptions]);
+  }, [imageId, images, initialDraft.imageId, selected.imageId]);
 
   useEffect(() => {
-    if (step !== 2 || !imageId) return;
+    if (step === 2) return;
+    setImagePickerOpen(false);
+  }, [step]);
+
+  useEffect(() => {
+    if (step !== 2) return;
+    if (imagesLoading || imagesStale) {
+      inventoryController.current?.abort();
+      setInventory((current) =>
+        current.state === 'unknown' ? current : { state: 'unknown' },
+      );
+      return;
+    }
+    if (!imageId || imagesError || !selectedImage) {
+      inventoryController.current?.abort();
+      setInventory((current) =>
+        current.state === 'unknown' ? current : { state: 'unknown' },
+      );
+      return;
+    }
+    const currentSelectionKey = selectionKey({
+      option: selected,
+      imageId,
+      bootDiskGb,
+    });
+    if (
+      useInitialInventory.current
+      && currentSelectionKey === initialSelectionKey.current
+    ) {
+      useInitialInventory.current = false;
+      return;
+    }
+    useInitialInventory.current = false;
     inventoryController.current?.abort();
     const controller = new AbortController();
     inventoryController.current = controller;
@@ -161,7 +247,17 @@ export function CreateEnvironmentWizard({
         });
       });
     return () => controller.abort();
-  }, [bootDiskGb, imageId, onCheckInventory, selected, step]);
+  }, [
+    bootDiskGb,
+    imageId,
+    imagesError,
+    imagesLoading,
+    imagesStale,
+    onCheckInventory,
+    selected,
+    selectedImage,
+    step,
+  ]);
 
   useEffect(
     () => () => {
@@ -172,7 +268,10 @@ export function CreateEnvironmentWizard({
 
   const chooseOption = (option: ComputeCatalogOption) => {
     setSelectedId(option.id);
-    setImageId(option.imageId || imageOptions[0]?.id || '');
+    setImageId(resolveImageSelection(images, [option.imageId]));
+    setInventory({ state: 'unknown' });
+    setImagePickerOpen(false);
+    setImageAnnouncement('');
     setBootDiskGb(option.diskMinGiB ?? 60);
     setAcknowledged(false);
     setAccepted(null);
@@ -180,10 +279,38 @@ export function CreateEnvironmentWizard({
     setErrors({});
   };
 
+  const closeImagePicker = () => {
+    setImagePickerOpen(false);
+    window.requestAnimationFrame(() => imageBrowseRef.current?.focus());
+  };
+
+  const selectImage = (nextImageId: string) => {
+    const nextImage = images.find(
+      (image) => image.CompShareImageId === nextImageId,
+    );
+    if (!nextImage || !imageAvailability(nextImage).available) return;
+    setImageId(nextImage.CompShareImageId);
+    setInventory({ state: 'unknown' });
+    setImageAnnouncement(
+      `已选择 ${nextImage.Name}，库存与报价需要重新核对。`,
+    );
+    setErrors((current) => {
+      const next = { ...current };
+      delete next.image;
+      delete next.inventory;
+      delete next.quote;
+      return next;
+    });
+  };
+
   const validate = (target: number) => {
     const next: Record<string, string> = {};
-    if (!selected.imageId && !imageId) {
-      next.image = '选择一个真实目录返回的运行镜像。';
+    if (!selectedImage || !imageId) {
+      next.image = imagesLoading
+        ? '正在读取运行镜像目录，请等待目录加载完成。'
+        : imagesError
+          ? '运行镜像目录读取失败，请重新读取后再继续。'
+          : '选择一个目录可用且仍有效的运行镜像。';
     }
     if (name.trim().length < 3 || name.trim().length > 120) {
       next.name = '实例名称需为 3–120 个字符。';
@@ -228,6 +355,15 @@ export function CreateEnvironmentWizard({
       return;
     }
     if (step === 2) {
+      if (imagesLoading || imagesStale) {
+        setErrors({
+          image: imagesLoading
+            ? '正在读取运行镜像目录，请等待目录加载完成。'
+            : '筛选条件已变化，旧镜像目录不能用于提交。',
+        });
+        requestAnimationFrame(() => errorSummary.current?.focus());
+        return;
+      }
       if (validate(3)) setStep(3);
       return;
     }
@@ -451,30 +587,117 @@ export function CreateEnvironmentWizard({
                     </small>
                   )}
                 </label>
-                <label className="mf-field">
-                  <span>运行镜像</span>
-                  <select
-                    id="mf-create-image"
-                    value={imageId}
-                    aria-invalid={Boolean(errors.image)}
-                    aria-describedby={errors.image ? errorId('image') : undefined}
-                    onChange={(event) => setImageId(event.target.value)}
-                  >
-                    {!imageOptions.length && (
-                      <option value="">目录未返回可用镜像</option>
-                    )}
-                    {imageOptions.map((image) => (
-                      <option value={image.id} key={image.id}>
-                        {image.name}
-                      </option>
-                    ))}
-                  </select>
+                <div
+                  className={`mf-wizard-image-field${imagePickerOpen ? ' is-open' : ''}`}
+                  id="mf-create-image"
+                  aria-invalid={Boolean(errors.image)}
+                  aria-describedby={
+                    errors.image ? errorId('image') : undefined
+                  }
+                  data-testid="wizard-image-field"
+                >
+                  <div className="mf-wizard-image-head">
+                    <span className="mf-image-option-mark large" aria-hidden="true">
+                      {selectedImage ? imageMonogram(selectedImage) : 'IMG'}
+                    </span>
+                    <div className="mf-wizard-image-copy">
+                      <span className="mf-wizard-image-label">运行镜像</span>
+                      <strong data-testid="wizard-selected-image">
+                        {selectedImage?.Name
+                          ?? (imagesLoading
+                            ? '正在读取运行镜像目录'
+                            : imagesError
+                              ? '运行镜像目录读取失败'
+                              : '当前目录没有可用运行镜像')}
+                      </strong>
+                      <div className="mf-wizard-image-meta">
+                        {selectedImage ? (
+                          <>
+                            <span
+                              className={`mf-image-status ${selectedImageAvailability?.tone ?? 'warning'}`}
+                            >
+                              <i aria-hidden="true" />
+                              {selectedImageAvailability?.label
+                                ?? '目录状态未知'}
+                            </span>
+                            <span>{imageTypeLabel(selectedImage.ImageType)}</span>
+                            <span>{selectedImageFamily}</span>
+                            <code>{selectedImage.CompShareImageId}</code>
+                          </>
+                        ) : (
+                          <span>
+                            {imagesLoading
+                              ? '目录返回前不会沿用未经确认的镜像。'
+                              : imagesError
+                                ? '重新读取目录后再选择运行镜像。'
+                                : '目录可用项为空，不能进入费用步骤。'}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <button
+                      ref={imageBrowseRef}
+                      type="button"
+                      className="mf-image-browse mf-wizard-image-browse"
+                      aria-expanded={imagePickerOpen}
+                      aria-controls="mf-create-image-catalog"
+                      onClick={() => setImagePickerOpen((open) => !open)}
+                      disabled={submitting}
+                      data-testid="wizard-image-picker-trigger"
+                    >
+                      <ComputeIcon name="search" size={15} />
+                      <span>
+                        {imagePickerOpen ? '收起镜像目录' : '浏览镜像目录'}
+                      </span>
+                      <small>
+                        {imagesLoading
+                          ? '读取中'
+                          : imagesError
+                            ? '读取失败'
+                            : imageTotal && imageTotal > images.length
+                              ? `${images.length}/${imageTotal}`
+                              : `${images.length} 个`}
+                      </small>
+                      <ComputeIcon
+                        name="chevron-down"
+                        size={14}
+                        className={imagePickerOpen ? 'is-open' : ''}
+                      />
+                    </button>
+                  </div>
+                  <p className="mf-wizard-image-boundary">
+                    目录可用只表示镜像存在，不表示已通过当前 GPU、磁盘和运行时
+                    兼容验证。
+                  </p>
+                  {imagePickerOpen && (
+                    <div
+                      id="mf-create-image-catalog"
+                      className="mf-wizard-image-catalog"
+                    >
+                      <ImageCatalogPicker
+                        images={images}
+                        imageType={imageType}
+                        selectedImageId={imageId}
+                        loading={imagesLoading}
+                        stale={imagesStale}
+                        error={imagesError}
+                        disabled={submitting}
+                        total={imageTotal}
+                        onSelect={selectImage}
+                        onClose={closeImagePicker}
+                        onRetry={onRetryImages}
+                      />
+                    </div>
+                  )}
+                  <span className="mf-sr-only" role="status" aria-live="polite">
+                    {imageAnnouncement}
+                  </span>
                   {errors.image && (
                     <small className="mf-field-error" id={errorId('image')}>
                       {errors.image}
                     </small>
                   )}
-                </label>
+                </div>
                 <label className="mf-field">
                   <span>系统盘容量（GiB）</span>
                   <input
@@ -596,8 +819,9 @@ export function CreateEnvironmentWizard({
                   <dt>地域 / 镜像</dt>
                   <dd>
                     {selected.region} /{' '}
-                    {imageOptions.find((image) => image.id === imageId)?.name ??
-                      selected.imageName}
+                    {selectedImage?.Name
+                      ?? selected.imageName
+                      ?? '未选择'}
                   </dd>
                 </div>
                 <div>
@@ -830,8 +1054,9 @@ export function CreateEnvironmentWizard({
             <div>
               <dt>镜像</dt>
               <dd>
-                {imageOptions.find((image) => image.id === imageId)?.name ??
-                  selected.imageName}
+                {selectedImage?.Name
+                  ?? selected.imageName
+                  ?? '未选择'}
               </dd>
             </div>
             <div>
@@ -886,7 +1111,16 @@ export function CreateEnvironmentWizard({
               type="button"
               className="mf-primary"
               onClick={next}
-              disabled={step === 2 && inventory.state === 'checking'}
+              disabled={
+                step === 2
+                && (
+                  inventory.state === 'checking'
+                  || imagesLoading
+                  || imagesStale
+                  || Boolean(imagesError)
+                  || !selectedImage
+                )
+              }
             >
               继续
               <ComputeIcon name="arrow-right" />
