@@ -25,7 +25,7 @@ export function LifecycleRail({
   conclusion: string;
   compact?: boolean;
 }) {
-  return <div className={'training-lifecycle' + (compact ? ' compact' : '')} aria-label="训练生命周期">
+  return <div className={'training-lifecycle' + (nodes.length > 5 ? ' many' : '') + (compact ? ' compact' : '')} aria-label="训练生命周期">
     <ol>
       {nodes.map((node, index) => <li
         key={node.key}

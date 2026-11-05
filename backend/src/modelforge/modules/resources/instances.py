@@ -37,7 +37,8 @@ class InstanceLifecycle:
             return {'lease': self.leases._snapshot(c, row),
                     'intent': {k: v for k,v in intent.items() if k != 'reservation_id'} if intent else None}
 
-    def create(self, token, spec):
+    def create(self, token, spec, *, login_password: str | None = None,
+               project_id: str | None = None):
         if not isinstance(spec, InstanceSpec):
             raise AppError(422, 'validation_error', 'Use a validated InstanceSpec')
         try:
@@ -64,6 +65,8 @@ class InstanceLifecycle:
             'MinimalCpuPlatform': spec.cpu_platform, 'CompShareImageId': spec.image_id,
             'MachineType': 'G', 'ChargeType': spec.charge_type,
             'Disks': [{'IsBoot': True, 'Type': spec.boot_disk_type, 'Size': spec.boot_disk_gb}]}
+        if project_id:
+            params['ProjectId'] = project_id
         capacity = self.provider.query('CheckCompShareResourceCapacity', params)
         rows = capacity.get('Specs')
         if (not isinstance(rows, list) or any(not isinstance(row, dict)
@@ -76,10 +79,65 @@ class InstanceLifecycle:
             raise AppError(409, 'cloud_out_of_stock', 'Selected exact specification is out of stock')
         creation = self.leases.begin_creation(token, spec.region)
         if creation['dispatch']:
+            login = {}
+            if login_password is not None:
+                if (not isinstance(login_password, str) or not 8 <= len(login_password) <= 128
+                        or any(character.isspace() for character in login_password)):
+                    raise AppError(422, 'validation_error', 'Bootstrap password does not meet the transport contract')
+                import base64
+                login = {
+                    'LoginMode': 'Password',
+                    'Password': base64.b64encode(login_password.encode('ascii')).decode('ascii'),
+                }
             response = self.provider.create({**params, 'CPU': spec.cpu, 'GPU': 1,
-                'Memory': spec.memory_mb, 'MaxCount': 1, 'Quantity': 1, 'Name': intent['label']})
+                'Memory': spec.memory_mb, 'MaxCount': 1, 'Quantity': 1,
+                'Name': intent['label'], **login})
             self.leases.bind_instance(token, creation['operation_id'], response['UHostIds'][0])
         return self._state(token)
+
+    def bootstrap_observation(self, token):
+        """Return transient connection facts for the exact bound instance.
+
+        The password and login command are intentionally absent from every
+        persistent projection. Callers must keep them in memory only and must
+        not include this result in API responses or evidence files.
+        """
+        result = self._state(token)
+        lease, intent = result['lease'], result['intent']
+        if lease['state'] == 'released' or lease['create_state'] != 'bound' or not intent:
+            raise AppError(409, 'cloud_instance_not_bound', 'A bound instance is required for secure bootstrap')
+        spec = InstanceSpec(**intent['spec'])
+        response = self.provider.query('DescribeCompShareInstance', {
+            'Region': spec.region,
+            'Zone': spec.zone,
+            'UHostIds': [lease['provider_instance_id']],
+            'Limit': 100,
+            'Offset': 0,
+        })
+        rows = response.get('UHostSet')
+        if (not isinstance(rows, list) or type(response.get('TotalCount')) is not int
+                or response['TotalCount'] != len(rows) or len(rows) != 1):
+            raise AppError(502, 'cloud_invalid_response', 'Exact bootstrap observation is incomplete')
+        raw = rows[0]
+        if not isinstance(raw, dict) or raw.get('UHostId') != lease['provider_instance_id']:
+            raise AppError(409, 'cloud_instance_conflict', 'Query did not identify the bound instance')
+        self._match(self._validated_rows([raw])[0], spec)
+        password = raw.get('Password')
+        ssh_login_command = raw.get('SshLoginCommand')
+        if password is not None and (not isinstance(password, str) or len(password) > 4096):
+            raise AppError(502, 'cloud_invalid_response', 'Provider credential observation is invalid')
+        if ssh_login_command is not None and (
+                not isinstance(ssh_login_command, str) or len(ssh_login_command) > 4096):
+            raise AppError(502, 'cloud_invalid_response', 'Provider SSH observation is invalid')
+        return {
+            'instance_id': lease['provider_instance_id'],
+            'state': raw.get('State'),
+            'password_base64': password,
+            'ssh_login_command': ssh_login_command,
+            'image_type': raw.get('CompShareImageType'),
+            'instance_type': raw.get('InstanceType'),
+            'observed_at': datetime.now().isoformat(),
+        }
 
     def reconcile(self, token):
         result = self._state(token)
@@ -204,6 +262,26 @@ class InstanceLifecycle:
             'UHostId': lease['provider_instance_id'],
         })
         return {**self._state(token), 'observation': observation, 'requested_state': 'Stopped'}
+
+    def reset_password(self, token, new_password):
+        """Rotate the provider password without persisting either password."""
+        if (not isinstance(new_password, str) or not 8 <= len(new_password) <= 128
+                or any(character.isspace() for character in new_password)):
+            raise AppError(422, 'validation_error', 'Reset password does not meet the transport contract')
+        result = self._state(token)
+        lease, intent = result['lease'], result['intent']
+        if lease['state'] == 'released' or lease['create_state'] != 'bound' or not intent:
+            raise AppError(409, 'cloud_instance_not_bound', 'A bound instance is required for password reset')
+        if lease['cleanup_policy'] is not None or intent['terminate_requested']:
+            raise AppError(409, 'cloud_instance_cleanup_started', 'An instance awaiting cleanup cannot reset credentials')
+        import base64
+        self.provider.reset_password({
+            'Region': intent['spec']['region'],
+            'Zone': intent['spec']['zone'],
+            'UHostId': lease['provider_instance_id'],
+            'Password': base64.b64encode(new_password.encode('ascii')).decode('ascii'),
+        })
+        return {'state': 'requested', 'instance_id': lease['provider_instance_id']}
 
     @staticmethod
     def _match(row, spec):

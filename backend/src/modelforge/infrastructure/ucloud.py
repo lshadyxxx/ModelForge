@@ -14,6 +14,7 @@ READ_ACTIONS = frozenset({
     "DescribeCompShareImages", "DescribeModelRepositoryModels",
     "CheckCompShareResourceCapacity", "DescribeCompShareInstance",
     "GetCompShareInstanceMonitor", "GetCompShareInstanceUserPrice",
+    "GetProjectList", "DescribeCompShareCustomImages",
 })
 
 
@@ -48,6 +49,16 @@ def provider_error(status: int, message: str = "", retcode: int | None = None) -
         return AppError(409, "cloud_out_of_stock", "当前规格库存不足，请刷新或选择其他组合。")
     if retcode == 226603:
         return AppError(409, "cloud_incompatible", "优云报告镜像不支持所选卡型，请重新选择。")
+    if retcode == 226601:
+        return AppError(409, "cloud_account_arrears", "优云账号欠费，暂时不能创建实例。")
+    if retcode == 226602:
+        return AppError(409, "cloud_account_expired", "优云账号已过期，暂时不能创建实例。")
+    if retcode == 226605:
+        return AppError(409, "cloud_image_operation_in_progress", "该实例已有镜像任务，请先核对任务状态。")
+    if retcode == 226606:
+        return AppError(409, "cloud_account_unverified", "优云账号未完成实名认证，不能创建实例。")
+    if retcode == 8433:
+        return AppError(503, "cloud_service_unavailable", "优云服务暂时异常，请稍后核对。")
     if re.search(r"(credential|token|key).{0,30}expired|expired.{0,30}(credential|token|key)|凭据.{0,15}过期|密钥.{0,15}过期", text):
         return AppError(503, "cloud_credentials_expired", "优云凭据已过期，请更新后端配置后重试。")
     if status == 403 or re.search(r"permission|forbidden|not authorized|权限|无权", text):
@@ -72,8 +83,10 @@ class UCloud:
         settings = self.settings
         if not settings.ucloud_public_key or not settings.ucloud_private_key:
             raise AppError(503, "cloud_not_configured", "尚未配置优云凭据，请在后端环境中配置公钥和私钥。")
+        parameters = dict(parameters)
+        explicit_project = parameters.pop("ProjectId", None)
         payload = encode_parameters({**parameters, "Action": action,
-            "ProjectId": settings.ucloud_project_id,
+            "ProjectId": explicit_project or settings.ucloud_project_id,
             "PublicKey": settings.ucloud_public_key.get_secret_value()})
         payload["Signature"] = sign_parameters(payload, settings.ucloud_private_key.get_secret_value())
         try:
@@ -143,3 +156,26 @@ class UCloudInstances(UCloud):
             'UHostId': result['UHostId'],
             'InRecycle': recycle if recycle is not None else 'NotReported',
         }
+
+    def update_stop_scheduler(self, parameters):
+        result = self._mutation('UpdateCompShareStopScheduler', parameters)
+        # The vendor acknowledges the scheduler but has historically omitted
+        # UHostId from the response. Never infer a timer from an unrelated row.
+        if result.get('UHostId') not in (None, parameters['UHostId']):
+            raise AppError(502, 'cloud_invalid_response', 'Scheduler acknowledgement is unverified')
+        return {
+            'UHostId': parameters['UHostId'],
+            'SchedulerStopTime': parameters['SchedulerStopTime'],
+        }
+
+    def delete_stop_scheduler(self, parameters):
+        result = self._mutation('DeleteCompShareStopScheduler', parameters)
+        if result.get('UHostId') not in (None, parameters['UHostId']):
+            raise AppError(502, 'cloud_invalid_response', 'Scheduler deletion acknowledgement is unverified')
+        return {'UHostId': parameters['UHostId']}
+
+    def reset_password(self, parameters):
+        result = self._mutation('ResetCompShareInstancePassword', parameters)
+        if result.get('UHostId') not in (None, parameters['UHostId']):
+            raise AppError(502, 'cloud_invalid_response', 'Password reset acknowledgement is unverified')
+        return {'UHostId': parameters['UHostId']}

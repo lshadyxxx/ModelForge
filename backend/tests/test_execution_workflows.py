@@ -97,7 +97,7 @@ class Channel:
 @pytest.fixture
 def env(monkeypatch):
     monkeypatch.setattr('modelforge.modules.resources.Catalog.validate_selection',lambda self,spec:spec)
-    monkeypatch.setattr('modelforge.modules.training.use_cases.training_compatibility',lambda *args:{})
+    monkeypatch.setattr('modelforge.modules.training.use_cases.training_compatibility',lambda *args,**kwargs:{})
     monkeypatch.setattr('modelforge.modules.serving.use_cases.inference_compatibility',lambda *args:{})
     resources=Resources.open(Settings());resources.pool.wait()
     with resources.pool.connection() as c:

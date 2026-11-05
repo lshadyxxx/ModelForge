@@ -41,6 +41,9 @@ class Settings(BaseSettings):
     ucloud_api_url: str = "https://api.compshare.cn"
     ucloud_timeout: float = Field(default=20, gt=0, le=60, allow_inf_nan=False)
     ucloud_write_enabled: bool = False
+    ucloud_training_window_minutes: int = Field(default=75, ge=5, le=360)
+    ucloud_training_budget_cny: float = Field(default=5.0, gt=0, allow_inf_nan=False)
+    ucloud_training_max_hourly_cny: float = Field(default=3.0, gt=0, allow_inf_nan=False)
 
     @field_validator("ucloud_public_key", "ucloud_private_key", mode="before")
     @classmethod

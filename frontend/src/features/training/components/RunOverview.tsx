@@ -1,13 +1,18 @@
 import {useState} from 'react';
 import {
+  executionModeDescriptor,
   formatBytes,
   formatDateTime,
   formatEpoch,
   formatLearningRate,
   formatMetric,
+  isManagedAttempt,
   isTerminalAttempt,
   lifecycleConclusion,
+  managedBudgetSummary,
+  normalizeExecutionMode,
   normalizeMetrics,
+  provisioningStateLabel,
   shortId,
   trainingErrorDescription,
   trainingLifecycle,
@@ -137,6 +142,9 @@ export function RunOverview({
   const lifecycle = trainingLifecycle(attempt);
   const state = trainingState(attempt.state);
   const terminal = isTerminalAttempt(attempt);
+  const managed = isManagedAttempt(attempt);
+  const mode = executionModeDescriptor(normalizeExecutionMode(attempt.execution_mode));
+  const budget = managedBudgetSummary(attempt);
   const evidentialFiles = attempt.execution_manifest?.files ?? [];
 
   return <div className="training-detail-stack">
@@ -146,7 +154,7 @@ export function RunOverview({
         <div><span>当前状态</span><TrainingStatusBadge attempt={attempt}/><p>{state.description}</p></div>
       </div>
       <div className="training-detail-stage">
-        <span>运行阶段</span>
+        <span>{mode.label} · 运行阶段</span>
         <strong>{trainingStage(attempt.stage)}</strong>
         <small>{attempt.cancel_requested && !terminal ? '已请求取消，等待安全退出与回收确认' : `更新于 ${formatDateTime(attempt.updated_at)}`}</small>
       </div>
@@ -159,7 +167,7 @@ export function RunOverview({
     <div className="training-detail-grid">
       <div className="training-detail-main">
         <section className="training-detail-panel">
-          <header><div><span className="training-kicker">LIFECYCLE</span><h2>五阶段生命周期</h2></div><span>{lifecycleConclusion(attempt)}</span></header>
+          <header><div><span className="training-kicker">LIFECYCLE</span><h2>{managed ? '托管执行生命周期' : '五阶段生命周期'}</h2></div><span>{lifecycleConclusion(attempt)}</span></header>
           <LifecycleRail nodes={lifecycle} conclusion={lifecycleConclusion(attempt)}/>
         </section>
 
@@ -173,13 +181,28 @@ export function RunOverview({
           </div>
         </section>
 
-        {attempt.state === 'waiting_instance' && <WaitingInstancePanel attempt={attempt} busy={busy} onBind={onBind}/>}
+        {managed && <section className="training-managed-run-panel">
+          <header>
+            <div><span className="training-kicker">MANAGED EXECUTION</span><h2>平台托管执行边界</h2></div>
+            <span className="training-execution-badge"><TrainingIcon name="shield" size={14}/>平台托管</span>
+          </header>
+          <div className="training-managed-run-grid">
+            <article><span>费用守卫</span><strong>{provisioningStateLabel('cost_guard_state', attempt.provisioning?.cost_guard_state)}</strong><small>{budget.deadline ? `截止 ${budget.deadline}` : `${budget.window} · ${budget.budget}`}</small></article>
+            <article><span>安全首启</span><strong>{provisioningStateLabel('credential_state', attempt.provisioning?.credential_state)}</strong><small>临时密码与实例密钥不进入 API 响应</small></article>
+            <article><span>运行环境</span><strong>{provisioningStateLabel('runtime_state', attempt.provisioning?.runtime_state)}</strong><small>{attempt.runtime_report?.lock_id ? `锁 ${shortId(attempt.runtime_report.lock_id, 12)}` : '预检通过后才传输训练输入'}</small></article>
+            <article><span>产物归档</span><strong>{provisioningStateLabel('artifact_state', attempt.provisioning?.artifact_state)}</strong><small>{attempt.provisioning?.artifact_verified_at ? `校验于 ${formatDateTime(attempt.provisioning.artifact_verified_at)}` : '正式存储回读校验后才标记可用'}</small></article>
+          </div>
+          <p className="training-managed-boundary"><TrainingIcon name="info" size={15}/>平台会在训练结束、失败或取消后停止并删除实例；若供应商确认未完成，Attempt 会停留在回收阶段且租约不释放。</p>
+        </section>}
+
+        {!managed && attempt.state === 'waiting_instance' && <WaitingInstancePanel attempt={attempt} busy={busy} onBind={onBind}/>}
 
         <section className="training-detail-panel">
           <header><div><span className="training-kicker">RUN IDENTITY</span><h2>运行事实</h2></div><span>只展示接口返回事实</span></header>
           <dl className="training-detail-facts">
             <FactRow label="Attempt ID"><CopyValue value={attempt.id} label="Attempt ID" display={shortId(attempt.id, 12)}/></FactRow>
             <FactRow label="任务 ID"><CopyValue value={attempt.task_id} label="任务 ID" display={shortId(attempt.task_id, 12)}/></FactRow>
+            <FactRow label="执行方式">{mode.label}{managed && attempt.snapshot.training_image_profile?.id ? <small> · {attempt.snapshot.training_image_profile.id}</small> : null}</FactRow>
             <FactRow label="实例 ID"><CopyValue value={attempt.instance_id} label="实例 ID" display={attempt.instance_id || '尚未关联'}/></FactRow>
             <FactRow label="租约 ID"><CopyValue value={attempt.lease_id} label="租约 ID" display={attempt.lease_id || '尚未建立'}/></FactRow>
             <FactRow label="数据版本"><CopyValue value={attempt.snapshot.dataset.id} label="数据集版本 ID" display={shortId(attempt.snapshot.dataset.id, 12)}/></FactRow>
@@ -213,7 +236,7 @@ export function RunOverview({
         <section className="training-detail-panel training-next-step">
           <header><div><span className="training-kicker">NEXT CHECK</span><h2>下一步核对</h2></div></header>
           <ol>
-            <li className={terminal ? 'done' : ''}><span>01</span><div><strong>确认实例与进程</strong><p>等待状态推进，或在等待实例时填写实例 ID。</p></div></li>
+            <li className={terminal ? 'done' : ''}><span>01</span><div><strong>确认实例与进程</strong><p>{managed ? '平台负责创建、费用守卫、安全首启和进程观察；只查看接口事实。' : '等待状态推进，或在等待实例时填写实例 ID。'}</p></div></li>
             <li className={metrics.train.length ? 'done' : ''}><span>02</span><div><strong>检查 Loss 与学习率</strong><p>只使用 trainer 实际写入的指标判断趋势。</p></div></li>
             <li className={attempt.state === 'succeeded' ? '' : 'muted'}><span>03</span><div><strong>核对 Best / Final 产物</strong><p>成功状态不等于 Adapter 已 2/2 可用。</p></div></li>
             <li className="muted"><span>04</span><div><strong>独立推理验收</strong><p>产物可用后再进入推理试用，不自动启动服务。</p></div></li>

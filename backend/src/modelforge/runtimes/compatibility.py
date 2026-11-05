@@ -20,6 +20,7 @@ from .runtime_lock import (
 )
 
 _BASELINE_PATH = Path(__file__).with_name("compatibility-baseline.json")
+_TRAINING_IMAGES_PATH = Path(__file__).with_name("training-image-profiles.json")
 
 
 class _StrictModel(BaseModel):
@@ -227,6 +228,50 @@ class CompatibilityBaseline(_StrictModel):
     blocked_combinations: list[BlockedCombination] = Field(min_length=1)
 
 
+class TrainingImageProfile(_StrictModel):
+    id: str = Field(min_length=1, max_length=120)
+    provider_profile: Literal["training-base-b", "base-image-a-prime"]
+    label: str = Field(min_length=1, max_length=120)
+    description: str = Field(min_length=1, max_length=500)
+    image_id: str | None = Field(default=None, min_length=1, max_length=120)
+    image_group_id: str | None = Field(default=None, min_length=1, max_length=120)
+    image_type: Literal["System", "App", "Custom", "Community"]
+    runtime_source: Literal["cold_install", "prebuilt"]
+    status: Literal["available", "not_published", "blocked"]
+    evidence: str = Field(min_length=1, max_length=500)
+
+    @model_validator(mode="after")
+    def published_profile_has_an_image(self):
+        if self.status == "available" and self.image_id is None:
+            raise ValueError("an available training image profile requires image_id")
+        if self.status == "available" and self.provider_profile != self.id:
+            raise ValueError("provider profile must match the stable profile id")
+        if self.status != "available" and self.image_id is not None:
+            raise ValueError("an unpublished or blocked profile must not expose an image id")
+        return self
+
+
+class TrainingImageProfiles(_StrictModel):
+    schema_version: int = Field(alias="schema")
+    id: str = Field(min_length=1, max_length=200)
+    baseline_id: str = Field(min_length=1, max_length=200)
+    baseline_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    profiles: list[TrainingImageProfile] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def profile_ids_are_unique(self):
+        identifiers = [profile.id for profile in self.profiles]
+        if len(identifiers) != len(set(identifiers)):
+            raise ValueError("training image profile ids must be unique")
+        provider_profiles = [
+            profile.provider_profile for profile in self.profiles
+            if profile.provider_profile in {"training-base-b", "base-image-a-prime"}
+        ]
+        if len(provider_profiles) != len(set(provider_profiles)):
+            raise ValueError("provider profiles must be unique")
+        return self
+
+
 @lru_cache
 def _bytes():
     try:
@@ -329,9 +374,63 @@ def compatibility_baseline_sha256() -> str:
         raise RuntimeError("runtime_baseline_invalid") from None
 
 
+@lru_cache
+def _training_image_bytes():
+    try:
+        return _TRAINING_IMAGES_PATH.read_bytes()
+    except OSError:
+        raise RuntimeError("training_image_profiles_invalid") from None
+
+
+@lru_cache
+def training_image_profiles() -> TrainingImageProfiles:
+    try:
+        value = TrainingImageProfiles.model_validate_json(_training_image_bytes())
+        if (value.schema_version != 1 or value.baseline_id != compatibility_baseline().id
+                or value.baseline_sha256 != compatibility_baseline_sha256()):
+            raise ValueError("training image profile baseline reference mismatch")
+        return value
+    except (ValidationError, ValueError, RuntimeError):
+        raise RuntimeError("training_image_profiles_invalid") from None
+
+
+def training_image_profiles_sha256() -> str:
+    training_image_profiles()
+    try:
+        return hashlib.sha256(_training_image_bytes()).hexdigest()
+    except OSError:
+        raise RuntimeError("training_image_profiles_invalid") from None
+
+
+def training_image_profile(profile_id: str) -> TrainingImageProfile:
+    for profile in training_image_profiles().profiles:
+        if profile.id == profile_id:
+            return profile
+    raise AppError(
+        422,
+        "training_image_profile_unsupported",
+        "所选训练镜像 profile 不存在或未获准用于当前基线。",
+        {"profile_id": profile_id},
+    )
+
+
+def public_training_image_profiles() -> dict[str, Any]:
+    document = training_image_profiles()
+    return {
+        "schema": document.schema_version,
+        "id": document.id,
+        "sha256": training_image_profiles_sha256(),
+        "baseline_id": document.baseline_id,
+        "baseline_sha256": document.baseline_sha256,
+        "profiles": [profile.model_dump(mode="json") for profile in document.profiles],
+    }
+
+
 def reset_compatibility_baseline_cache():
     compatibility_baseline.cache_clear()
     _bytes.cache_clear()
+    training_image_profiles.cache_clear()
+    _training_image_bytes.cache_clear()
     reset_runtime_lock_cache()
 
 
@@ -404,13 +503,20 @@ def _model_mismatches(model: dict[str, Any], baseline: CompatibilityBaseline) ->
     return mismatches
 
 
-def _hardware_mismatches(instance: Any, expected: HardwareRule) -> list[dict[str, Any]]:
+def _hardware_mismatches(
+    instance: Any,
+    expected: HardwareRule,
+    *,
+    allowed_images: set[str] | None = None,
+) -> list[dict[str, Any]]:
     values = instance.model_dump() if hasattr(instance, "model_dump") else dict(instance)
     mismatches = []
     for field, wanted in expected.model_dump().items():
         if field == "device_memory_bytes":
             continue
         actual = values.get(field)
+        if field == "image_id" and allowed_images and actual in allowed_images:
+            continue
         if actual != wanted:
             mismatches.append({"field": f"instance.{field}", "expected": wanted, "actual": actual})
     return mismatches
@@ -434,7 +540,13 @@ def _training_mismatches(config: Any, expected: TrainingPreset) -> list[dict[str
     return mismatches
 
 
-def training_compatibility(model: dict[str, Any], config: Any, instance: Any) -> dict[str, Any]:
+def training_compatibility(
+    model: dict[str, Any],
+    config: Any,
+    instance: Any,
+    *,
+    image_profile: TrainingImageProfile | None = None,
+) -> dict[str, Any]:
     baseline = compatibility_baseline()
     model_mismatches = _model_mismatches(model, baseline)
     if model_mismatches:
@@ -447,12 +559,43 @@ def training_compatibility(model: dict[str, Any], config: Any, instance: Any) ->
         _runtime_error("runtime_parameters_unsupported",
                        "The selected training parameters are outside the verified runtime preset",
                        config_mismatches)
-    hardware_mismatches = _hardware_mismatches(instance, baseline.training.hardware)
+    allowed_images = None
+    if image_profile is not None:
+        if image_profile.status != "available" or image_profile.image_id is None:
+            _runtime_error(
+                "training_image_profile_unsupported",
+                "The selected training image profile is not published",
+                [{
+                    "field": "instance.image_id",
+                    "expected": "published training image profile",
+                    "actual": image_profile.status,
+                }],
+            )
+        values = instance.model_dump() if hasattr(instance, "model_dump") else dict(instance)
+        if values.get("image_id") != image_profile.image_id:
+            _runtime_error(
+                "training_image_profile_mismatch",
+                "The selected image does not match the approved training image profile",
+                [{
+                    "field": "instance.image_id",
+                    "expected": image_profile.image_id,
+                    "actual": values.get("image_id"),
+                }],
+            )
+        allowed_images = {image_profile.image_id}
+    hardware_mismatches = _hardware_mismatches(
+        instance,
+        baseline.training.hardware,
+        allowed_images=allowed_images,
+    )
     if hardware_mismatches:
         _runtime_error("runtime_hardware_unsupported",
                        "The selected instance is outside the verified training hardware and image",
                        hardware_mismatches)
-    return {
+    hardware = baseline.training.hardware.model_dump()
+    values = instance.model_dump() if hasattr(instance, "model_dump") else dict(instance)
+    hardware["image_id"] = values.get("image_id")
+    result = {
         "baseline_id": baseline.id,
         "baseline_sha256": compatibility_baseline_sha256(),
         "model_architecture": baseline.model.architecture,
@@ -460,8 +603,18 @@ def training_compatibility(model: dict[str, Any], config: Any, instance: Any) ->
         "training_runtime_lock_id": baseline.training.runtime_lock_id,
         "training_runtime_lock_sha256": baseline.training.runtime_lock_sha256,
         "training_preset": baseline.training.verified_preset.model_dump(),
-        "hardware": baseline.training.hardware.model_dump(),
+        "hardware": hardware,
     }
+    if image_profile is not None:
+        result.update({
+            "training_image_profile_id": image_profile.id,
+            "training_image_profile_sha256": training_image_profiles_sha256(),
+            "training_image_id": image_profile.image_id,
+            "training_image_group_id": image_profile.image_group_id,
+            "training_image_type": image_profile.image_type,
+            "training_runtime_source": image_profile.runtime_source,
+        })
+    return result
 
 
 def inference_compatibility(adapter: dict[str, Any], instance: Any) -> dict[str, Any]:

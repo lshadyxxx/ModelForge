@@ -2,7 +2,7 @@
 
 ModelForge（模锻）是一个独立规划中的模型训练与推理平台，目标是把数据集、微调任务、模型产物和推理服务放进一条可追踪的生命周期中。
 
-当前状态（2026-11-03）：核心 MVP 已在使用者手动创建收费实例的边界内闭合一个受支持组合：Qwen3-0.6B、单卡 RTX 4090、固定训练与 vLLM 运行时。真实 SFT/LoRA、Best/Final、独立推理、多轮 SSE、取消、Worker 重启、空闲回收和页面手动结束均完成，训练与推理实例都已停止、删除并核对租约释放。当前代码包含首页工作台、数据集审阅工作室、模型验证工作室和版本化运行兼容基线；数据页面已支持按不可变 ID 分组、完整样本分页、单行原始 JSONL 审阅、逐行编辑并派生新版本，派生重试使用请求幂等身份。模型页面已按不可变模型族组织全部版本，并可从最新成功 Attempt 查看和下载经过再次清单与 SHA-256 校验的 Best/Final Adapter ZIP。基线 `qwen3-0.6b-rtx4090-cn-bj2-partial-20261102-r1` 的数值容量已与运行时配置严格绑定，训练 GPU 峰值也已实测归档，但容量边界实测和更广模型/GPU/镜像兼容矩阵仍未完成，因此状态保持 `partial`。收费实例继续由用户手动创建，平台不会采购或预留资源。完整容量边界和模型/GPU/镜像兼容矩阵仍由票据 06 跟踪，详见[数据集审阅工作室记录](docs/implementation/datasets-review-studio-2026-11-03.md)、[模型验证工作室记录](docs/implementation/model-validation-studio-2026-11-03.md)、[Adapter 导出记录](docs/implementation/adapter-export-2026-11-03.md)、[运行时兼容记录](docs/implementation/runtime-compatibility-2026-11-02.md)及[运行说明](docs/RUNNING.md)。
+当前状态（2026-11-05）：核心 MVP 已在一个受支持组合上完成平台托管训练的真实闭环，同时保留原有手动实例路径。A′ 路线使用基础镜像、安全首启和冷安装 runtime，真实完成了 Qwen3-0.6B、单卡 RTX 4090 的 SFT/LoRA：Attempt `6b330374-7fff-4ac2-9104-4f3909045e0b` 运行 22 step，最终 `eval_loss=0.214783`；12 个执行证据文件经 MinIO 读回 SHA-256 全部一致，Best/Final Adapter 均为 `available` 并通过下载包级校验；实例 `<redacted-instance-id>` 已停止、删除并二次精确查询为空，租约 `092392a1-6626-4561-95b4-0fed21476b0f` 在删除确认后释放。A′ 训练主页、详情页和产物页已在 1440/390 宽度完成真实 API 截图核对，无横向溢出或浏览器运行时错误。B「预构建 Training Base」镜像 `compshareImage-1xc89j1np56m`（`Custom` / `Available`）随后通过第二次正式 managed Attempt `fbc8a03d-27e3-4ef2-8253-c23ac8a599ac` 完成 22 step SFT/LoRA、Best/Final Adapter、12/12 MinIO 读回、实例删除和租约释放；第一次 Attempt 的瞬态公钥首启失败已单列并完成有限重试修复。整体结论仍为 `PASS_WITH_LIMITATIONS`：scheduler 到期实际自动关机未单独等待验证，供应商 `ResetCompShareInstancePassword` 在当前基础镜像路径返回 `cloud_api_error`，实际安全结果由“锁定系统密码并验证旧密码认证失败”实现，不能表述为供应商 reset 成功；B 根密码快照硬化、多实例首启矩阵和实际账单仍未验证。验收后 `MF_UCLOUD_WRITE_ENABLED` 已恢复为 `false`，当前计算环境写入为 `read_only`。基线 `qwen3-0.6b-rtx4090-cn-bj2-partial-20261102-r1` 的容量边界和更广模型/GPU/镜像兼容矩阵仍未完成，因此基线继续保持 `partial`。详见[托管训练真实验收记录](docs/implementation/training-oneclick-p1-20261105.md)、[B 完整验收记录](<internal-evidence>)、[数据集审阅工作室记录](docs/implementation/datasets-review-studio-2026-11-03.md)、[模型验证工作室记录](docs/implementation/model-validation-studio-2026-11-03.md)、[Adapter 导出记录](docs/implementation/adapter-export-2026-11-03.md)、[运行时兼容记录](docs/implementation/runtime-compatibility-2026-11-02.md)及[运行说明](docs/RUNNING.md)。
 
 ## 产品目标
 
@@ -41,6 +41,7 @@ React + Vite、FastAPI、PostgreSQL 与 MinIO 是已确定的架构选型，本�
 - [产品 MVP 本地实现任务](<internal-evidence>)
 - [优云远程执行范围决策](docs/adr/0001-ucompshare-remote-execution.md)
 - [公共基座外部只读引用决策](docs/adr/0002-external-readonly-base-models.md)
+- [托管训练一键化真实验收记录（2026-11-05）](docs/implementation/training-oneclick-p1-20261105.md)
 - [领域术语](GLOSSARY.md)
 - [运行架构与数据归属](docs/ARCHITECTURE.md)
 - [项目结构与模块设计](docs/PROJECT_STRUCTURE.md)

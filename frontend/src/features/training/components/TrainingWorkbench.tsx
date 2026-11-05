@@ -2,6 +2,7 @@ import {useMemo, useState} from 'react';
 import {SelectMenu} from '../../../shared/SelectMenu';
 import {
   chooseCurrentAttempt,
+  executionModeDescriptor,
   filterAttempts,
   formatDateTime,
   formatEpoch,
@@ -85,7 +86,7 @@ function ActiveAttempt({
       <div>
         <span className="training-kicker">{active ? 'CURRENT ATTEMPT' : 'LATEST ATTEMPT'}</span>
         <h2>{attempt.name}</h2>
-        <p>Attempt #{attempt.number} · {trainingStage(attempt.stage)} · 更新于 {formatDateTime(attempt.updated_at)}</p>
+        <p>Attempt #{attempt.number} · {executionModeDescriptor(attempt.execution_mode).shortLabel} · {trainingStage(attempt.stage)} · 更新于 {formatDateTime(attempt.updated_at)}</p>
       </div>
       <TrainingStatusBadge attempt={attempt}/>
     </header>
@@ -155,6 +156,7 @@ function FactPanel({
     <header><div><span>RUN FACTS</span><h2>运行事实</h2></div><TrainingIcon name="database" size={17}/></header>
     <dl>
       <dt>任务 ID</dt><dd><code>{shortId(attempt.task_id, 12)}</code></dd>
+      <dt>执行方式</dt><dd>{executionModeDescriptor(attempt.execution_mode).label}{attempt.provisioning?.training_image_profile_id ? <small>{attempt.provisioning.training_image_profile_id}</small> : null}</dd>
       <dt>快照指纹</dt><dd><code>{shortId(attempt.snapshot_sha256, 12)}</code><small>数据、基座与参数在详情页读取</small></dd>
       <dt>实例</dt><dd><code>{attempt.instance_id || '尚未关联'}</code></dd>
       <dt>租约 ID</dt><dd><code>{attempt.lease_id || '尚未建立'}</code></dd>
@@ -204,7 +206,7 @@ function AttemptLedger({
             const metrics = normalizeMetrics(attempt.metrics);
             return <tr key={attempt.id}>
               <td data-label="任务"><strong>{attempt.name}</strong><small><code>{shortId(attempt.id)}</code></small></td>
-              <td data-label="Attempt"><span className="training-mono">#{attempt.number}</span></td>
+              <td data-label="Attempt"><span className="training-mono">#{attempt.number}</span><small>{executionModeDescriptor(attempt.execution_mode).shortLabel}</small></td>
               <td data-label="状态"><TrainingStatusBadge attempt={attempt} compact/></td>
               <td data-label="阶段"><span>{trainingStage(attempt.stage)}</span>{attempt.error_code && <small>{attempt.error_code}</small>}</td>
               <td data-label="最新指标"><span className="training-mono">{metrics.latestStep === null ? '—' : `step ${metrics.latestStep}`}</span><small>{metrics.latestTrainLoss === null ? 'Loss 未上报' : `train ${formatMetric(metrics.latestTrainLoss)}`}</small></td>
@@ -270,7 +272,7 @@ export function TrainingWorkbench({
     </div>}
     <section className="training-summary-strip" aria-label="训练任务摘要">
       <SummaryMetric label="活动运行" value={summaryUnknown ? '—' : summary.active} note={summaryUnknown ? '最近读取失败，状态待确认' : '排队、实例、准备、训练、同步或回收'} tone={!summaryUnknown && summary.active ? 'info' : undefined} icon="play"/>
-      <SummaryMetric label="等待实例" value={summaryUnknown ? '—' : summary.waiting} note={summaryUnknown ? '最近读取失败，状态待确认' : '需要手动创建并关联实例'} tone={!summaryUnknown && summary.waiting ? 'warning' : undefined} icon="clock"/>
+      <SummaryMetric label="等待实例" value={summaryUnknown ? '—' : summary.waiting} note={summaryUnknown ? '最近读取失败，状态待确认' : '仅手动模式需要创建并关联实例'} tone={!summaryUnknown && summary.waiting ? 'warning' : undefined} icon="clock"/>
       <SummaryMetric label="已成功" value={summaryUnknown ? '—' : summary.succeeded} note={summaryUnknown ? '最近读取失败，状态待确认' : '产物可继续进入独立推理验收'} icon="check"/>
       <SummaryMetric label="需要关注" value={summaryUnknown ? '—' : summary.attention} note={summaryUnknown ? '最近读取失败，状态待确认' : '失败、错误代码或取消请求待确认'} tone={!summaryUnknown && summary.attention ? 'danger' : undefined} icon="alert"/>
     </section>
@@ -279,7 +281,7 @@ export function TrainingWorkbench({
       <div><h2>暂时无法读取训练任务</h2><p>{error}</p><button type="button" onClick={onRefresh}>重试读取</button></div>
     </section> : !attempts.length ? <section className="training-empty-panel">
       <div className="training-empty-symbol"><TrainingIcon name="gpu" size={26}/></div>
-      <div><span>READY TO TRAIN</span><h2>还没有训练 Attempt</h2><p>先准备已发布数据集和可用基座，然后按受支持的单 GPU 规格创建第一个训练任务。</p><div><button type="button" onClick={onCreate}>新建训练</button><a className="secondary" href="#datasets">准备数据集</a></div></div>
+      <div><span>READY TO TRAIN</span><h2>还没有训练 Attempt</h2><p>先准备已发布数据集和可用基座，再创建第一个托管训练；平台会在费用守卫通过后自动创建单台 GPU 实例。</p><div><button type="button" onClick={onCreate}>新建训练</button><a className="secondary" href="#datasets">准备数据集</a></div></div>
     </section> : <>
       <div className="training-workbench-grid">
         <div className="training-workbench-main">

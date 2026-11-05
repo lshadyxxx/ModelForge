@@ -1,6 +1,6 @@
 # 本地运行与第一阶段验收
 
-当前开放工作台、数据集、模型管理、计算环境、训练和独立试用入口。数据集/模型页面调用实际 API；优云凭据由后端环境注入，未配置时显示明确提示，不提供演示目录。真实 Qwen3-0.6B SFT/LoRA、Best/Final、独立 vLLM Adapter 生成、多轮 SSE、取消、Worker 重启、断流恢复、十五分钟空闲回收和页面手动结束均已通过；所有训练/推理实例均已停止、删除并核对租约释放。首页工作台已在提交 `b8987dd` 中改为真实资产、GPU、最近训练、Loss、下一步动作和最近活动视图，并通过桌面及 390px 隔离浏览器验收。版本化兼容基线已绑定模型/Adapter 指纹、完整训练与推理实例规格和数值容量，训练 GPU 峰值也已实测归档；容量边界实测和完整兼容矩阵仍开放，因此基线保持 `partial`，见[运行时兼容记录](implementation/runtime-compatibility-2026-11-02.md)。真实存储与基础设施结果见[基础骨架验收](implementation/full-compose-2026-10-29.md)，历史增量见[连续记录](implementation/progress-2026-10-31.md)和[优云目录](implementation/ucloud-catalog-2026-10-31.md)。
+当前开放工作台、数据集、模型管理、计算环境、训练和独立试用入口。数据集/模型页面调用实际 API；优云凭据由后端环境注入，未配置时显示明确提示，不提供演示目录。2026-11-05 的平台托管训练已完成 A′ 与 B 两条路线的真实闭环：A′ 在基础镜像 `compshareImage-1fc8fjody17l` 上完成冷安装 runtime、22 step SFT/LoRA、12 个证据文件 MinIO 校验、Best/Final Adapter 发布、实例删除和租约释放；B 预构建镜像 `compshareImage-1xc89j1np56m` 随后以第二次正式 managed Attempt `fbc8a03d-27e3-4ef2-8253-c23ac8a599ac` 完成 22 step SFT/LoRA、Best/Final Adapter、12/12 MinIO 读回、实例删除和租约释放。第一次 B Attempt 的瞬态公钥首启失败已保留为失败证据，并通过有限重试修复。结果与限制见[托管训练真实验收记录](implementation/training-oneclick-p1-20261105.md)和[B 完整验收记录](../<internal-evidence>)。原手动实例、独立 vLLM Adapter、多轮 SSE、取消、Worker 重启、断流恢复、十五分钟空闲回收和页面手动结束路径仍保留。托管 A′ 与 B 的单次闭环为 `PASS_WITH_LIMITATIONS`，不是生产 SLA：scheduler 到期实际关机、B 快照根密码硬化、多实例/多区域稳定性和真实账单查询仍未验证；供应商密码 reset 在当前基础镜像路径返回 `cloud_api_error`，当前安全结果来自实例内密码锁定与旧密码认证失败验证。验收后后端写入开关已恢复为 `MF_UCLOUD_WRITE_ENABLED=false`，所有实例和活动租约查询为空。版本化兼容基线已绑定模型/Adapter 指纹、完整训练与推理实例规格和数值容量，训练 GPU 峰值也已实测归档；容量边界实测和完整兼容矩阵仍开放，因此基线保持 `partial`，见[运行时兼容记录](implementation/runtime-compatibility-2026-11-02.md)。真实存储与基础设施结果见[基础骨架验收](implementation/full-compose-2026-10-29.md)，历史增量见[连续记录](implementation/progress-2026-10-31.md)和[优云目录](implementation/ucloud-catalog-2026-10-31.md)。
 
 ## 启停
 
@@ -213,11 +213,59 @@ backend/.venv/Scripts/python.exe scripts/acceptance-modelscope.py --version-id <
 
 进入“计算环境”，先刷新地域/可用区，再查 GPU 规格、平台镜像及公共模型；库存查询必须选定可用区、单卡型号、镜像、CPU 自动平台、计费模式和规格目录支持的系统盘。库存只反映查询时刻，不保留资源。目录可见不代表训练/推理已兼容。
 
-接口前缀 `/api/v1/resources/ucloud`：`GET /configuration` 仅返回配置布尔值/默认地域/只读模式；`GET /zones`、`/specs`、`/images`、`/models`、`/instances`、`/monitor` 以及 `POST /capacity` 均为只读查询。镜像按单一类型分页：API 和页面默认 `System`，可选 `App`，不提供跨类型混合分页；供应商会对每类分别应用 offset/limit。实例支持 offset/limit，公共模型按名称/标签筛选；实例响应移除密码、登录命令等敏感字段。本轮不提供创建、启动、停止或删除云实例接口。
+接口前缀 `/api/v1/resources/ucloud`：`GET /configuration` 返回配置布尔值、默认地域和当前 `read_only`/`read_write` 模式；`GET /zones`、`/specs`、`/images`、`/models`、`/instances`、`/monitor` 以及 `POST /capacity` 均为只读查询。镜像按单一类型分页：API 和页面默认 `System`，可选 `App`，不提供跨类型混合分页；供应商会对每类分别应用 offset/limit。实例支持 offset/limit，公共模型按名称/标签筛选；实例响应移除密码、登录命令等敏感字段。
+
+计算环境写入使用 `/api/v1/resources/compute/environments` 的创建、启动、停止、删除和对账接口；只有后端 `MF_UCLOUD_WRITE_ENABLED=true` 时才允许，否则返回 `403 compute_write_disabled` 且不会发送云端写命令。托管训练创建也受同一写开关和单 GPU 租约保护。2026-11-05 验收结束后已恢复为 `false`，因此当前页面和 API 都是 `read_only`；重新执行真实窗口时必须显式打开并在结束后关闭。只读目录、健康检查或库存查询不能替代写开关和费用/清理门禁。
 
 `cloud_not_configured`、`cloud_credentials_rejected`、`cloud_credentials_expired`、`cloud_permission_denied`、`cloud_unavailable`、`cloud_timeout`、`cloud_rate_limited`、`cloud_invalid_response`、`cloud_out_of_stock`、`cloud_incompatible` 分别说明配置、鉴权、权限、连接、协议或库存问题。供应商未说明原因时返回 `cloud_api_error`，不推测凭据过期；供应商原始错误正文不返回浏览器。成功响应包含 fetched_at、filters、total、state 和 compatibility=unverified。无后台静默重试，用户可显式刷新。
 
 浏览器验收不得置前窗口、调整窗口、使用桌面坐标或全局输入。后台驱动无法完成的文件选择/页面验收保留缺口，继续 HTTP 与测试。
+
+## 平台托管训练（A′ / B）
+
+训练创建向导提供两条互斥路径：平台托管和手动实例。托管 Attempt 创建后模式不可切换，平台负责创建实例、设置费用守卫、安全首启、runtime preflight、上传固定输入、启动远程 job、收集指标、回传产物、删除实例并在确认后释放租约。API 的历史默认值仍为 `manual`，页面新建训练默认选择 `managed`；手动路径保留用于回退和受控运维。
+
+当前 A′ 完整真实验收组合为：
+
+| 项 | 值 |
+|---|---|
+| 模型 | Qwen3-0.6B，内容指纹必须匹配当前兼容基线 |
+| GPU / 区域 | 单卡 RTX 4090 / `cn-bj2`、`cn-bj2-03` |
+| 基础镜像 | `compshareImage-1fc8fjody17l` |
+| runtime lock | `ucloud-cuda13.2-llamafactory-0.9.5-qwen3-20261101-r2` |
+| 训练镜像 profile | `base-image-a-prime`，`runtime_source=cold_install` |
+
+2026-11-05 真实验收的 Attempt 为 `6b330374-7fff-4ac2-9104-4f3909045e0b`，实例 `<redacted-instance-id>`，租约 `092392a1-6626-4561-95b4-0fed21476b0f`。结果为 `succeeded`、`exit_code=0`、22 个训练 step、`eval_loss=0.214783`；12 个执行证据文件读回 SHA-256 全部一致，Best/Final Adapter 均为 `available`。冷安装 runtime 约 7 分钟，整个窗口约 14 分 27 秒，只是单次样本，不是 SLA。官方目录报价为 `CNY 2.15/小时`，未查询实际账单。
+
+B 预构建镜像已通过正式 managed 训练全闭环：
+
+| 项 | 值 |
+|---|---|
+| 镜像 | `compshareImage-1xc89j1np56m`，`Custom` / `Available` |
+| 训练镜像 profile | `training-base-b`，`runtime_source=prebuilt` |
+| 区域 / 可用区 | `cn-bj2` / `cn-bj2-03` |
+| GroupId | Provider 未返回，当前为 `null` |
+| 已验证 | 新实例无需冷安装即可通过同一 runtime lock 的 preflight；22 step、Best/Final Adapter、12/12 MinIO 读回、实例删除和租约释放 |
+| 未验证 | B 快照根密码硬化、多实例/多区域首启稳定性、实际账单 |
+
+安全首启优先尝试一次供应商 `ResetCompShareInstancePassword`。如果该接口失败，只有在公钥登录已成功证明后才允许执行实例内 `passwd -l`，随后用旧密码再次登录并确认认证失败；若旧密码仍可登录，抛出 `credential_disable_unverified` 并停止训练。因此：
+
+- `credential_state=password_disabled` 表示实例密码已经不可用于登录；
+- 它不等于供应商 reset 接口成功；
+- 当前真实验收记录为 `credential_recovery=password_disabled_after_reset_error`；
+- 不能把这条路径写成“供应商密码轮换已验证通过”。
+
+安全首启成功后才允许执行 runtime preflight 和传输训练输入。实例 Running、训练 exit 0、产物已同步、实例已删除分别是不同事实；只有训练退出成功、产物校验完成、删除确认和租约释放都成立，Attempt 才显示最终成功。产物同步失败时保留实例和租约，不能为了缩短窗口删除唯一输出。
+
+本轮未执行或不能外推的项目：
+
+- B「预构建 Training Base」：全量托管训练已通过；第一次 Attempt 的瞬态首启失败已保留并修复；
+- scheduler 到期后实际进入 Stopped：`NOT_RUN`，只验证了设置和清理事实；
+- 供应商 `ResetCompShareInstancePassword` 成功：调用失败，保留为限制；
+- 实际云账单：`NOT_RUN`；
+- 多卡、多实例、多 Worker、Spot、公网控制台：不在本轮范围。
+
+完整证据目录、限制和复验命令见[托管训练真实验收记录](implementation/training-oneclick-p1-20261105.md)。
 
 
 ## 优云外部只读基座
@@ -226,9 +274,9 @@ backend/.venv/Scripts/python.exe scripts/acceptance-modelscope.py --version-id <
 
 完整文件探针可在明确的本地 fixture 上用 `python -m modelforge.infrastructure.model_probe <directory>` 执行；不要把此命令运行在未知大目录，也不要把其输出手动提交给浏览器作为核对证明。实际公共挂载和服务器远程核对通道尚未接通，页面没有伪造成功的“验证”按钮。扫描上限、固化/漂移/重试契约和证据见[实施记录](implementation/external-bases-2026-10-31.md)。
 
-## 手动 GPU 实例与 SSH
+## 手动 GPU 实例与 SSH（回退路径）
 
-平台不会自动创建收费实例。训练或独立推理提交前会弹出确认窗口，展示固定的单GPU规格并说明平台只保存要求、不购买或预留资源；确认后任务才进入“等待手动创建实例”。请按页面规格在优云控制台手动创建，确认 Running 后关联实例ID并明确授权停止/删除。训练和独立试用使用不同实例身份。
+手动模式不会自动创建收费实例。训练或独立推理提交前会弹出确认窗口，展示固定的单 GPU 规格并说明平台只保存要求、不购买或预留资源；确认后任务才进入“等待手动创建实例”。请按页面规格在优云控制台手动创建，确认 Running 后关联实例 ID 并明确授权停止/删除。训练和独立试用使用不同实例身份。托管模式只在后端写开关打开时创建实例，且受单 GPU 租约约束；当前验收后写开关为 `false`，不应在未重新授权窗口时打开。
 
 后端只读挂载 `.runtime/ssh` 到 `/run/modelforge/ssh`。在被Git忽略的 `.runtime/ssh/endpoints.json` 按实例ID配置：
 

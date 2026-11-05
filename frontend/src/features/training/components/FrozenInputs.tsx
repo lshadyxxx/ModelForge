@@ -1,4 +1,4 @@
-import {formatDateTime} from '../training-model';
+import {executionModeDescriptor, formatDateTime} from '../training-model';
 import type {TrainingAttempt} from '../types';
 import {CopyValue} from './CopyValue';
 import {TrainingIcon} from './TrainingIcon';
@@ -33,6 +33,7 @@ export function FrozenInputs({attempt}: {attempt: TrainingAttempt}) {
   const config = snapshot.config;
   const instance = snapshot.instance;
   const compatibility = snapshot.compatibility;
+  const mode = executionModeDescriptor(snapshot.execution_mode);
   return <div className="training-frozen-page">
     <section className="training-frozen-heading">
       <div><span className="training-kicker">IMMUTABLE ATTEMPT INPUT</span><h2>冻结输入与运行参数</h2><p>这是提交时写入 Attempt 快照的身份和参数。重试会创建新的 Attempt，而不是修改这一份记录。</p></div>
@@ -77,8 +78,10 @@ export function FrozenInputs({attempt}: {attempt: TrainingAttempt}) {
     </InputSection>
 
     <div className="training-frozen-grid">
-      <InputSection title="计算实例要求" kicker="COMPUTE REQUEST">
+      <InputSection title={snapshot.execution_mode === 'managed' ? '托管计算实例' : '计算实例要求'} kicker="COMPUTE REQUEST">
         <dl>
+          <ValueRow label="执行方式">{mode.label}</ValueRow>
+          {snapshot.training_image_profile && <ValueRow label="训练镜像 profile"><code>{snapshot.training_image_profile.id || '—'}</code></ValueRow>}
           <ValueRow label="地域 / 可用区"><code>{instance.region || '—'} / {instance.zone || '—'}</code></ValueRow>
           <ValueRow label="GPU">{instance.gpu_type || '—'}</ValueRow>
           <ValueRow label="CPU / 内存">{instance.cpu || '—'} 核 / {instance.memory_mb ? `${instance.memory_mb / 1024} GiB` : '—'}</ValueRow>

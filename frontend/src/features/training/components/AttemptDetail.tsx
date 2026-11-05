@@ -1,6 +1,8 @@
 import {useState, type ReactNode} from 'react';
 import {
+  executionModeDescriptor,
   formatDateTime,
+  isManagedAttempt,
   isTerminalAttempt,
   trainingErrorDescription,
   trainingStage,
@@ -82,6 +84,8 @@ export function AttemptDetail({
   const [retryOpen, setRetryOpen] = useState(false);
   const terminal = isTerminalAttempt(attempt);
   const state = trainingState(attempt.state);
+  const managed = isManagedAttempt(attempt);
+  const mode = executionModeDescriptor(attempt.execution_mode);
   const diagnosticGap = Boolean(attempt.execution_manifest?.diagnostic_gap);
 
   let content: ReactNode;
@@ -102,9 +106,9 @@ export function AttemptDetail({
     <button type="button" className="training-back" onClick={onBack}><TrainingIcon name="back" size={16}/>训练工作台</button>
     <header className="training-detail-heading">
       <div className="training-detail-title">
-        <span className="training-eyebrow">RUN DETAIL / ATTEMPT #{attempt.number}</span>
+        <span className="training-eyebrow">RUN DETAIL / ATTEMPT #{attempt.number} / {managed ? 'MANAGED' : 'MANUAL'}</span>
         <h1>{attempt.name}</h1>
-        <p><code>{attempt.id}</code> · {trainingStage(attempt.stage)} · 更新于 {formatDateTime(attempt.updated_at)}</p>
+        <p><code>{attempt.id}</code> · {mode.label} · {trainingStage(attempt.stage)} · 更新于 {formatDateTime(attempt.updated_at)}</p>
       </div>
       <div className="training-detail-heading-actions">
         <TrainingStatusBadge attempt={attempt}/>
@@ -157,11 +161,14 @@ export function AttemptDetail({
 
     {retryOpen && <TrainingDialog titleId="training-retry-title" onClose={() => setRetryOpen(false)}>
       <div className="training-dialog-heading"><span>NEW ATTEMPT</span><h2 id="training-retry-title">创建新的重试 Attempt？</h2></div>
-      <p>重试会复制本次冻结输入并创建新的 Attempt，不会修改当前记录，也不会自动购买 GPU。</p>
+      <p>{managed
+        ? '重试会复制本次冻结输入并创建一个新的托管 Attempt；新 Attempt 通过费用守卫后会创建新的单台收费实例。'
+        : '重试会复制本次冻结输入并创建新的 Attempt，不会修改当前记录，也不会自动购买 GPU。'}</p>
       <dl className="training-retry-summary">
         <dt>数据版本</dt><dd><code>{attempt.snapshot.dataset.id}</code></dd>
         <dt>基座模型</dt><dd><code>{attempt.snapshot.base.id}</code></dd>
         <dt>GPU 规格</dt><dd>{attempt.snapshot.instance.gpu_type || '—'}</dd>
+        <dt>执行方式</dt><dd>{mode.label}{managed && attempt.snapshot.training_image_profile?.id ? ` · ${attempt.snapshot.training_image_profile.id}` : ''}</dd>
       </dl>
       <DialogActions busy={busy} confirmLabel="创建重试 Attempt" onClose={() => setRetryOpen(false)} onConfirm={() => {setRetryOpen(false); void onRetry();}}/>
     </TrainingDialog>}

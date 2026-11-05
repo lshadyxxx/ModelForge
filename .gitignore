@@ -12,6 +12,7 @@ out/
 
 # Python
 .venv/
+.test-venv/
 venv/
 __pycache__/
 *.py[cod]

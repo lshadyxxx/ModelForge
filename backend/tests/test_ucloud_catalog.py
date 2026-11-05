@@ -78,7 +78,7 @@ def test_missing_credentials_and_write_action_never_hit_network():
     (httpx.Response(200, json={"RetCode": 1002, "Message": "Permission denied"}), "cloud_permission_denied"),
     (httpx.Response(200, json={"RetCode": 226604, "Message": ""}), "cloud_out_of_stock"),
     (httpx.Response(200, json={"RetCode": 226603}), "cloud_incompatible"),
-    (httpx.Response(200, json={"RetCode": 226602, "Message": "The instance has expired"}), "cloud_api_error"),
+    (httpx.Response(200, json={"RetCode": 226602, "Message": "The instance has expired"}), "cloud_account_expired"),
     (httpx.Response(200, content=b"not json"), "cloud_invalid_response"),
     (httpx.Response(200, json={"RetCode": "0"}), "cloud_invalid_response"),
     (httpx.Response(200, json={"RetCode": 0, "Action": "WrongResponse"}), "cloud_invalid_response"),

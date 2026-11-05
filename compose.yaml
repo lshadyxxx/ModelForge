@@ -13,7 +13,9 @@ x-backend: &backend
     MF_UCLOUD_WRITE_ENABLED: ${MF_UCLOUD_WRITE_ENABLED:-false}
   init: true
   volumes:
-    - ./.runtime/ssh:/run/modelforge/ssh:ro
+    # Managed training generates per-instance endpoint metadata after the
+    # provider instance exists. API processes read; Worker writes atomically.
+    - ./.runtime/ssh:/run/modelforge/ssh
 
 services:
   postgres:

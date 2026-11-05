@@ -1,0 +1,32 @@
+{
+  "schema": 1,
+  "id": "training-image-profiles-20261105-r2",
+  "baseline_id": "qwen3-0.6b-rtx4090-cn-bj2-partial-20261102-r1",
+  "baseline_sha256": "e88471f9ddee563edab1bb11413193422c6450873fe402e10c549bdc275f7b4b",
+  "profiles": [
+    {
+      "id": "base-image-a-prime",
+      "provider_profile": "base-image-a-prime",
+      "label": "基础镜像 + 安全首启",
+      "description": "使用已验证基础镜像，由平台完成安全首启并安装固定训练运行时。",
+      "image_id": "compshareImage-1fc8fjody17l",
+      "image_group_id": null,
+      "image_type": "System",
+      "runtime_source": "cold_install",
+      "status": "available",
+      "evidence": "P0 provisioning and runtime bootstrap passed; full P1 training pending"
+    },
+    {
+      "id": "training-base-b",
+      "provider_profile": "training-base-b",
+      "label": "Training Base 预构建镜像",
+      "description": "预装固定训练运行时的平台自制镜像。",
+      "image_id": "compshareImage-1xc89j1np56m",
+      "image_group_id": null,
+      "image_type": "Custom",
+      "runtime_source": "prebuilt",
+      "status": "available",
+      "evidence": "Available; source build <redacted-instance-id>; verification instance <redacted-instance-id> passed prebuilt runtime preflight without cold install; no group id returned by provider"
+    }
+  ]
+}

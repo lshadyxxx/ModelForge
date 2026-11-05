@@ -9,7 +9,11 @@ from modelforge.errors import AppError
 from modelforge.modules.datasets import DatasetRegistry
 from modelforge.modules.models import ModelRegistry
 from modelforge.modules.resources import GpuLeases, InstanceSpec, LeaseToken, Catalog
-from modelforge.runtimes.compatibility import training_compatibility
+from modelforge.runtimes.compatibility import (
+    training_compatibility,
+    training_image_profile,
+    training_image_profiles_sha256,
+)
 
 class TrainingConfig(BaseModel):
     model_config = ConfigDict(extra='forbid', frozen=True, allow_inf_nan=False, strict=True)
@@ -33,6 +37,8 @@ class CreateTask(BaseModel):
     base_model_version_id: uuid.UUID
     instance: InstanceSpec
     config: TrainingConfig
+    execution_mode: Literal['managed', 'manual'] = 'manual'
+    training_image_profile_id: str | None = Field(default=None, min_length=1, max_length=120)
 
 def canonical(value):
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(',', ':'), allow_nan=False).encode()
@@ -47,29 +53,66 @@ class Training:
 
     def create(self, body):
         body = CreateTask.model_validate(body.model_dump())
+        image_profile = None
+        if body.execution_mode == 'managed':
+            settings = self.resources.settings
+            if not settings.ucloud_public_key or not settings.ucloud_private_key:
+                raise AppError(403, 'cloud_not_configured', '尚未配置优云凭据，不能创建托管训练实例。')
+            if not settings.ucloud_write_enabled:
+                raise AppError(403, 'cloud_write_disabled', '后端尚未开启优云写入，不能创建托管训练实例。')
+            if not body.training_image_profile_id:
+                raise AppError(422, 'training_image_profile_required', '托管训练必须选择已批准的训练镜像 profile。')
+            image_profile = training_image_profile(body.training_image_profile_id)
+        elif body.training_image_profile_id:
+            raise AppError(422, 'manual_image_profile_not_allowed', '手动实例不能声明平台训练镜像 profile。')
         registry = ModelRegistry(self.resources)
         model_selection = registry.get(body.base_model_version_id)
         if (model_selection['source_kind'] == 'ucloud_public'
                 and model_selection['external']['region'] != body.instance.region):
             raise AppError(422, 'base_region_mismatch', 'External base and execution instance must use the same region')
-        compatibility = training_compatibility(model_selection, body.config, body.instance)
+        compatibility = training_compatibility(
+            model_selection,
+            body.config,
+            body.instance,
+            image_profile=image_profile,
+        )
         Catalog(self.resources).validate_selection(body.instance)
         task_id, attempt_id = uuid.uuid4(), uuid.uuid4()
         with self.pool.connection() as connection:
             dataset = DatasetRegistry(self.resources).pin(body.dataset_version_id, 'training_task', str(task_id), connection=connection)
             model = registry.pin(body.base_model_version_id, 'training_task', str(task_id), connection=connection)
-            snapshot = {'schema': 1, 'runtime': 'llamafactory-sft-lora-v1', 'dataset': dataset, 'base': model,
-                        'config': body.config.model_dump(), 'instance': body.instance.model_dump(),
-                        'compatibility': compatibility}
+            snapshot = {
+                'schema': 2,
+                'runtime': 'llamafactory-sft-lora-v1',
+                'execution_mode': body.execution_mode,
+                'training_image_profile': ({
+                    'id': image_profile.id,
+                    'provider_profile': image_profile.provider_profile,
+                    'image_id': image_profile.image_id,
+                    'image_group_id': image_profile.image_group_id,
+                    'image_type': image_profile.image_type,
+                    'runtime_source': image_profile.runtime_source,
+                    'profiles_sha256': training_image_profiles_sha256(),
+                } if image_profile is not None else None),
+                'dataset': dataset,
+                'base': model,
+                'config': body.config.model_dump(),
+                'instance': body.instance.model_dump(),
+                'compatibility': compatibility,
+            }
             connection.execute('INSERT INTO training_tasks(id,name,snapshot,snapshot_sha256) VALUES (%s,%s,%s,%s)',
                 (task_id, body.name.strip(), Jsonb(snapshot), hashlib.sha256(canonical(snapshot)).hexdigest()))
-            connection.execute('INSERT INTO training_attempts(id,task_id,number) VALUES (%s,%s,1)', (attempt_id,task_id))
+            connection.execute(
+                'INSERT INTO training_attempts(id,task_id,number,execution_mode) VALUES (%s,%s,1,%s)',
+                (attempt_id, task_id, body.execution_mode),
+            )
         return self.get(attempt_id)
 
     def list(self):
         with self.pool.connection() as c:
-            return c.execute('''SELECT a.*,t.name,t.snapshot_sha256 FROM training_attempts a
+            rows = c.execute('''SELECT a.*,t.name,t.snapshot_sha256 FROM training_attempts a
                 JOIN training_tasks t ON t.id=a.task_id ORDER BY a.created_at DESC LIMIT 200''').fetchall()
+        return self._decorate(rows)
 
     def get(self, identifier):
         with self.pool.connection() as c:
@@ -78,7 +121,57 @@ class Training:
         if not row: raise AppError(404, 'not_found', 'Training Attempt not found')
         if hashlib.sha256(canonical(row['snapshot'])).hexdigest() != row['snapshot_sha256']:
             raise AppError(409, 'snapshot_integrity_failed', 'Immutable task snapshot integrity check failed')
-        return row
+        return self._decorate([row])[0]
+
+    def _decorate(self, rows):
+        if not rows:
+            return rows
+        identifiers = [row['id'] for row in rows]
+        with self.pool.connection() as c:
+            provisioning = c.execute(
+                'SELECT * FROM training_provisioning WHERE attempt_id = ANY(%s)',
+                (identifiers,),
+            ).fetchall()
+            jobs = c.execute(
+                'SELECT * FROM training_remote_jobs WHERE attempt_id = ANY(%s)',
+                (identifiers,),
+            ).fetchall()
+        provisioning_by_id = {row['attempt_id']: row for row in provisioning}
+        jobs_by_id = {row['attempt_id']: row for row in jobs}
+        safe_provisioning = {
+            key for key in (
+                'attempt_id', 'provider_profile', 'training_image_profile_id',
+                'training_image_profile_sha256', 'image_id', 'image_group_id',
+                'project_id', 'request_fingerprint', 'request_disposition',
+                'provider_state', 'provider_observed_at', 'cost_guard_state',
+                'cost_guard_deadline', 'cost_guard_set_at', 'credential_state',
+                'bootstrap_profile', 'host_key_fingerprint', 'endpoint_epoch',
+                'runtime_state', 'artifact_state', 'artifact_verified_at',
+                'last_error_code', 'created_at', 'updated_at',
+            )
+        }
+        safe_jobs = {
+            key for key in (
+                'attempt_id', 'instance_id', 'launch_state', 'remote_dir',
+                'argv_hash', 'input_manifest_hash', 'requested_at', 'observed_at',
+                'started_at', 'finished_at', 'exit_code', 'cancelled', 'group_exited',
+            )
+        }
+        decorated = []
+        for row in rows:
+            value = dict(row)
+            fact = provisioning_by_id.get(row['id'])
+            value['provisioning'] = (
+                {key: fact[key] for key in safe_provisioning if key in fact}
+                if fact else None
+            )
+            job = jobs_by_id.get(row['id'])
+            value['remote_job'] = (
+                {key: job[key] for key in safe_jobs if key in job}
+                if job else None
+            )
+            decorated.append(value)
+        return decorated
 
     def cancel(self, identifier):
         with self.pool.connection() as c:
@@ -97,7 +190,10 @@ class Training:
                 raise AppError(409, 'attempt_active', 'Complete cleanup before retrying with a new Attempt')
             identifier = uuid.uuid4()
             number = c.execute('SELECT max(number)+1 AS n FROM training_attempts WHERE task_id=%s', (row['task_id'],)).fetchone()['n']
-            c.execute('INSERT INTO training_attempts(id,task_id,number) VALUES (%s,%s,%s)', (identifier,row['task_id'],number))
+            c.execute(
+                'INSERT INTO training_attempts(id,task_id,number,execution_mode) VALUES (%s,%s,%s,%s)',
+                (identifier, row['task_id'], number, row['execution_mode']),
+            )
         return self.get(identifier)
 
     def logs(self, identifier, offset=0):
@@ -115,6 +211,8 @@ class Training:
 
     def bind(self, identifier, instance_id, acknowledge_cleanup, lifecycle):
         row = self.get(identifier)
+        if row['execution_mode'] != 'manual':
+            raise AppError(409, 'attempt_execution_mode_locked', '托管训练不能切换到手动实例绑定。')
         if row['state'] != 'waiting_instance' or row['cancel_requested']:
             raise AppError(409, 'attempt_not_waiting', 'Attempt is not waiting for a manually created instance')
         leases = GpuLeases(self.pool); lease = leases.get(row['lease_id'])

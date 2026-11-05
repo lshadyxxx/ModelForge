@@ -1,5 +1,12 @@
 import {api, json} from '../../shared/http';
-import type {LogChunk, TrainingAttempt, TrainingAttemptSummary, TrainingConfig} from './types';
+import type {
+  LogChunk,
+  TrainingAttempt,
+  TrainingAttemptSummary,
+  TrainingConfig,
+  TrainingExecutionMode,
+  TrainingImageCatalog,
+} from './types';
 
 export type TrainingPayload = {
   name: string;
@@ -7,6 +14,16 @@ export type TrainingPayload = {
   base_model_version_id: string;
   config: TrainingConfig;
   instance: TrainingAttempt['snapshot']['instance'];
+  execution_mode: TrainingExecutionMode;
+  training_image_profile_id?: string;
+};
+
+export type TrainingWriteConfiguration = {
+  configured: boolean;
+  default_region: string;
+  mode: 'read_only' | 'read_write';
+  write_enabled: boolean;
+  reason: string | null;
 };
 
 export function listTrainingAttempts(signal?: AbortSignal) {
@@ -15,6 +32,14 @@ export function listTrainingAttempts(signal?: AbortSignal) {
 
 export function getTrainingAttempt(identifier: string, signal?: AbortSignal) {
   return api<TrainingAttempt>('/training/attempts/' + encodeURIComponent(identifier), {signal});
+}
+
+export function getTrainingImageProfiles(signal?: AbortSignal) {
+  return api<TrainingImageCatalog>('/runtime/training-images', {signal});
+}
+
+export function getTrainingWriteConfiguration(signal?: AbortSignal) {
+  return api<TrainingWriteConfiguration>('/resources/ucloud/configuration', {signal});
 }
 
 export async function listTrainingLogs(identifier: string, signal?: AbortSignal) {

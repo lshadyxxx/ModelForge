@@ -13,13 +13,32 @@ import {
   trainingPresetFromBaseline,
   type RuntimeBaseline,
 } from '../../runtime';
-import {createTrainingAttempt, getTrainingAttempt, type TrainingPayload} from '../api';
+import {
+  createTrainingAttempt,
+  getTrainingAttempt,
+  getTrainingImageProfiles,
+  getTrainingWriteConfiguration,
+} from '../api';
 import {clearTrainingReuseAttempt, readTrainingReuseAttempt} from '../reuse';
 import {
-  formatMetric,
+  availableTrainingProfiles,
+  buildTrainingPayload,
+  defaultTrainingImageProfile,
+  executionModeDescriptor,
+  imageProfileStatus,
+  normalizeExecutionMode,
   shortId,
+  trainingImageProfileById,
 } from '../training-model';
-import type {TrainingAsset, TrainingAttempt, TrainingConfig, TrainingSnapshot} from '../types';
+import type {
+  TrainingAsset,
+  TrainingAttempt,
+  TrainingConfig,
+  TrainingExecutionMode,
+  TrainingImageCatalog,
+  TrainingImageProfile,
+  TrainingSnapshot,
+} from '../types';
 import {TrainingIcon} from './TrainingIcon';
 
 const initialConfig: TrainingConfig = {
@@ -37,7 +56,13 @@ const initialConfig: TrainingConfig = {
   seed: 42,
 };
 
-const stepLabels = ['选择输入', '计算环境', '训练参数', '确认提交'];
+const stepLabels = ['选择输入', '执行方式', '训练参数', '确认提交'];
+
+const managedWindow = {
+  minutes: 75,
+  budgetCny: 5,
+  hourlyCny: 3,
+};
 
 type Errors = Record<string, string>;
 
@@ -75,6 +100,27 @@ function formatInstance(instance: InstanceSpec) {
   return `${instance.gpu_type || 'GPU 未选择'} · ${instance.cpu || '—'} 核 / ${instance.memory_mb ? instance.memory_mb / 1024 + ' GiB' : '—'} · ${instance.region || '—'} / ${instance.zone || '—'}`;
 }
 
+function managedInstanceFrom(
+  runtime: RuntimeBaseline | null,
+  profile: TrainingImageProfile | null,
+): InstanceSpec {
+  if (!runtime || !profile) return emptyInstance;
+  const hardware = runtime.training.hardware;
+  return {
+    ...emptyInstance,
+    region: hardware.region,
+    zone: hardware.zone,
+    gpu_type: hardware.gpu_type,
+    cpu: hardware.cpu,
+    memory_mb: hardware.memory_mb,
+    image_id: profile.image_id ?? hardware.image_id,
+    cpu_platform: hardware.cpu_platform,
+    charge_type: hardware.charge_type,
+    boot_disk_gb: hardware.boot_disk_gb,
+    boot_disk_type: hardware.boot_disk_type,
+  };
+}
+
 function validateInstance(instance: InstanceSpec): Errors {
   const errors: Errors = {};
   if (!instance.region) errors.region = '请选择地域。';
@@ -107,6 +153,15 @@ export function CreateTrainingWizard({
   const [name, setName] = useState('');
   const [dataset, setDataset] = useState('');
   const [model, setModel] = useState('');
+  const [executionMode, setExecutionMode] = useState<TrainingExecutionMode>('managed');
+  const [profileCatalog, setProfileCatalog] = useState<TrainingImageCatalog | null>(null);
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [profileError, setProfileError] = useState('');
+  const [profileId, setProfileId] = useState('');
+  const [managedAuthorized, setManagedAuthorized] = useState(false);
+  const [writeEnabled, setWriteEnabled] = useState<boolean | null>(null);
+  const [writeReason, setWriteReason] = useState('');
+  const [writeLoading, setWriteLoading] = useState(true);
   const [config, setConfig] = useState<TrainingConfig>(initialConfig);
   const [instance, setInstance] = useState<InstanceSpec>(emptyInstance);
   const [datasets, setDatasets] = useState<TrainingAsset[]>([]);
@@ -122,6 +177,68 @@ export function CreateTrainingWizard({
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState('');
   const summaryRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setProfileLoading(true);
+    setProfileError('');
+    getTrainingImageProfiles(controller.signal)
+      .then((catalog) => {
+        if (controller.signal.aborted) return;
+        setProfileCatalog(catalog);
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted) {
+          setProfileError(error instanceof Error ? error.message : String(error));
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setProfileLoading(false);
+      });
+    return () => controller.abort();
+  }, [reloadKey]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setWriteLoading(true);
+    setWriteReason('');
+    getTrainingWriteConfiguration(controller.signal)
+      .then((configuration) => {
+        if (controller.signal.aborted) return;
+        setWriteEnabled(configuration.write_enabled);
+        if (!configuration.write_enabled) {
+          setExecutionMode('manual');
+          setManagedAuthorized(false);
+          setWriteReason(configuration.reason || '后端未开放云资源写入，平台无法创建收费实例。');
+        }
+      })
+      .catch((error) => {
+        if (controller.signal.aborted) return;
+        setWriteEnabled(false);
+        setExecutionMode('manual');
+        setManagedAuthorized(false);
+        setWriteReason(`无法确认云写入权限，已切换手动模式：${error instanceof Error ? error.message : String(error)}`);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setWriteLoading(false);
+      });
+    return () => controller.abort();
+  }, [reloadKey]);
+
+  useEffect(() => {
+    if (!profileCatalog || executionMode !== 'managed') return;
+    const current = trainingImageProfileById(profileCatalog, profileId);
+    if (!current || !imageProfileStatus(current).selectable) {
+      setProfileId(defaultTrainingImageProfile(profileCatalog)?.id ?? '');
+    }
+  }, [executionMode, profileCatalog, profileId]);
+
+  useEffect(() => {
+    if (writeEnabled === false && executionMode === 'managed') {
+      setExecutionMode('manual');
+      setManagedAuthorized(false);
+    }
+  }, [executionMode, writeEnabled]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -147,9 +264,12 @@ export function CreateTrainingWizard({
         setDataset(reused.snapshot.dataset.id);
         setModel(reused.snapshot.base.id);
         setConfig(reused.snapshot.config);
-        setInstance(reused.snapshot.instance);
+        const reusedMode = normalizeExecutionMode(reused.snapshot.execution_mode);
+        setExecutionMode(reusedMode);
+        if (reusedMode === 'manual') setInstance(reused.snapshot.instance);
+        setProfileId(reused.snapshot.training_image_profile?.id ?? '');
         setReusedSnapshot(reused.snapshot);
-        setReuseNotice(`已载入 Attempt #${reused.number} 的数据集、基座、训练参数和实例规格。`);
+        setReuseNotice(`已载入 Attempt #${reused.number} 的数据集、基座、训练参数和执行方式。`);
         clearTrainingReuseAttempt(reuseAttemptId);
       } else {
         setConfig((current) => trainingPresetFromBaseline(current, baseline));
@@ -164,6 +284,9 @@ export function CreateTrainingWizard({
 
   const selectedDataset = datasets.find((row) => row.version_id === dataset);
   const selectedModel = models.find((row) => row.version_id === model);
+  const availableProfiles = availableTrainingProfiles(profileCatalog);
+  const selectedProfile = trainingImageProfileById(profileCatalog, profileId);
+  const managedInstance = managedInstanceFrom(runtime, selectedProfile);
   const modelReason = selectedModel && runtime ? modelCompatibilityReason(selectedModel, runtime) : '';
   const datasetOptions = datasets.map((row) => ({
     value: row.version_id,
@@ -187,7 +310,22 @@ export function CreateTrainingWizard({
         ...(model && modelReason ? {model: modelReason} : {}),
       }
     : step === 2
-      ? validateInstance(instance)
+      ? executionMode === 'managed'
+        ? {
+            ...(writeEnabled !== true ? {execution_mode: writeReason || '平台托管写入尚未开启，不能创建收费实例。'} : {}),
+            ...(profileLoading ? {execution_mode: '正在读取已批准的训练镜像 profile。'} : {}),
+            ...(profileError ? {execution_mode: `无法读取训练镜像：${profileError}`} : {}),
+            ...(!profileLoading && !profileError && !availableProfiles.length
+              ? {execution_mode: '当前没有可用的训练镜像 profile，不能提交托管训练。'}
+              : {}),
+            ...(!selectedProfile && !profileLoading && !profileError
+              ? {execution_mode: '请选择一个已批准的训练镜像 profile。'}
+              : {}),
+            ...(selectedProfile && !imageProfileStatus(selectedProfile).selectable
+              ? {execution_mode: '所选训练镜像尚未发布，不能提交。'}
+              : {}),
+          }
+        : validateInstance(instance)
       : step === 3
         ? validateConfig(config)
         : {};
@@ -225,15 +363,33 @@ export function CreateTrainingWizard({
 
   async function submit() {
     setConfirmInstance(false);
+    if (executionMode === 'managed' && writeEnabled !== true) {
+      setStep(2);
+      setShowErrors(true);
+      setActionError(writeReason || '平台托管写入尚未开启，不能创建收费实例。');
+      return;
+    }
+    if (executionMode === 'managed' && !managedAuthorized) {
+      setActionError('请先确认本次托管训练会创建 1 台收费实例，并接受费用与回收边界。');
+      return;
+    }
+    if (executionMode === 'managed' && !selectedProfile) {
+      setStep(2);
+      setShowErrors(true);
+      setActionError('托管训练必须选择一个已批准的训练镜像 profile。');
+      return;
+    }
     setBusy(true);
     setActionError('');
-    const payload: TrainingPayload = {
+    const payload = buildTrainingPayload({
       name: name.trim(),
-      dataset_version_id: dataset,
-      base_model_version_id: model,
+      datasetVersionId: dataset,
+      baseModelVersionId: model,
       config,
-      instance,
-    };
+      instance: executionMode === 'managed' ? managedInstance : instance,
+      executionMode,
+      trainingImageProfileId: selectedProfile?.id,
+    });
     try {
       const attempt = await createTrainingAttempt(payload);
       onCreated(attempt);
@@ -247,7 +403,7 @@ export function CreateTrainingWizard({
   return <div className="training-page-shell training-create-page">
     <header className="training-create-heading">
       <button type="button" className="training-back" onClick={onCancel}><TrainingIcon name="back" size={16}/>训练工作台</button>
-      <div><span className="training-eyebrow">NEW TRAINING / IMMUTABLE INPUT</span><h1>新建训练任务</h1><p>冻结数据版本、基座、训练参数和单 GPU 实例要求。提交不会自动购买云资源。</p></div>
+      <div><span className="training-eyebrow">NEW TRAINING / IMMUTABLE INPUT</span><h1>新建训练任务</h1><p>冻结数据版本、基座、训练参数和执行方式。平台托管会在授权预算内创建单台收费 GPU 实例。</p></div>
     </header>
     <section className="training-create-panel">
       <ol className="training-create-steps" aria-label="新建训练步骤">
@@ -266,7 +422,12 @@ export function CreateTrainingWizard({
       </div>}
       {actionError && <div className="training-notice danger" role="alert"><TrainingIcon name="alert" size={18}/><div><strong>当前操作未完成</strong><p>{actionError}</p></div></div>}
       {assetsLoading && !assetsError && <div className="training-inline-loading" role="status"><span/><div><strong>正在读取训练输入</strong><p>核对已发布数据集、可用模型和当前训练兼容基线。</p></div></div>}
-      <form noValidate onSubmit={(event) => {event.preventDefault(); if (step < 4) goNext(); else setConfirmInstance(true);}}>
+      <form noValidate onSubmit={(event) => {
+        event.preventDefault();
+        if (step < 4) goNext();
+        else if (executionMode === 'managed') void submit();
+        else setConfirmInstance(true);
+      }}>
         {showErrors && allErrors.length > 0 && <div className="training-form-errors" role="alert" tabIndex={-1} ref={summaryRef}>
           <TrainingIcon name="alert" size={18}/>
           <div><strong>还有 {allErrors.length} 项需要处理</strong><ul>{Object.entries(errors).map(([key, message]) => <li key={key}><a href={errorAnchor(key)}>{message}</a></li>)}</ul></div>
@@ -320,13 +481,112 @@ export function CreateTrainingWizard({
             {runtime && <span>{runtime.status === 'partial' ? '部分收口' : '已收口'}</span>}
           </div>
         </div>}
-        {step === 2 && <div className="training-step-panel" id="training-instance-fieldset">
-          <div className="training-step-heading"><span>02</span><div><h2>单 GPU 计算环境</h2><p>当前平台不会自动创建收费实例。这里冻结的是你在优云控制台需要手动创建的规格。</p></div></div>
-          <InstanceFields value={instance} onChange={setInstance} disabled={assetsLoading || busy}/>
-          <div className="training-instance-preview">
-            <TrainingIcon name="gpu" size={18}/>
-            <div><span>当前选择</span><strong>{formatInstance(instance)}</strong><small>镜像 {instance.image_id || '未选择'} · {instance.boot_disk_gb || 0} GB {instance.boot_disk_type || ''} · {instance.charge_type || '未选择计费'}</small></div>
+        {step === 2 && <div className="training-step-panel" id="training-field-execution_mode">
+          <div className="training-step-heading"><span>02</span><div><h2>选择执行方式</h2><p>托管模式由平台完成实例、安全首启、费用守卫、训练和回收；手动模式只关联你自行创建的实例。</p></div></div>
+          {(writeLoading || writeEnabled === false) && <div className={'training-write-gate' + (writeEnabled === false ? ' blocked' : '')} role="status">
+            <TrainingIcon name={writeLoading ? 'clock' : 'lock'} size={17}/>
+            <div><strong>{writeLoading ? '正在核对云写入权限' : '平台托管当前不可用'}</strong><p>{writeLoading ? '托管创建按钮会在确认后端 write_enabled 后启用。' : `${writeReason} 已保留手动实例路径。`}</p></div>
+          </div>}
+          <div className="training-execution-choices" role="radiogroup" aria-label="训练执行方式">
+            {(['managed', 'manual'] as TrainingExecutionMode[]).map((mode) => {
+              const descriptor = executionModeDescriptor(mode);
+              const selected = executionMode === mode;
+              const modeDisabled = busy || (mode === 'managed' && writeEnabled !== true);
+              return <label key={mode} className={'training-execution-choice' + (selected ? ' selected' : '')}>
+                <input
+                  type="radio"
+                  name="training-execution-mode"
+                  value={mode}
+                  checked={selected}
+                  onChange={() => {
+                    setExecutionMode(mode);
+                    setManagedAuthorized(false);
+                    setShowErrors(false);
+                  }}
+                  disabled={modeDisabled}
+                />
+                <span className="training-execution-choice-icon"><TrainingIcon name={mode === 'managed' ? 'spark' : 'terminal'} size={18}/></span>
+                <span className="training-execution-choice-copy">
+                  <span><strong>{descriptor.label}</strong><i>{mode === 'managed' ? writeLoading ? '检查中' : writeEnabled ? '推荐' : '未开通' : '高级'}</i></span>
+                  <small>{descriptor.description}</small>
+                </span>
+              </label>;
+            })}
           </div>
+          <FieldError errors={errors} name="execution_mode"/>
+
+          {executionMode === 'managed' ? <>
+            <section className="training-managed-section" aria-labelledby="training-profile-heading">
+              <header>
+                <div><span className="training-kicker">PLATFORM IMAGE PROFILE</span><h3 id="training-profile-heading">训练镜像与运行时</h3></div>
+                {profileCatalog && <span className="training-profile-catalog">目录指纹 {shortId(profileCatalog.sha256, 12)}</span>}
+              </header>
+              {profileLoading ? <div className="training-inline-loading" role="status">
+                <span/><div><strong>正在读取训练镜像</strong><p>核对当前账号已发布 profile 与兼容基线。</p></div>
+              </div> : profileError ? <div className="training-inline-empty danger" role="alert">
+                <strong>无法读取训练镜像目录</strong><p>{profileError}</p>
+                <button type="button" className="secondary" onClick={() => setReloadKey((value) => value + 1)}>重新读取</button>
+              </div> : !availableProfiles.length ? <div className="training-inline-empty">
+                <strong>当前没有已发布的训练镜像</strong><p>未发布或已阻止的 profile 不允许提交，也不会回退到手动镜像。</p>
+              </div> : <div className="training-profile-grid" role="radiogroup" aria-label="训练镜像 profile">
+                {profileCatalog?.profiles.map((profile) => {
+                  const availability = imageProfileStatus(profile);
+                  const selected = profile.id === profileId;
+                  return <label
+                    key={profile.id}
+                    className={'training-profile-card' + (selected ? ' selected' : '') + (availability.selectable ? '' : ' unavailable')}
+                  >
+                    <input
+                      type="radio"
+                      name="training-image-profile"
+                      value={profile.id}
+                      checked={selected}
+                      disabled={!availability.selectable || busy}
+                      onChange={() => {
+                        setProfileId(profile.id);
+                        setManagedAuthorized(false);
+                      }}
+                    />
+                    <span className="training-profile-card-top">
+                      <span className={`training-status ${availability.tone}`}><i/>{availability.label}</span>
+                      <small>{profile.runtime_source === 'cold_install' ? '冷安装固定运行时' : '预构建镜像'}</small>
+                    </span>
+                    <strong>{profile.label}</strong>
+                    <p>{profile.description}</p>
+                    <span className="training-profile-meta">
+                      <code>{profile.id}</code>
+                      <small>{profile.image_id ? shortId(profile.image_id, 24) : '无已发布镜像 ID'}</small>
+                    </span>
+                  </label>;
+                })}
+              </div>}
+            </section>
+
+            <div className="training-managed-spec" aria-label="托管实例冻结规格">
+              <article><span>GPU</span><strong>{managedInstance.gpu_type || '—'}</strong><small>单卡 · 24 GB 显存</small></article>
+              <article><span>CPU / 内存</span><strong>{managedInstance.cpu || '—'} 核</strong><small>{managedInstance.memory_mb ? `${managedInstance.memory_mb / 1024} GiB` : '—'}</small></article>
+              <article><span>地域 / 可用区</span><strong>{managedInstance.region || '—'}</strong><small>{managedInstance.zone || '—'}</small></article>
+              <article><span>系统盘</span><strong>{managedInstance.boot_disk_gb || '—'} GB</strong><small>{managedInstance.boot_disk_type || '—'}</small></article>
+            </div>
+            <div className="training-cost-guard">
+              <TrainingIcon name="shield" size={19}/>
+              <div>
+                <strong>提交后将创建 1 台收费实例</strong>
+                <p>平台安全窗口：{managedWindow.minutes} 分钟 · 总额上限 ¥{managedWindow.budgetCny} · 小时上限 ¥{managedWindow.hourlyCny}。创建前会重新报价；超过任一上限即停止。训练结束后平台负责停止并删除实例。</p>
+              </div>
+            </div>
+            <p className="training-managed-boundary"><TrainingIcon name="key" size={15}/>首启凭据、临时密码和 SSH 私钥只在 Worker 内部处理，不会显示在页面、日志或 API 响应中。</p>
+          </> : <>
+            <div className="training-manual-banner">
+              <TrainingIcon name="info" size={17}/>
+              <p>手动模式不会自动创建实例，也不会设置平台费用守卫。请在优云控制台创建相同规格，确认 Running 后在 Attempt 详情页关联。</p>
+            </div>
+            <InstanceFields value={instance} onChange={setInstance} disabled={assetsLoading || busy}/>
+            <div className="training-instance-preview">
+              <TrainingIcon name="gpu" size={18}/>
+              <div><span>当前选择</span><strong>{formatInstance(instance)}</strong><small>镜像 {instance.image_id || '未选择'} · {instance.boot_disk_gb || 0} GB {instance.boot_disk_type || ''} · {instance.charge_type || '未选择计费'}</small></div>
+            </div>
+          </>}
         </div>}
         {step === 3 && <div className="training-step-panel">
           <div className="training-step-heading"><span>03</span><div><h2>训练参数</h2><p>首版只开放真实跑通的参数 preset。锁定字段来自兼容基线，随机种子可调整。</p></div></div>
@@ -360,9 +620,10 @@ export function CreateTrainingWizard({
           <div className="training-step-heading"><span>04</span><div><h2>确认冻结输入</h2><p>提交后，以下身份和参数会写入不可变 Attempt 快照。重试会创建新的 Attempt。</p></div></div>
           <div className="training-review-grid">
             <article><span>任务</span><strong>{name}</strong><small>{datasets.length} 个数据集版本可选 · {models.length} 个模型版本可用</small></article>
+            <article><span>执行方式</span><strong>{executionModeDescriptor(executionMode).label}</strong><small>{executionMode === 'managed' ? selectedProfile?.label || '尚未选择训练镜像' : '自行创建并关联实例'}</small></article>
             <article><span>数据版本</span><strong>{selectedDataset?.name || shortId(dataset)}</strong><small>{dataset || '未选择'} · {reusedSnapshot ? `拆分 ${shortId(reusedSnapshot.dataset.split_sha256, 12)}` : '拆分指纹在提交后固化'}</small></article>
             <article><span>基础模型</span><strong>{selectedModel?.name || shortId(model)}</strong><small>{selectedModel?.format_summary?.model_type || '架构未标注'} · {shortId(selectedModel?.manifest_sha256 || model, 14)}</small></article>
-            <article><span>计算环境</span><strong>{instance.gpu_type} · {instance.cpu} 核</strong><small>{instance.region} / {instance.zone} · {instance.memory_mb / 1024} GiB · {instance.image_id}</small></article>
+            <article><span>计算环境</span><strong>{(executionMode === 'managed' ? managedInstance : instance).gpu_type || '—'} · {(executionMode === 'managed' ? managedInstance : instance).cpu || '—'} 核</strong><small>{(executionMode === 'managed' ? managedInstance : instance).region || '—'} / {(executionMode === 'managed' ? managedInstance : instance).zone || '—'} · {(executionMode === 'managed' ? managedInstance : instance).memory_mb / 1024} GiB · {(executionMode === 'managed' ? selectedProfile?.id : instance.image_id) || '镜像未选择'}</small></article>
           </div>
           <div className="training-review-parameters">
             <h3>训练参数</h3>
@@ -379,19 +640,34 @@ export function CreateTrainingWizard({
           </div>
           <div className="training-boundary-card">
             <TrainingIcon name="alert" size={19}/>
-            <div><strong>提交不会购买或预留 GPU</strong><p>提交后任务进入“等待实例”。你需要按冻结规格在优云控制台手动创建收费实例，确认 Running 后回到详情页填写实例 ID，并授权平台在安全完成或取消后停止、删除实例。</p></div>
+            {executionMode === 'managed'
+              ? <div><strong>提交后平台将创建 1 台收费实例</strong><p>Worker 会在创建前核对库存与精确报价；费用守卫最长 {managedWindow.minutes} 分钟、总额不超过 ¥{managedWindow.budgetCny}、小时报价不超过 ¥{managedWindow.hourlyCny}。训练结束、失败或取消后，平台停止并删除实例；若回收未确认，租约保持占用。</p>
+                <label className="training-managed-confirm">
+                  <input type="checkbox" checked={managedAuthorized} onChange={(event) => setManagedAuthorized(event.target.checked)} disabled={busy}/>
+                  <span>我确认创建 1 台收费实例，并接受上述费用上限、最长运行窗口和自动回收边界。</span>
+                </label>
+              </div>
+              : <div><strong>提交不会购买或预留 GPU</strong><p>提交后任务进入“等待实例”。你需要在优云控制台按冻结规格手动创建收费实例，确认 Running 后回到详情页填写实例 ID，并授权平台在安全完成或取消后停止并删除实例。</p></div>}
           </div>
-          <details className="training-raw-details"><summary>查看提交 payload</summary><pre>{JSON.stringify({name: name.trim(), dataset_version_id: dataset, base_model_version_id: model, instance, config}, null, 2)}</pre></details>
+          <details className="training-raw-details"><summary>查看提交 payload</summary><pre>{JSON.stringify(buildTrainingPayload({
+            name: name.trim(),
+            datasetVersionId: dataset,
+            baseModelVersionId: model,
+            config,
+            instance: executionMode === 'managed' ? managedInstance : instance,
+            executionMode,
+            trainingImageProfileId: selectedProfile?.id,
+          }), null, 2)}</pre></details>
         </div>}
         <footer className="training-create-footer">
           <div><span>步骤 {step} / 4</span><i style={{width: `${step * 25}%`}}/></div>
           <div>{step > 1 && <button type="button" className="secondary" onClick={goBack} disabled={busy}>上一步</button>}
-            {step < 4 ? <button type="submit" disabled={assetsLoading || Boolean(assetsError)}>{assetsLoading ? '正在读取输入…' : '下一步'}<TrainingIcon name="arrow" size={15}/></button> : <button type="submit" disabled={busy || assetsLoading || Boolean(assetsError)}>{busy ? '正在提交…' : '提交训练任务'}</button>}
+            {step < 4 ? <button type="submit" disabled={assetsLoading || Boolean(assetsError)}>{assetsLoading ? '正在读取输入…' : '下一步'}<TrainingIcon name="arrow" size={15}/></button> : <button type="submit" disabled={busy || assetsLoading || Boolean(assetsError) || (executionMode === 'managed' && !managedAuthorized)}>{busy ? '正在提交…' : executionMode === 'managed' ? '确认创建托管训练' : '提交训练任务'}</button>}
           </div>
         </footer>
       </form>
     </section>
-    {confirmInstance && <ManualInstanceDialog purpose="训练" instance={instance} busy={busy} onCancel={() => setConfirmInstance(false)} onConfirm={() => void submit()}/>}
+    {confirmInstance && executionMode === 'manual' && <ManualInstanceDialog purpose="训练" instance={instance} busy={busy} onCancel={() => setConfirmInstance(false)} onConfirm={() => void submit()}/>}
   </div>;
 
 }

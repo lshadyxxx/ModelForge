@@ -15,7 +15,9 @@ from modelforge.runtimes.compatibility import (
     compatibility_baseline_sha256,
     inference_compatibility,
     public_compatibility_baseline,
+    public_training_image_profiles,
     reset_compatibility_baseline_cache,
+    training_image_profile,
     training_compatibility,
 )
 from modelforge.runtimes.runtime_lock import (
@@ -96,6 +98,35 @@ def test_versioned_baseline_cross_checks_current_runtime_locks():
     assert baseline.limits.model.file_count_limit == 10_000
     assert baseline.limits.dataset.largest_observed_file_bytes <= baseline.limits.dataset.file_limit_bytes
     assert baseline.limits.model.largest_observed_total_bytes <= baseline.limits.model.total_limit_bytes
+
+
+def test_training_image_profiles_publish_the_verified_b_route():
+    profiles = public_training_image_profiles()
+    assert profiles["baseline_sha256"] == compatibility_baseline_sha256()
+    assert training_image_profile("base-image-a-prime").status == "available"
+    b_profile = training_image_profile("training-base-b")
+    assert b_profile.status == "available"
+    assert b_profile.image_id == "compshareImage-1xc89j1np56m"
+    assert b_profile.image_type == "Custom"
+    assert b_profile.runtime_source == "prebuilt"
+    assert b_profile.image_group_id is None
+    with pytest.raises(AppError) as caught:
+        training_image_profile("not-a-profile")
+    assert caught.value.code == "training_image_profile_unsupported"
+
+
+def test_b_profile_requires_its_own_custom_image_and_runtime_source():
+    profile = training_image_profile("training-base-b")
+    matched = TRAIN_INSTANCE.model_copy(update={"image_id": profile.image_id})
+    identity = training_compatibility(MODEL, CONFIG, matched, image_profile=profile)
+    assert identity["training_image_profile_id"] == "training-base-b"
+    assert identity["training_image_id"] == "compshareImage-1xc89j1np56m"
+    assert identity["training_image_type"] == "Custom"
+    assert identity["training_runtime_source"] == "prebuilt"
+
+    with pytest.raises(AppError) as caught:
+        training_compatibility(MODEL, CONFIG, TRAIN_INSTANCE, image_profile=profile)
+    assert caught.value.code == "training_image_profile_mismatch"
 
 
 def test_measured_training_peak_must_be_complete_and_consistent():

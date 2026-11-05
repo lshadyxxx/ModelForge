@@ -11,12 +11,16 @@ from modelforge.modules.resources import GpuLeases
 from modelforge.runtimes.runtime_lock import training_runtime_lock
 from .use_cases import Training, token_from
 from .contracts import TrainingExecutor
+from .provisioning import RemoteJobs, TrainingProvisioning
 
 class TrainingWorker:
-    def __init__(self, resources, channel, lifecycle, executor: TrainingExecutor):
+    def __init__(self, resources, channel, lifecycle, executor: TrainingExecutor, *,
+                 provisioning=None, remote_jobs=None):
         self.resources, self.channel, self.lifecycle = resources, channel, lifecycle
         self.executor = executor
         self.training = Training(resources); self.leases = GpuLeases(resources.pool)
+        self.provisioning = provisioning or TrainingProvisioning(resources, lifecycle)
+        self.remote_jobs = remote_jobs or RemoteJobs(resources.pool)
 
     def run_once(self):
         # A session advisory lock prevents two resident Workers from executing this loop.
@@ -109,11 +113,20 @@ class TrainingWorker:
             if row['cancel_requested']:
                 self.training.update(identifier,state='cancelled',outcome='cancelled',stage='finished'); return
             token = self.leases.reserve('attempt', identifier)
-            self.training.update(identifier,lease_id=token.reservation_id,state='waiting_instance',stage='manual_instance')
+            if row['execution_mode'] == 'managed':
+                self.provisioning.ensure_intent(identifier, token)
+                self.training.update(identifier, lease_id=token.reservation_id, state='preparing', stage='provisioning')
+            else:
+                self.training.update(identifier, lease_id=token.reservation_id, state='waiting_instance', stage='manual_instance')
             row = self.training.get(identifier)
         lease = self.leases.get(row['lease_id']); token = token_from(lease)
         if lease['state'] == 'released':
             if row['outcome']:
+                if row['outcome'] == 'succeeded':
+                    facts = self.provisioning.row(identifier)
+                    if not facts or facts['artifact_state'] != 'verified':
+                        raise AppError(409, 'artifact_unverified', 'A released successful Attempt has no verified artifact fact')
+                self.provisioning.remove_endpoint(identifier, token)
                 fields = {'state': row['outcome'], 'stage': 'finished'}
                 if row['outcome'] in ('succeeded', 'cancelled'):
                     fields['error_code'] = None
@@ -121,6 +134,85 @@ class TrainingWorker:
             else: raise AppError(409,'execution_reconciliation_required','Released lease has no persisted outcome')
             return
         self.leases.renew(token)
+        if (row['cancel_requested'] and lease['create_state'] == 'not_requested'
+                and lease['provider_instance_id'] is None):
+            # Cancellation before the side-effecting create call must never
+            # spend money just to discover that the user already cancelled.
+            self.leases.release(token)
+            self.training.update(
+                identifier, state='cancelled', stage='finished',
+                outcome='cancelled', error_code=None,
+            )
+            return
+        if (row['cancel_requested'] and lease['create_state'] == 'bound'
+                and lease['process_state'] == 'not_started'
+                and row['state'] not in {'cleanup', 'succeeded', 'failed', 'cancelled'}):
+            if row['instance_id'] is None and lease['provider_instance_id']:
+                self.training.update(
+                    identifier, instance_id=lease['provider_instance_id'],
+                    state='cleanup', stage='cleanup', outcome='cancelled',
+                )
+            else:
+                self.training.update(
+                    identifier, state='cleanup', stage='cleanup',
+                    outcome='cancelled',
+                )
+            row = self.training.get(identifier)
+        if row['execution_mode'] == 'managed' and row['stage'] in {
+                'provisioning', 'cost_guard', 'bootstrap', 'runtime'}:
+            try:
+                if row['cancel_requested']:
+                    if row['instance_id'] is None:
+                        provisioned = self.provisioning.ensure_instance(identifier, token)
+                        row = self.training.get(identifier)
+                        if not row['instance_id']:
+                            return
+                    self.training.update(
+                        identifier, state='cleanup', stage='cleanup',
+                        outcome='cancelled',
+                    )
+                    return
+                if row['instance_id'] is None:
+                    provisioned = self.provisioning.ensure_instance(identifier, token)
+                    row = self.training.get(identifier)
+                    if not row['instance_id']:
+                        return
+                facts = self.provisioning.row(identifier)
+                if not facts:
+                    raise AppError(409, 'provisioning_missing', 'Managed provisioning facts are missing')
+                if facts['cost_guard_state'] != 'set':
+                    self.training.update(identifier, state='preparing', stage='cost_guard')
+                    self.provisioning.guard_cost(identifier, token)
+                    facts = self.provisioning.row(identifier)
+                if facts['credential_state'] not in {'rotated', 'password_disabled'}:
+                    self.training.update(identifier, state='preparing', stage='bootstrap')
+                    boot = self.provisioning.bootstrap(identifier, token)
+                    if boot.get('state') == 'pending':
+                        return
+                    facts = self.provisioning.row(identifier)
+                if facts['runtime_state'] != 'preflight_ready':
+                    self.training.update(identifier, state='preparing', stage='runtime')
+                    self.provisioning.ensure_runtime(identifier, token, self.channel)
+                self.training.update(identifier, state='preparing', stage='inputs', error_code=None)
+                row = self.training.get(identifier)
+            except AppError as error:
+                current_lease = self.leases.get(row['lease_id'])
+                if current_lease['provider_instance_id'] is None and current_lease['create_state'] == 'not_requested':
+                    self.leases.release(token)
+                    self.training.update(
+                        identifier,
+                        state='failed' if not row['cancel_requested'] else 'cancelled',
+                        stage='finished',
+                        outcome='failed' if not row['cancel_requested'] else 'cancelled',
+                        error_code=error.code,
+                    )
+                else:
+                    self.training.update(
+                        identifier, state='cleanup', stage='cleanup',
+                        outcome='failed' if not row['cancel_requested'] else 'cancelled',
+                        error_code=error.code,
+                    )
+                return
         if not row['instance_id'] and lease['provider_instance_id']:
             self.training.update(identifier,instance_id=lease['provider_instance_id'],state='preparing',stage='inputs')
             row = self.training.get(identifier)
@@ -130,9 +222,31 @@ class TrainingWorker:
                 self.training.update(identifier,state='cancelled',outcome='cancelled',stage='finished')
             return
         if row['stage'] == 'cleanup':
+            current_lease = self.leases.get(row['lease_id'])
+            if row['execution_mode'] == 'managed' and current_lease['create_state'] not in {
+                    'not_requested', 'bound'}:
+                # A create request may have been sent before cancellation or
+                # failure. Resolve that uncertain request before cleanup; never
+                # release the lease while the provider may still hold a child.
+                try:
+                    self.provisioning.ensure_instance(identifier, token)
+                except AppError:
+                    return
+                current_lease = self.leases.get(row['lease_id'])
+                if current_lease['create_state'] != 'bound':
+                    return
+                row = self.training.get(identifier)
+                if row['instance_id'] is None and current_lease['provider_instance_id']:
+                    self.training.update(
+                        identifier, instance_id=current_lease['provider_instance_id'],
+                    )
+                    row = self.training.get(identifier)
+            if row['execution_mode'] == 'managed':
+                self.provisioning.clear_cost_guard(identifier, token)
             self.lifecycle.cleanup(token, 'outputs_persisted' if row['outcome']=='succeeded' else 'discard')
             self.lifecycle.reconcile(token)
             if self.leases.get(row['lease_id'])['state']=='released':
+                self.provisioning.remove_endpoint(identifier, token)
                 fields = {'state': row['outcome'], 'stage': 'finished'}
                 if row['outcome'] in ('succeeded', 'cancelled'):
                     fields['error_code'] = None
@@ -175,18 +289,30 @@ class TrainingWorker:
             # Re-read cancellation after all potentially slow input transfers.
             if self.training.get(identifier)['cancel_requested']:
                 self.training.update(identifier,state='cleanup',stage='cleanup',outcome='cancelled'); return
-            if lease['process_state']=='not_started': self.leases.execution_requested(token)
+            if lease['process_state']=='not_started':
+                self.leases.execution_requested(token)
+                self.remote_jobs.ensure(identifier, row['instance_id'], plan.argv, inputs)
+                self.remote_jobs.launch_requested(identifier)
             status = self.channel.call(row['instance_id'],identifier,'start',argv=list(plan.argv),inputs=inputs)
+            self.remote_jobs.observed(identifier, status)
         if status['state'] in ('launching','running'):
+            self.remote_jobs.observed(identifier, status)
             self.training.update(identifier,state='running',stage='training',error_code=None)
             if self.training.get(identifier)['cancel_requested']:
                 status = self.channel.call(row['instance_id'],identifier,'cancel')
             self._logs(self.training.get(identifier)); self._runtime_reports(row); return
         if status['state'] != 'exited' or status.get('group_exited') is not True:
+            self.remote_jobs.observed(identifier, status)
             raise AppError(503,'remote_process_unknown','Remote process exit is unverified; retain GPU instance')
+        self.remote_jobs.observed(identifier, status)
         self.leases.record_process_exit(token,row['instance_id'],status['exit_code'],cancelled=bool(status.get('cancelled')))
         cancelled = bool(status.get('cancelled'))
         unsuccessful=cancelled or status['exit_code']!=0
+        if not unsuccessful:
+            # Artifact persistence is a distinct user-visible phase. Record it
+            # before touching object storage so a failed upload cannot leave
+            # the Attempt looking like training is still running.
+            self.training.update(identifier,state='syncing',stage='artifacts',exit_code=0)
         try:
             # Bound each tick; resume large tails next tick while the instance exists.
             for _ in range(4):
@@ -194,6 +320,8 @@ class TrainingWorker:
             else:
                 self.training.update(identifier,stage='logs');return
             self._runtime_reports(row)
+            if row['execution_mode'] == 'managed':
+                self.provisioning.mark_artifact(identifier, 'uploading')
             self._archive(row,set() if unsuccessful else self.executor.required_evidence)
         except Exception:
             if not unsuccessful:raise
@@ -201,12 +329,15 @@ class TrainingWorker:
             # Keep the gap explicit while allowing safe resource reclamation.
             self.training.update(identifier,execution_manifest={'diagnostic_gap':True,'code':'diagnostic_collection_failed'})
         if cancelled or status['exit_code'] != 0:
+            if row['execution_mode'] == 'managed':
+                self.provisioning.mark_artifact(identifier, 'failed')
             code = 'cancelled' if cancelled else 'training_failed'
             if not cancelled:code=self.executor.failure_code(lambda path:self._read_json(row,path))
             self.training.update(identifier,state='cleanup',stage='cleanup',
                 outcome='cancelled' if cancelled else 'failed',exit_code=status['exit_code'],error_code=code)
             return
-        self.training.update(identifier,state='syncing',stage='artifacts',exit_code=0)
         result = self.executor.result(lambda path:self._read_json(row,path))
         Adapters(self.resources).publish(identifier,row['snapshot'],self.channel,row['instance_id'],result)
+        if row['execution_mode'] == 'managed':
+            self.provisioning.mark_artifact(identifier, 'verified', verified=True)
         self.training.update(identifier,state='cleanup',stage='cleanup',outcome='succeeded',error_code=None)

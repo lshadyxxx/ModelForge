@@ -1,17 +1,27 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {
+  availableTrainingProfiles,
+  buildTrainingPayload,
   chooseCurrentAttempt,
+  defaultTrainingImageProfile,
+  executionModeDescriptor,
   filterAttempts,
   filterLogLines,
   formatBytes,
+  isActiveAttempt,
+  isManagedAttempt,
+  imageProfileStatus,
   lifecycleConclusion,
+  normalizeExecutionMode,
   needsAttention,
   normalizeMetrics,
   parseLogLines,
   parseTrainingRoute,
+  provisioningStateLabel,
   summarizeAttempts,
   trainingLifecycle,
+  trainingStage,
   trainingRouteQuery,
   trainingState,
 } from '../src/features/training/training-model.ts';
@@ -155,4 +165,161 @@ test('byte formatting is stable at binary unit boundaries', () => {
   assert.equal(formatBytes(1024), '1.00 KiB');
   assert.equal(formatBytes(1024 ** 3), '1.00 GiB');
   assert.equal(formatBytes(24 * 1024 ** 3), '24.0 GiB');
+});
+
+test('managed execution states and stages stay explicit', () => {
+  assert.equal(normalizeExecutionMode('managed'), 'managed');
+  assert.equal(normalizeExecutionMode(undefined), 'manual');
+  assert.equal(executionModeDescriptor('managed').label, '平台托管');
+  assert.equal(trainingState('provisioning_unknown').label, '云实例待核对');
+  assert.match(trainingState('provisioning_unknown').description, /不会自动重复创建/);
+  assert.equal(trainingState('blocked').label, '等待处理');
+  assert.equal(trainingState('cost_guard').label, '费用守卫');
+  assert.equal(trainingState('bootstrap').label, '安全首启');
+  assert.equal(trainingState('runtime').label, '运行环境预检');
+  assert.equal(trainingState('artifact_sync_failed').tone, 'danger');
+  assert.equal(trainingStage('cost_guard'), '费用守卫');
+  assert.equal(trainingStage('bootstrap'), '安全首启');
+  assert.equal(trainingStage('runtime'), '运行环境预检');
+  assert.equal(trainingStage('preflight'), '运行环境预检');
+  assert.equal(trainingStage('syncing'), '同步产物');
+  assert.equal(trainingStage('artifact_sync_failed'), '产物同步失败');
+  assert.equal(trainingStage('cleanup_pending'), '等待回收确认');
+  assert.equal(provisioningStateLabel('cost_guard_state', 'set'), '已设置');
+  assert.equal(provisioningStateLabel('credential_state', 'password_disabled'), '密码已禁用');
+  assert.equal(provisioningStateLabel('runtime_state', 'preflight_ready'), '预检通过');
+  assert.equal(provisioningStateLabel('artifact_state', 'failed'), '同步失败');
+  assert.equal(needsAttention(attempt({state: 'provisioning_unknown'})), true);
+  assert.equal(needsAttention(attempt({state: 'artifact_sync_failed'})), true);
+  assert.equal(isActiveAttempt(attempt({state: 'provisioning_unknown'})), true);
+  assert.equal(isActiveAttempt(attempt({state: 'cleanup_pending'})), true);
+  assert.equal(isManagedAttempt(attempt({execution_mode: 'managed'})), true);
+  assert.equal(isManagedAttempt(attempt({execution_mode: 'manual', provisioning: {attempt_id: 'a'}})), true);
+  assert.equal(isManagedAttempt(attempt({execution_mode: 'manual'})), false);
+});
+
+test('managed lifecycle exposes provisioning, guard, security and cleanup gates', () => {
+  const running = attempt({
+    state: 'running',
+    stage: 'training',
+    execution_mode: 'managed',
+  });
+  const nodes = trainingLifecycle(running);
+  assert.deepEqual(nodes.map((node) => node.label), [
+    '创建实例',
+    '费用守卫',
+    '首启与运行时',
+    '训练',
+    '产物同步',
+    '回收',
+  ]);
+  assert.deepEqual(nodes.map((node) => node.status), [
+    'done',
+    'done',
+    'done',
+    'active',
+    'pending',
+    'pending',
+  ]);
+  assert.equal(lifecycleConclusion(running), '当前在训练阶段');
+  assert.deepEqual(
+    trainingLifecycle(attempt({state: 'succeeded', stage: 'finished', execution_mode: 'managed'}))
+      .map((node) => node.status),
+    ['done', 'done', 'done', 'done', 'done', 'done'],
+  );
+  assert.deepEqual(
+    trainingLifecycle(attempt({state: 'failed', stage: 'bootstrap', execution_mode: 'managed'}))
+      .map((node) => node.status),
+    ['done', 'done', 'failed', 'pending', 'pending', 'pending'],
+  );
+  const unsafe = trainingLifecycle(attempt({
+    state: 'provisioning_unknown',
+    stage: 'provisioning',
+    execution_mode: 'managed',
+  }));
+  assert.equal(unsafe[0].status, 'active');
+});
+
+test('training image availability never falls back to an unpublished route', () => {
+  const catalog = {
+    schema: 1,
+    id: 'catalog',
+    sha256: 'x',
+    baseline_id: 'b',
+    baseline_sha256: 'y',
+    profiles: [
+      {
+        id: 'base-image-a-prime',
+        provider_profile: 'base-image-a-prime',
+        label: 'A prime',
+        description: 'Available',
+        image_id: 'img-1',
+        image_group_id: null,
+        image_type: 'System',
+        runtime_source: 'cold_install',
+        status: 'available',
+        evidence: 'test',
+      },
+      {
+        id: 'training-base-b',
+        provider_profile: 'training-base-b',
+        label: 'B',
+        description: 'Not published',
+        image_id: null,
+        image_group_id: null,
+        image_type: 'Custom',
+        runtime_source: 'prebuilt',
+        status: 'not_published',
+        evidence: 'test',
+      },
+    ],
+  };
+  assert.deepEqual(availableTrainingProfiles(catalog).map((profile) => profile.id), ['base-image-a-prime']);
+  assert.equal(defaultTrainingImageProfile(catalog).id, 'base-image-a-prime');
+  assert.equal(availableTrainingProfiles({...catalog, profiles: [catalog.profiles[1]]}).length, 0);
+  assert.equal(imageProfileStatus(catalog.profiles[0]).label, '可使用');
+  assert.equal(imageProfileStatus(catalog.profiles[1]).label, '未发布');
+  assert.equal(imageProfileStatus({...catalog.profiles[0], status: 'blocked'}).label, '已阻止');
+  assert.equal(imageProfileStatus({...catalog.profiles[0], status: 'blocked'}).selectable, false);
+});
+
+test('managed payload sends a profile while manual payload remains profile-free', () => {
+  const base = {
+    name: 'Qwen3 小样本训练',
+    datasetVersionId: 'dataset-1',
+    baseModelVersionId: 'model-1',
+    config: {epochs: 1},
+    instance: {gpu_type: '4090'},
+  };
+  assert.deepEqual(
+    buildTrainingPayload({
+      ...base,
+      executionMode: 'managed',
+      trainingImageProfileId: 'base-image-a-prime',
+    }),
+    {
+      name: 'Qwen3 小样本训练',
+      dataset_version_id: 'dataset-1',
+      base_model_version_id: 'model-1',
+      config: base.config,
+      instance: base.instance,
+      execution_mode: 'managed',
+      training_image_profile_id: 'base-image-a-prime',
+    },
+  );
+  assert.deepEqual(
+    buildTrainingPayload({
+      ...base,
+      executionMode: 'manual',
+      trainingImageProfileId: 'base-image-a-prime',
+    }),
+    {
+      name: 'Qwen3 小样本训练',
+      dataset_version_id: 'dataset-1',
+      base_model_version_id: 'model-1',
+      config: base.config,
+      instance: base.instance,
+      execution_mode: 'manual',
+    },
+  );
 });

@@ -1,5 +1,29 @@
 import type {InstanceSpec} from '../resources';
 
+export type TrainingExecutionMode = 'managed' | 'manual';
+
+export type TrainingImageProfile = {
+  id: string;
+  provider_profile: string;
+  label: string;
+  description: string;
+  image_id: string | null;
+  image_group_id: string | null;
+  image_type: 'System' | 'App' | 'Custom' | 'Community';
+  runtime_source: 'cold_install' | 'prebuilt';
+  status: 'available' | 'not_published' | 'blocked';
+  evidence: string;
+};
+
+export type TrainingImageCatalog = {
+  schema: number;
+  id: string;
+  sha256: string;
+  baseline_id: string;
+  baseline_sha256: string;
+  profiles: TrainingImageProfile[];
+};
+
 export type TrainingAsset = {
   id?: string;
   version_id: string;
@@ -26,6 +50,16 @@ export type TrainingConfig = {
 };
 
 export type TrainingSnapshot = {
+  execution_mode?: TrainingExecutionMode;
+  training_image_profile?: {
+    id?: string;
+    provider_profile?: string;
+    image_id?: string | null;
+    image_group_id?: string | null;
+    image_type?: string;
+    runtime_source?: string;
+    profiles_sha256?: string;
+  } | null;
   dataset: {
     id: string;
     sha256: string;
@@ -98,10 +132,54 @@ export type ExecutionManifest = {
   }>;
 };
 
+export type TrainingProvisioning = {
+  attempt_id: string;
+  provider_profile: string;
+  training_image_profile_id: string;
+  training_image_profile_sha256: string;
+  image_id: string | null;
+  image_group_id: string | null;
+  project_id: string;
+  request_fingerprint: string;
+  request_disposition: string;
+  provider_state: string;
+  provider_observed_at?: string | null;
+  cost_guard_state: string;
+  cost_guard_deadline?: string | null;
+  cost_guard_set_at?: string | null;
+  credential_state: string;
+  bootstrap_profile: string;
+  host_key_fingerprint?: string | null;
+  endpoint_epoch?: number | null;
+  runtime_state: string;
+  artifact_state: string;
+  artifact_verified_at?: string | null;
+  last_error_code?: string | null;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type TrainingRemoteJob = {
+  attempt_id: string;
+  instance_id: string;
+  launch_state: string;
+  remote_dir: string;
+  argv_hash: string;
+  input_manifest_hash: string;
+  requested_at?: string | null;
+  observed_at?: string | null;
+  started_at?: string | null;
+  finished_at?: string | null;
+  exit_code?: number | null;
+  cancelled?: boolean | null;
+  group_exited?: boolean | null;
+};
+
 export type TrainingAttemptSummary = {
   id: string;
   task_id: string;
   number: number;
+  execution_mode?: TrainingExecutionMode;
   name: string;
   state: string;
   stage: string;
@@ -118,6 +196,8 @@ export type TrainingAttemptSummary = {
     overflow?: unknown[];
   } | null;
   execution_manifest?: ExecutionManifest | null;
+  provisioning?: TrainingProvisioning | null;
+  remote_job?: TrainingRemoteJob | null;
   log_offset?: number;
   snapshot_sha256?: string;
   created_at: string;
