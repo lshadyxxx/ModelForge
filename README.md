@@ -1,88 +1,143 @@
-# ModelForge
+# ModelForge / 模锻
 
-ModelForge（模锻）是一个独立规划中的模型训练与推理平台，目标是把数据集、微调任务、模型产物和推理服务放进一条可追踪的生命周期中。
+ModelForge 是一个面向模型训练与推理生命周期的开源工作台。它把数据集、训练运行、
+模型产物、推理试用和证据审计放进同一条可追踪流程，重点解决“训练完成不等于产物可交付”
+这一问题。
 
-当前状态（2026-11-05）：核心 MVP 已在一个受支持组合上完成平台托管训练的真实闭环，同时保留原有手动实例路径。A′ 路线使用基础镜像、安全首启和冷安装 runtime，真实完成了 Qwen3-0.6B、单卡 RTX 4090 的 SFT/LoRA：Attempt `6b330374-7fff-4ac2-9104-4f3909045e0b` 运行 22 step，最终 `eval_loss=0.214783`；12 个执行证据文件经 MinIO 读回 SHA-256 全部一致，Best/Final Adapter 均为 `available` 并通过下载包级校验；实例 `<redacted-instance-id>` 已停止、删除并二次精确查询为空，租约 `092392a1-6626-4561-95b4-0fed21476b0f` 在删除确认后释放。A′ 训练主页、详情页和产物页已在 1440/390 宽度完成真实 API 截图核对，无横向溢出或浏览器运行时错误。B「预构建 Training Base」镜像 `compshareImage-1xc89j1np56m`（`Custom` / `Available`）随后通过第二次正式 managed Attempt `fbc8a03d-27e3-4ef2-8253-c23ac8a599ac` 完成 22 step SFT/LoRA、Best/Final Adapter、12/12 MinIO 读回、实例删除和租约释放；第一次 Attempt 的瞬态公钥首启失败已单列并完成有限重试修复。整体结论仍为 `PASS_WITH_LIMITATIONS`：scheduler 到期实际自动关机未单独等待验证，供应商 `ResetCompShareInstancePassword` 在当前基础镜像路径返回 `cloud_api_error`，实际安全结果由“锁定系统密码并验证旧密码认证失败”实现，不能表述为供应商 reset 成功；B 根密码快照硬化、多实例首启矩阵和实际账单仍未验证。验收后 `MF_UCLOUD_WRITE_ENABLED` 已恢复为 `false`，当前计算环境写入为 `read_only`。基线 `qwen3-0.6b-rtx4090-cn-bj2-partial-20261102-r1` 的容量边界和更广模型/GPU/镜像兼容矩阵仍未完成，因此基线继续保持 `partial`。详见[托管训练真实验收记录](docs/implementation/training-oneclick-p1-20261105.md)、[B 完整验收记录](<internal-evidence>)、[数据集审阅工作室记录](docs/implementation/datasets-review-studio-2026-11-03.md)、[模型验证工作室记录](docs/implementation/model-validation-studio-2026-11-03.md)、[Adapter 导出记录](docs/implementation/adapter-export-2026-11-03.md)、[运行时兼容记录](docs/implementation/runtime-compatibility-2026-11-02.md)及[运行说明](docs/RUNNING.md)。
+> **项目状态：实验性参考实现，不是生产级平台。**
+>
+> 当前版本已在一个 Qwen3-0.6B、单卡 RTX 4090、文本 SFT/LoRA 组合上完成参考闭环验证，
+> 但仍未覆盖多租户、身份认证、生产级隔离、多区域稳定性、完整模型/GPU 兼容矩阵和 SLA。
+> 请勿将演示结果或单次验收表述为通用生产可用性。
 
-> 当前写入状态：上段“read_only”是验收时的历史快照，已被本节取代。本地二次开关已移除；有优云凭据时 `/configuration` 返回 `read_write`，无凭据时保持只读。
+![AI 训练诊断报告](design/ai-training-report-2026-11-06/qa/v3-report-desktop-1440.png)
 
-## 2026-11-05 写入策略更新
+## 功能
 
-本地产品已移除 `MF_UCLOUD_WRITE_ENABLED` 二次开关。只要后端配置了优云凭据，
-计算环境和平台托管训练即返回 `read_write` 并允许发起真实云操作；未配置凭据时
-保持 `read_only`，不会发送云端写命令。费用预算、单 GPU 租约、实例回收和删除
-确认仍然有效。
+- **数据集与模型管理**：维护不可变版本、校验状态、模型目录和版本关系。
+- **计算环境与实例**：查询云资源目录、兼容性、费用守卫和实例生命周期状态。
+- **托管训练**：面向文本 SFT/LoRA 的单次训练运行，支持预检、日志、指标、失败重试和清理。
+- **产物交付**：追踪 Best/Final Adapter、Manifest、SHA-256 回读和独立推理验收状态。
+- **推理试用**：将已登记模型或 Adapter 交给独立 vLLM 运行时，记录健康、流式输出和清理结果。
+- **AI 训练诊断**：基于 Attempt 快照、Train/Eval Loss、学习率、Token 预检、显存、运行时报告、
+  日志和产物状态生成结构化报告。
 
-## 2026-11-06 训练配置策略
+## AI 诊断边界
 
-平台托管不再是单一参数预设。推荐基线仍作为默认值，但训练页可切换自定义实例规格，
-并编辑训练轮数、学习率、上下文、批量、梯度累积和 LoRA 参数；其他已映射模型架构会
-自动匹配训练模板。非实测模型、超参或硬件会冻结为 `selection_mode=custom` 并附带告警，
-训练产物必须重新完成推理兼容验收。未知架构、模型模板不匹配、未发布训练镜像和费用
-超限仍会阻止提交。
+AI 报告是 **advisory 诊断层**，不替代硬门禁：
 
-## 产品目标
+- 分开判断“训练健康度”和“产物可交付性”。
+- 每个关键发现都必须引用可追溯证据。
+- 未上报的指标写“未上报/无法判断”，不从 loss 推断业务效果。
+- 没有独立推理验收时，只能说“产物可交付，模型可用性未验证”。
+- 报告中的建议只用于下一轮实验，不会自动修改训练配置或替用户执行云操作。
 
-- 管理训练数据集及其校验、版本和发布状态。
-- 创建、排队、监控和取消模型微调任务。
-- 追踪基础模型、训练配置、数据集版本和 Adapter 等模型产物之间的关系。
-- 将已完成的模型产物部署为推理服务，并提供调用与健康状态检查。
-- 记录资源使用和任务失败原因，避免把“任务完成”“产物可用”和“服务就绪”混为一谈。
+## 架构
 
-## 初期边界
+| 层 | 技术 |
+|---|---|
+| Web | React、TypeScript、Vite |
+| API / Worker | Python、FastAPI、Pydantic、SQLAlchemy、Alembic |
+| 元数据 | PostgreSQL |
+| 对象存储 | MinIO |
+| 训练运行时 | 远程 GPU 执行器、固定 runtime contract、LLaMA-Factory |
+| 推理运行时 | vLLM 独立生命周期管理 |
+| AI 编排 | LangGraph、`langchain-openai`、PostgreSQL checkpoint |
+| 本地编排 | Docker Compose |
 
-- 产品首版终点是在平台内加载真实训练产物并完成推理试用；本地控制面和任务底座是前置里程碑，底座或模拟流程不代表产品 MVP 完成。
-- MVP 训练范围已确定为文本 SFT＋LoRA，并接入优云智算的远程训练、权重回传和平台内推理试用；QLoRA、DPO、全参数训练、视觉/多模态和其他云厂商后续按需求加入。
-- 训练和推理运行时通过明确的执行器接口接入，平台 API 不直接承担重量级模型进程。
-- 项目按自身需求定义模块、数据模型、接口和实现。
+API 与 Worker 共用代码、分进程运行；云凭据只从后端环境注入，不进入浏览器。
+模型权重、数据集和生产凭据不属于源码仓库。
 
-## 拟议技术栈
+## 本地启动
 
-- Web：React、TypeScript、Vite 单页应用；由静态 Web 服务器托管，通过同源代理访问 FastAPI。
-- API：Python、FastAPI、Pydantic。
-- 元数据与任务状态：统一使用 PostgreSQL；本地和部署环境不维护第二套数据库后端。
-- 文件存储：从第一阶段直接使用 MinIO，保存数据集、用户上传/模型平台导入的模型、Adapter 和需持久保留的训练产物；优云公共基础模型按已核对内容指纹直接读取外部目录，不要求复制入库。本地磁盘仅用于临时工作目录和可重建缓存。
-- 训练：文本 SFT＋LoRA；训练后端在实现阶段通过兼容验证确定，训练页从真实优云目录选择模型/GPU/镜像，不在产品规格中固定单一型号。
-- 推理：以 vLLM 作为首选服务运行时，通过独立生命周期管理器启动和监控。
-- 开发和本地控制面运行：Docker Compose；首期单平台 Worker、单 GPU，云端执行接入优云智算，暂不引入 Redis 和 Kubernetes。
+前置条件：Docker Desktop（Linux containers）、Compose v2+、PowerShell 5.1+ 或 PowerShell 7。
 
-React + Vite、FastAPI、PostgreSQL 与 MinIO 是已确定的架构选型，本地开发通过 Docker Compose 提供 PostgreSQL 与 MinIO。第一批版本、Alembic迁移、对象存储配置已记录在运行文档；备份恢复后续收敛，启动配置已生成；真实存储服务验收状态以实施记录为准。
+```powershell
+./scripts/start.ps1
+```
 
-## 文档
+- Web 工作台：<http://127.0.0.1:8092>
+- API：<http://127.0.0.1:8102>
 
-- [项目简述](docs/PROJECT_BRIEF.md)
-- [功能清单与 UI 调研入口](docs/FEATURE_INVENTORY.md)
-- [产品 MVP 规格（范围已确认）](<internal-evidence>)
-- [产品 MVP 连续流程原型](designs/modelforge-mvp/index.html)
-- [原型预览说明与检查记录](designs/modelforge-mvp/README.md)
-- [产品 MVP 本地实现任务](<internal-evidence>)
-- [优云远程执行范围决策](docs/adr/0001-ucompshare-remote-execution.md)
-- [公共基座外部只读引用决策](docs/adr/0002-external-readonly-base-models.md)
-- [托管训练一键化真实验收记录（2026-11-05）](docs/implementation/training-oneclick-p1-20261105.md)
-- [领域术语](GLOSSARY.md)
-- [运行架构与数据归属](docs/ARCHITECTURE.md)
-- [项目结构与模块设计](docs/PROJECT_STRUCTURE.md)
-- [技术栈决策](docs/TECH_STACK.md)
-- [阶段路线](docs/IMPLEMENTATION_ROADMAP.md)
-- [第一阶段可运行基础骨架规格](<internal-evidence>)
-- [工程流程入口](AGENTS.md)
-- [本地问题与任务跟踪](docs/agents/issue-tracker.md)
-- [审查与验收策略](docs/agents/review-policy.md)
+停止：
+
+```powershell
+./scripts/stop.ps1
+```
+
+首次启动会从 `.env.example` 生成被 Git 忽略的 `.env` 和本地随机凭据。
+需要接入云 GPU、模型平台或 AI 诊断服务时，再配置对应的后端环境变量。
+
+详细运行、迁移、存储校验和故障排查见
+[docs/RUNNING.md](docs/RUNNING.md)。
+
+## 开发检查
+
+```powershell
+cd frontend
+npm ci
+npm test
+npm run build
+
+cd ../backend
+python -m venv .venv
+./.venv/Scripts/python.exe -m pip install -e ".[test]"
+./.venv/Scripts/python.exe -m pytest -q
+./.venv/Scripts/python.exe -m pip check
+```
+
+也可以使用现有 Compose 环境运行后端测试：
+
+```powershell
+docker compose exec -T api python -m pytest -q
+```
+
+## 安全模型
+
+- `.env`、本地运行数据、浏览器配置和验收取证目录不进入 Git。
+- AI 与云写入能力默认关闭，只有显式配置凭据后才会启用。
+- 控制面面向单机或受控网络使用，当前没有用户登录、RBAC 或多租户隔离。
+- 不要将本地 Compose 配置直接暴露到公网；公网部署前必须增加 TLS、认证、限流、
+  审计和密钥管理。
+- 安全问题请按 [SECURITY.md](SECURITY.md) 私下报告。
+
+## 已知限制
+
+- 单次 Qwen3-0.6B/RTX 4090 验证不等于完整兼容矩阵。
+- 供应商密码重置、计划关机、多实例首启和实际账单仍需更多验证。
+- 尚未完成所有模型、GPU、区域和长时间运行场景。
+- 独立推理验收记录缺失时，不能声明模型业务可用。
+- AI 报告质量依赖已上报证据；缺失指标不会被推断补齐。
 
 ## 目录
 
-以下为规划结构，按实施阶段逐步创建；详细代码布局及依赖规则见 [项目结构设计](docs/PROJECT_STRUCTURE.md)。第一批应用代码与启动配置已生成，真实服务验收状态见实施记录。
-
 ```text
-ModelForge/
-├── frontend/   # 按业务 feature 组织的 React + TypeScript + Vite 工程
-├── backend/    # 模块化后端；API 与 Worker 共用代码、独立启动
-├── compose.yaml  # 开发与单机运行的统一入口
-├── docker-db/    # PostgreSQL 与 MinIO 的 Compose 本地持久化目录
-├── deploy/     # 镜像与同源反向代理的配套配置
-├── scripts/    # 环境、迁移和存储校验脚本
-├── tests/e2e/  # 跨前后端的浏览器闭环
-├── docs/       # 产品、架构、结构、路线与工程流程
-├── .scratch/   # 本地规格及任务，按需创建
-└── .runtime/   # 临时工作目录和可重建缓存，排除出 Git
+backend/       FastAPI API、Worker、迁移、诊断和运行时
+frontend/      React 工作台
+compose.yaml   本地控制面
+deploy/        镜像和同源反向代理配置
+docs/          架构、运行、ADR 和实现记录
+design/        公开设计原型与验收截图
+designs/       历史设计探索
+scripts/       启动、停止、验收和迁移脚本
+tests/         跨模块验收脚本
 ```
+
+## 文档
+
+- [架构与数据归属](docs/ARCHITECTURE.md)
+- [项目结构与模块边界](docs/PROJECT_STRUCTURE.md)
+- [技术栈](docs/TECH_STACK.md)
+- [实现路线](docs/IMPLEMENTATION_ROADMAP.md)
+- [运行说明](docs/RUNNING.md)
+- [领域术语](GLOSSARY.md)
+- [AI 训练报告设计入口](design/ai-training-report-2026-11-06/index.html)
+
+## 贡献
+
+提交前请阅读 [CONTRIBUTING.md](CONTRIBUTING.md)。请勿在 issue、测试数据或提交中放入
+真实云凭据、生产 DSN、私钥、个人目录路径或未脱敏的云资源标识。
+
+## 许可证
+
+Apache License 2.0，详见 [LICENSE](LICENSE)。

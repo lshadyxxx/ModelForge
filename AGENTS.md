@@ -2,9 +2,12 @@
 
 ## 项目入口
 
+本文件面向 AI 编码代理；人类贡献者请先读 `CONTRIBUTING.md`。
+
 开始任务时先读 `README.md`、`docs/PROJECT_BRIEF.md`、
 `docs/ARCHITECTURE.md`、`docs/TECH_STACK.md` 和 `docs/IMPLEMENTATION_ROADMAP.md`。
-这些文档描述规划与已确定边界；实现状态以仓库内容和验证证据为准。领域术语见 `GLOSSARY.md`；产品首版范围见 `<internal-evidence>`。
+这些文档描述规划与已确定边界；实现状态以仓库内容和验证证据为准。领域术语见
+`GLOSSARY.md`；产品范围见 `docs/FEATURE_INVENTORY.md`。
 
 设计目录、调整模块或开始实现前，读取 `docs/PROJECT_STRUCTURE.md`，
 按其中的职责归属、依赖方向和分阶段创建规则安排代码。
@@ -25,14 +28,14 @@
 
 开始实现前，读取目标本地 spec 和 ticket，明确范围、依赖及验收条件。
 实现与验收遵循 `docs/agents/review-policy.md`。
-所有工程操作限于 ModelForge；Git 操作限于本地。
-远程 Issues、添加远程地址、push、PR 和部署均须另获用户明确授权。
+所有工程操作限于 ModelForge。
+远程 Issues、push、PR、发布和部署均须另获维护者明确授权。
 
 ## Agent skills
 
 ### Issue tracker
 
-问题、规格和任务使用 `.scratch/` 下的本地 Markdown。
+公开问题和任务使用 GitHub Issues；本地临时材料放在被 Git 忽略的 `.scratch/`。
 See `docs/agents/issue-tracker.md`.
 
 ### Triage labels

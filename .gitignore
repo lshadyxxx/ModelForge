@@ -48,14 +48,7 @@ dist/
 *.egg-info/
 /backend/build/
 
-# Local-only internal integration research
-<internal-evidence>*.md
-
-# Local verification evidence, browser profiles and cloud responses
-<internal-evidence>
-<internal-evidence>
-<internal-evidence>*/
-<internal-evidence>*
-<internal-evidence>*-20261103/
+# Local-only planning, research, browser profiles and verification evidence
+.scratch/
 *.log
 /test-datasets/
