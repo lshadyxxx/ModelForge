@@ -23,6 +23,7 @@ export type ImageCategory = {
 };
 
 export function imageTypeLabel(value: string | undefined) {
+  if (value === 'Custom') return '自定义镜像';
   return value === 'App' ? '应用镜像' : '系统镜像';
 }
 
@@ -180,6 +181,7 @@ export function resolveImageSelection(
 }
 
 export function imageMonogram(image: Image) {
+  if (image.ImageType === 'Custom') return 'My';
   if (image.ImageType === 'System') {
     const platform = imagePlatform(image);
     if (platform.key === 'windows') return 'Win';

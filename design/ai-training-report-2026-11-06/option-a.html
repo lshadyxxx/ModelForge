@@ -1,0 +1,3418 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>方案 A · AI 训练诊断信号台 · ModelForge</title>
+  <link rel="stylesheet" href="shared/base.css">
+  <style>
+    :root {
+      --a-rail: 224px;
+      --a-top: 58px;
+      --mf-muted: #536372;
+    }
+
+    body {
+      background: var(--mf-canvas);
+    }
+
+    .skip-link {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      z-index: 120;
+      padding: 10px 14px;
+      border-radius: 6px;
+      color: white;
+      background: var(--mf-brand-deep);
+      transform: translateY(-160%);
+    }
+
+    .skip-link:focus {
+      transform: translateY(0);
+    }
+
+    .app-frame {
+      display: grid;
+      grid-template-columns: var(--a-rail) minmax(0, 1fr);
+      min-height: 100vh;
+    }
+
+    .rail {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      padding: 22px 14px 16px;
+      border-right: 1px solid #ddd6c7;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.52), rgba(255, 255, 255, 0) 260px),
+        var(--mf-canvas-deep);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 8px 22px;
+    }
+
+    .brand-mark {
+      display: grid;
+      place-items: center;
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      color: white;
+      background: var(--mf-brand-deep);
+      font-size: 18px;
+      font-weight: 760;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+    }
+
+    .brand-copy strong {
+      display: block;
+      color: var(--mf-ink);
+      font-size: 15px;
+      line-height: 1.2;
+      letter-spacing: -0.025em;
+    }
+
+    .brand-copy small {
+      display: block;
+      margin-top: 2px;
+      color: var(--mf-muted);
+      font-size: 11px;
+      letter-spacing: 0.05em;
+    }
+
+    .nav-label {
+      padding: 5px 10px 8px;
+      color: #5d594f;
+      font-size: 11px;
+      font-weight: 760;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+    }
+
+    .side-nav {
+      display: grid;
+      gap: 3px;
+    }
+
+    .side-nav a,
+    .side-nav button {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      min-height: 38px;
+      padding: 7px 10px;
+      border: 1px solid transparent;
+      border-radius: 7px;
+      color: #596775;
+      background: transparent;
+      font-size: 12px;
+      text-align: left;
+    }
+
+    .side-nav a:hover,
+    .side-nav button:hover {
+      color: var(--mf-ink);
+      background: rgba(255, 255, 255, 0.5);
+    }
+
+    .side-nav .is-active {
+      border-color: #bfccec;
+      color: var(--mf-brand-deep);
+      background: var(--mf-brand-soft);
+      font-weight: 680;
+    }
+
+    .side-nav svg {
+      width: 16px;
+      height: 16px;
+    }
+
+    .rail-context {
+      margin-top: 25px;
+      padding: 13px 12px;
+      border: 1px solid #d6cebf;
+      border-radius: 9px;
+      background: rgba(255, 253, 248, 0.72);
+    }
+
+    .rail-context .mf-eyebrow {
+      margin-bottom: 8px;
+      color: #4b5a67;
+      font-size: 11px;
+    }
+
+    .rail-context strong {
+      display: block;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .rail-context p {
+      margin-top: 6px;
+      color: var(--mf-muted);
+      font-size: 11px;
+      line-height: 1.55;
+    }
+
+    .rail-report-nav {
+      display: grid;
+      gap: 1px;
+      margin-top: 10px;
+    }
+
+    .rail-report-nav a {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 33px;
+      padding: 6px 10px;
+      border-radius: 6px;
+      color: var(--mf-muted);
+      font-size: 11px;
+    }
+
+    .rail-report-nav a::before {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: #a9b3bc;
+      content: "";
+    }
+
+    .rail-report-nav a:hover {
+      color: var(--mf-brand-deep);
+      background: rgba(255, 255, 255, 0.55);
+    }
+
+    .rail-report-nav a:first-child::before {
+      background: var(--mf-brand);
+    }
+
+    .rail-report-nav[hidden] {
+      display: none;
+    }
+
+    .rail-foot {
+      margin-top: auto;
+      padding: 14px 10px 0;
+      color: var(--mf-muted);
+      font-size: 11px;
+      line-height: 1.6;
+    }
+
+    .rail-foot strong {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      color: var(--mf-success);
+      font-size: 11px;
+    }
+
+    .rail-foot strong::before {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+      content: "";
+    }
+
+    .workspace {
+      min-width: 0;
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 30;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      min-height: var(--a-top);
+      padding: 9px 28px;
+      border-bottom: 1px solid var(--mf-line);
+      background: rgba(255, 253, 248, 0.94);
+      backdrop-filter: blur(10px);
+    }
+
+    .topbar-left,
+    .topbar-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .crumbs {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      min-width: 0;
+      color: var(--mf-muted);
+      font-size: 11px;
+      white-space: nowrap;
+    }
+
+    .crumbs a {
+      color: var(--mf-brand);
+      font-weight: 650;
+    }
+
+    .crumbs span {
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .top-select {
+      position: relative;
+      min-width: 0;
+    }
+
+    .top-select select {
+      max-width: 300px;
+      min-height: 34px;
+      padding: 5px 26px 5px 9px;
+      border: 1px solid var(--mf-line);
+      border-radius: 7px;
+      color: var(--mf-ink-soft);
+      background: #fff;
+      font-size: 11px;
+    }
+
+    .demo-copy {
+      color: var(--mf-muted);
+      font-size: 11px;
+      white-space: nowrap;
+    }
+
+    .mf-demo-stamp,
+    .mf-dialog-head .mf-eyebrow {
+      font-size: 11px;
+    }
+
+    main {
+      width: min(100%, 1540px);
+      min-width: 0;
+      margin: 0 auto;
+      padding: 24px 28px 54px;
+    }
+
+    .view {
+      min-width: 0;
+    }
+
+    .detail-heading {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 24px;
+      margin-bottom: 17px;
+    }
+
+    .detail-heading h1 {
+      max-width: 980px;
+      margin-top: 4px;
+      color: var(--mf-ink);
+      font-size: clamp(24px, 2.2vw, 34px);
+      font-weight: 720;
+      line-height: 1.22;
+      letter-spacing: -0.045em;
+      text-wrap: balance;
+    }
+
+    .detail-heading .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px 12px;
+      margin-top: 7px;
+      color: var(--mf-muted);
+      font-size: 10px;
+    }
+
+    .detail-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      padding-top: 2px;
+    }
+
+    .detail-tabs {
+      display: flex;
+      gap: 2px;
+      min-width: 0;
+      margin-bottom: 18px;
+      padding: 0 4px;
+      border-bottom: 1px solid var(--mf-line);
+      overflow-x: auto;
+      scrollbar-width: thin;
+    }
+
+    .detail-tabs button,
+    .detail-tabs a {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 40px;
+      padding: 8px 11px 10px;
+      border: 0;
+      color: var(--mf-muted);
+      background: transparent;
+      font-size: 11px;
+      white-space: nowrap;
+    }
+
+    .detail-tabs .active {
+      color: var(--mf-brand-deep);
+      font-weight: 700;
+    }
+
+    .detail-tabs .active::after {
+      position: absolute;
+      right: 8px;
+      bottom: -1px;
+      left: 8px;
+      height: 2px;
+      background: var(--mf-brand);
+      content: "";
+    }
+
+    .detail-tabs svg {
+      width: 14px;
+      height: 14px;
+    }
+
+    .status-band {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-height: 48px;
+      margin-bottom: 15px;
+      padding: 9px 13px;
+      border: 1px solid #cad8cf;
+      border-radius: 9px;
+      color: #355247;
+      background: #f4fbf7;
+      font-size: 11px;
+    }
+
+    .status-band.failure {
+      border-color: #e5c5c0;
+      color: #713f38;
+      background: #fff8f6;
+    }
+
+    .status-band .mark {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--mf-success);
+      box-shadow: 0 0 0 4px rgba(19, 122, 85, 0.1);
+    }
+
+    .status-band.failure .mark {
+      background: var(--mf-danger);
+      box-shadow: 0 0 0 4px rgba(173, 45, 37, 0.1);
+    }
+
+    .status-band strong {
+      color: inherit;
+    }
+
+    .status-band .boundary {
+      margin-left: auto;
+      color: var(--mf-muted);
+      font-size: 11px;
+    }
+
+    .entry-hero {
+      position: relative;
+      overflow: hidden;
+      display: grid;
+      grid-template-columns: minmax(0, 1.45fr) minmax(300px, 0.75fr);
+      gap: 26px;
+      padding: 28px;
+      border: 1px solid #bdc9e5;
+      border-radius: 13px;
+      background:
+        linear-gradient(135deg, rgba(33, 77, 184, 0.06), rgba(255, 255, 255, 0) 44%),
+        var(--mf-surface);
+      box-shadow: var(--mf-shadow-soft);
+    }
+
+    .entry-hero::after {
+      position: absolute;
+      top: -58px;
+      right: 33%;
+      width: 250px;
+      height: 250px;
+      border: 1px solid rgba(33, 77, 184, 0.08);
+      border-radius: 50%;
+      content: "";
+      pointer-events: none;
+    }
+
+    .entry-copy {
+      position: relative;
+      z-index: 1;
+      min-width: 0;
+    }
+
+    .entry-kicker {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+    }
+
+    .entry-copy h2 {
+      max-width: 780px;
+      margin-top: 12px;
+      font-size: clamp(23px, 2.1vw, 32px);
+      font-weight: 690;
+      line-height: 1.32;
+      letter-spacing: -0.035em;
+      text-wrap: balance;
+    }
+
+    .entry-copy > p {
+      max-width: 720px;
+      margin-top: 10px;
+      color: var(--mf-muted);
+      font-size: 12px;
+      line-height: 1.75;
+    }
+
+    .entry-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+      margin-top: 17px;
+    }
+
+    .entry-badges span {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 28px;
+      padding: 4px 9px;
+      border: 1px solid #d3d9df;
+      border-radius: 5px;
+      color: #475d70;
+      background: rgba(255, 255, 255, 0.78);
+      font-size: 10px;
+    }
+
+    .entry-badges b {
+      color: var(--mf-ink);
+      font-weight: 700;
+    }
+
+    .entry-actions {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      flex-wrap: wrap;
+      margin-top: 21px;
+    }
+
+    .entry-side {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      align-content: start;
+      gap: 9px;
+      padding-left: 24px;
+      border-left: 1px solid rgba(167, 181, 202, 0.65);
+    }
+
+    .entry-side h3 {
+      color: var(--mf-muted);
+      font-size: 10px;
+      font-weight: 750;
+      letter-spacing: 0.11em;
+      text-transform: uppercase;
+    }
+
+    .coverage-number {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+      margin-top: 2px;
+    }
+
+    .coverage-number strong {
+      font-family: var(--mf-mono);
+      font-size: 30px;
+      font-weight: 600;
+      letter-spacing: -0.05em;
+    }
+
+    .coverage-number span {
+      color: var(--mf-muted);
+      font-size: 10px;
+    }
+
+    .coverage-bar {
+      height: 6px;
+      overflow: hidden;
+      border-radius: 99px;
+      background: #e5e9ef;
+    }
+
+    .coverage-bar span {
+      display: block;
+      width: 62%;
+      height: 100%;
+      border-radius: inherit;
+      background: var(--mf-brand);
+    }
+
+    .coverage-list {
+      display: grid;
+      gap: 6px;
+      margin-top: 2px;
+    }
+
+    .coverage-list div {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      color: var(--mf-muted);
+      font-size: 10px;
+    }
+
+    .coverage-list strong {
+      color: var(--mf-ink-soft);
+      font-weight: 650;
+    }
+
+    .overview-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(290px, 0.76fr);
+      gap: 16px;
+      margin-top: 16px;
+    }
+
+    .overview-card {
+      min-width: 0;
+      padding: 18px;
+      border: 1px solid var(--mf-line);
+      border-radius: 10px;
+      background: var(--mf-surface);
+      box-shadow: var(--mf-shadow-soft);
+    }
+
+    .card-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .card-head h2,
+    .card-head h3 {
+      margin-top: 2px;
+      font-size: 15px;
+      letter-spacing: -0.02em;
+    }
+
+    .card-head p {
+      margin-top: 3px;
+      color: var(--mf-muted);
+      font-size: 10px;
+    }
+
+    .overview-metrics {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      border: 1px solid #e2ded3;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .overview-metrics div {
+      min-width: 0;
+      padding: 13px 14px;
+      border-right: 1px solid #e2ded3;
+      background: #fffefa;
+    }
+
+    .overview-metrics div:last-child {
+      border-right: 0;
+    }
+
+    .overview-metrics span,
+    .overview-metrics strong,
+    .overview-metrics small {
+      display: block;
+    }
+
+    .overview-metrics span {
+      color: var(--mf-muted);
+      font-size: 9px;
+    }
+
+    .overview-metrics strong {
+      margin-top: 3px;
+      font-family: var(--mf-mono);
+      font-size: 20px;
+      font-weight: 600;
+      letter-spacing: -0.035em;
+    }
+
+    .overview-metrics small {
+      margin-top: 2px;
+      color: var(--mf-muted);
+      font-size: 9px;
+    }
+
+    .lifecycle {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 0;
+      margin-top: 15px;
+      padding: 13px 10px;
+      border: 1px solid #e2ded3;
+      border-radius: 8px;
+      background: #fffefa;
+    }
+
+    .lifecycle span {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      min-width: 0;
+      color: var(--mf-success);
+      font-size: 9px;
+      white-space: nowrap;
+    }
+
+    .lifecycle span::before {
+      width: 5px;
+      height: 5px;
+      flex: 0 0 auto;
+      border-radius: 50%;
+      background: currentColor;
+      content: "";
+    }
+
+    .fact-list {
+      display: grid;
+      gap: 0;
+    }
+
+    .fact-list div {
+      display: grid;
+      grid-template-columns: 92px minmax(0, 1fr);
+      gap: 10px;
+      padding: 8px 0;
+      border-bottom: 1px solid #ece7dc;
+      font-size: 10px;
+    }
+
+    .fact-list div:last-child {
+      border-bottom: 0;
+    }
+
+    .fact-list dt {
+      color: var(--mf-muted);
+    }
+
+    .fact-list dd {
+      min-width: 0;
+      overflow-wrap: anywhere;
+      color: var(--mf-ink-soft);
+    }
+
+    .report-shell {
+      min-width: 0;
+    }
+
+    .report-heading {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 20px;
+      margin-bottom: 16px;
+    }
+
+    .report-title-line {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      flex-wrap: wrap;
+    }
+
+    .report-heading h1 {
+      margin-top: 7px;
+      font-size: clamp(26px, 2.45vw, 38px);
+      font-weight: 690;
+      line-height: 1.2;
+      letter-spacing: -0.035em;
+      text-wrap: balance;
+    }
+
+    .report-heading p {
+      max-width: 850px;
+      margin-top: 8px;
+      color: var(--mf-muted);
+      font-size: 11px;
+      line-height: 1.75;
+    }
+
+    .report-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .report-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px 13px;
+      margin-top: 9px;
+      color: var(--mf-muted);
+      font-size: 9px;
+    }
+
+    .verdict-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 13px;
+      margin-bottom: 14px;
+    }
+
+    .verdict-card {
+      position: relative;
+      min-width: 0;
+      padding: 18px 18px 16px;
+      border: 1px solid var(--mf-line);
+      border-radius: 11px;
+      background: var(--mf-surface);
+      box-shadow: var(--mf-shadow-soft);
+    }
+
+    .verdict-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .verdict-top > span:first-child {
+      color: var(--mf-muted);
+      font-size: 9px;
+      font-weight: 750;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .verdict-card h2 {
+      margin-top: 10px;
+      font-size: 19px;
+      font-weight: 680;
+      line-height: 1.35;
+      letter-spacing: -0.025em;
+    }
+
+    .verdict-card p {
+      margin-top: 7px;
+      color: var(--mf-muted);
+      font-size: 10px;
+      line-height: 1.7;
+    }
+
+    .verdict-facts {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 12px;
+    }
+
+    .verdict-facts span {
+      padding: 3px 7px;
+      border: 1px solid #e0dcd1;
+      border-radius: 4px;
+      color: #5a6570;
+      background: #fffefa;
+      font-family: var(--mf-mono);
+      font-size: 9px;
+    }
+
+    .verdict-actions {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 8px;
+      min-height: 33px;
+      margin-top: 11px;
+      padding-top: 9px;
+      border-top: 1px solid #ece7dc;
+    }
+
+    .verdict-action {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      min-height: 32px;
+      padding: 4px 0;
+      border: 0;
+      color: var(--mf-brand-deep);
+      background: transparent;
+      font-size: 10px;
+      font-weight: 680;
+    }
+
+    .verdict-action:hover {
+      color: var(--mf-brand);
+    }
+
+    .verdict-action svg {
+      width: 13px;
+      height: 13px;
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: minmax(260px, 0.6fr) minmax(0, 1.4fr);
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+
+    .summary-lead {
+      padding: 20px;
+      border: 1px solid #c4d0eb;
+      border-radius: 11px;
+      background: #f8faff;
+    }
+
+    .summary-lead h2 {
+      margin-top: 8px;
+      font-size: 18px;
+      line-height: 1.5;
+      letter-spacing: -0.025em;
+    }
+
+    .summary-lead p {
+      margin-top: 8px;
+      color: var(--mf-muted);
+      font-size: 10px;
+      line-height: 1.7;
+    }
+
+    .summary-next {
+      display: grid;
+      gap: 5px;
+      margin-top: 14px;
+      padding-top: 13px;
+      border-top: 1px solid #d5def1;
+    }
+
+    .summary-next > span {
+      color: var(--mf-brand);
+      font-size: 9px;
+      font-weight: 760;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .summary-next strong {
+      color: var(--mf-ink);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .summary-next p {
+      margin-top: 0;
+    }
+
+    .summary-next .mf-button {
+      justify-self: start;
+      min-height: 34px;
+      margin-top: 4px;
+      padding: 6px 10px;
+      font-size: 10px;
+    }
+
+    .summary-answers {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      border: 1px solid var(--mf-line);
+      border-radius: 11px;
+      overflow: hidden;
+      background: var(--mf-surface);
+    }
+
+    .summary-answer {
+      min-width: 0;
+      padding: 15px 16px;
+      border-right: 1px solid var(--mf-line);
+      border-bottom: 1px solid var(--mf-line);
+    }
+
+    .summary-answer:nth-child(2n) {
+      border-right: 0;
+    }
+
+    .summary-answer:nth-last-child(-n + 2) {
+      border-bottom: 0;
+    }
+
+    .summary-answer span {
+      color: var(--mf-muted);
+      font-size: 9px;
+      font-weight: 650;
+    }
+
+    .summary-answer strong {
+      display: block;
+      margin-top: 4px;
+      color: var(--mf-brand-deep);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .summary-answer p {
+      margin-top: 5px;
+      color: var(--mf-muted);
+      font-size: 9px;
+      line-height: 1.65;
+    }
+
+    .diagnosis-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 330px;
+      align-items: start;
+      gap: 14px;
+    }
+
+    .findings-panel {
+      min-width: 0;
+      border: 1px solid var(--mf-line);
+      border-radius: 11px;
+      background: var(--mf-surface);
+      box-shadow: var(--mf-shadow-soft);
+    }
+
+    .findings-toolbar {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 17px 18px 13px;
+      border-bottom: 1px solid var(--mf-line);
+    }
+
+    .findings-toolbar h2 {
+      margin-top: 2px;
+      font-size: 17px;
+      letter-spacing: -0.025em;
+    }
+
+    .filter-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      justify-content: flex-end;
+    }
+
+    .findings-live {
+      padding: 7px 18px;
+      border-bottom: 1px solid #e9e4d9;
+      color: var(--mf-muted);
+      background: #fbf8f0;
+      font-size: 9px;
+    }
+
+    .finding-group {
+      border-bottom: 1px solid var(--mf-line);
+    }
+
+    .finding-group:last-child {
+      border-bottom: 0;
+    }
+
+    .finding-group-head {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 18px;
+      color: var(--mf-muted);
+      background: #faf7ef;
+      font-size: 9px;
+      font-weight: 750;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .finding-group-head::after {
+      flex: 1;
+      height: 1px;
+      background: #e5dfd2;
+      content: "";
+    }
+
+    .finding {
+      border-top: 1px solid #ece7dc;
+      background: var(--mf-surface);
+    }
+
+    .finding:first-of-type {
+      border-top: 0;
+    }
+
+    .finding > summary {
+      display: block;
+      padding: 16px 18px 13px;
+      list-style: none;
+      cursor: pointer;
+      transition: background-color 160ms ease;
+    }
+
+    .finding > summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .finding > summary:hover {
+      background: #fffcf5;
+    }
+
+    .finding > summary:focus-visible {
+      outline: 2px solid var(--mf-brand);
+      outline-offset: -3px;
+    }
+
+    .finding[open] > summary {
+      background: #fffdf8;
+    }
+
+    .finding-content {
+      padding: 0 18px 16px;
+    }
+
+    .finding-state {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: 0 0 auto;
+    }
+
+    .finding-chevron {
+      display: grid;
+      place-items: center;
+      width: 24px;
+      height: 24px;
+      border-radius: 5px;
+      color: var(--mf-muted);
+      background: #f4f0e7;
+      transition: transform 180ms ease, color 180ms ease;
+    }
+
+    .finding-chevron svg {
+      width: 14px;
+      height: 14px;
+    }
+
+    .finding[open] .finding-chevron {
+      color: var(--mf-brand-deep);
+      transform: rotate(180deg);
+    }
+
+    .finding-preview {
+      display: -webkit-box;
+      margin-top: 7px;
+      overflow: hidden;
+      color: var(--mf-muted);
+      font-size: 10px;
+      line-height: 1.6;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+    }
+
+    .finding-headline {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .finding-id {
+      color: var(--mf-muted-2);
+      font-family: var(--mf-mono);
+      font-size: 9px;
+    }
+
+    .finding h3 {
+      margin-top: 4px;
+      font-size: 14px;
+      line-height: 1.45;
+      letter-spacing: -0.012em;
+    }
+
+    .finding-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      align-items: center;
+      margin-top: 7px;
+    }
+
+    .finding-meta > span:not(.mf-layer):not(.mf-status) {
+      color: var(--mf-muted);
+      font-size: 9px;
+    }
+
+    .finding-copy {
+      display: grid;
+      gap: 7px;
+      margin-top: 11px;
+    }
+
+    .finding-copy div {
+      display: grid;
+      grid-template-columns: 42px minmax(0, 1fr);
+      gap: 8px;
+      font-size: 10px;
+      line-height: 1.65;
+    }
+
+    .finding-copy dt {
+      color: var(--mf-muted-2);
+      font-size: 9px;
+      font-weight: 700;
+    }
+
+    .finding-copy dd {
+      color: #455765;
+    }
+
+    .finding-foot {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 11px;
+    }
+
+    .evidence-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+    }
+
+    .confidence {
+      color: var(--mf-muted);
+      font-size: 9px;
+    }
+
+    .inspector {
+      position: sticky;
+      top: calc(var(--a-top) + 14px);
+      min-width: 0;
+      overflow: hidden;
+      border: 1px solid var(--mf-line);
+      border-radius: 11px;
+      background: var(--mf-surface);
+      box-shadow: var(--mf-shadow-soft);
+    }
+
+    .inspector-head {
+      padding: 16px 16px 13px;
+      border-bottom: 1px solid var(--mf-line);
+      background: #fbf8f0;
+    }
+
+    .inspector-head h2 {
+      margin-top: 3px;
+      font-size: 15px;
+      letter-spacing: -0.02em;
+    }
+
+    .inspector-body {
+      padding: 15px 16px;
+    }
+
+    .evidence-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 7px;
+      border: 1px solid #b9c8d8;
+      border-radius: 4px;
+      color: #345168;
+      background: #f9fcff;
+      font-family: var(--mf-mono);
+      font-size: 9px;
+    }
+
+    .inspector-value {
+      margin-top: 11px;
+      color: var(--mf-ink);
+      font-family: var(--mf-mono);
+      font-size: 14px;
+      font-weight: 600;
+      line-height: 1.5;
+      overflow-wrap: anywhere;
+    }
+
+    .inspector-detail {
+      margin-top: 7px;
+      color: var(--mf-muted);
+      font-size: 10px;
+      line-height: 1.7;
+    }
+
+    .inspector-facts {
+      display: grid;
+      gap: 0;
+      margin-top: 12px;
+      border-top: 1px solid #ece7dc;
+    }
+
+    .inspector-facts div {
+      display: grid;
+      grid-template-columns: 72px minmax(0, 1fr);
+      gap: 8px;
+      padding: 7px 0;
+      border-bottom: 1px solid #f0ece3;
+      font-size: 9px;
+    }
+
+    .inspector-facts dt {
+      color: var(--mf-muted);
+    }
+
+    .inspector-facts dd {
+      min-width: 0;
+      color: #465867;
+      overflow-wrap: anywhere;
+    }
+
+    .inspector-note {
+      margin-top: 12px;
+      padding: 9px 10px;
+      border: 1px solid #eadfbf;
+      border-radius: 6px;
+      color: #675b3b;
+      background: #fff9e8;
+      font-size: 9px;
+      line-height: 1.65;
+    }
+
+    .evidence-index {
+      display: grid;
+      gap: 2px;
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid #e7e1d6;
+    }
+
+    .evidence-index-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 4px;
+      color: var(--mf-muted);
+      font-size: 8px;
+      font-weight: 760;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .evidence-index button {
+      display: grid;
+      grid-template-columns: 38px minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 7px;
+      min-height: 31px;
+      padding: 4px 6px;
+      border: 1px solid transparent;
+      border-radius: 5px;
+      color: #526270;
+      background: transparent;
+      font-size: 9px;
+      text-align: left;
+    }
+
+    .evidence-index button:hover {
+      background: #faf7ef;
+    }
+
+    .evidence-index button.is-active {
+      border-color: #bfccec;
+      color: var(--mf-brand-deep);
+      background: var(--mf-brand-soft);
+    }
+
+    .evidence-index button:focus-visible {
+      outline: 2px solid var(--mf-brand);
+      outline-offset: 1px;
+    }
+
+    .evidence-index .id {
+      color: inherit;
+      font-family: var(--mf-mono);
+      font-weight: 620;
+    }
+
+    .evidence-index .title {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .evidence-index .kind {
+      color: var(--mf-muted);
+      font-size: 8px;
+    }
+
+    .chart-section {
+      display: grid;
+      grid-template-columns: minmax(0, 1.4fr) minmax(270px, 0.6fr);
+      align-items: start;
+      gap: 14px;
+      margin-top: 14px;
+    }
+
+    .chart-card,
+    .limit-card,
+    .experiment-panel {
+      min-width: 0;
+      border: 1px solid var(--mf-line);
+      border-radius: 11px;
+      background: var(--mf-surface);
+      box-shadow: var(--mf-shadow-soft);
+    }
+
+    .chart-card {
+      padding: 17px 18px 14px;
+    }
+
+    .chart-title {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 14px;
+    }
+
+    .chart-title h2 {
+      margin-top: 2px;
+      font-size: 16px;
+      letter-spacing: -0.02em;
+    }
+
+    .chart-title p {
+      margin-top: 4px;
+      color: var(--mf-muted);
+      font-size: 9px;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      color: var(--mf-muted);
+      font-size: 9px;
+    }
+
+    .legend span {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .legend i {
+      width: 12px;
+      height: 2px;
+      background: #4b74d8;
+    }
+
+    .legend i.eval {
+      height: 6px;
+      border-radius: 50%;
+      background: #178a70;
+    }
+
+    .legend i.lr {
+      background: #bf8727;
+    }
+
+    .chart-svg {
+      display: block;
+      width: 100%;
+      height: auto;
+      margin-top: 10px;
+      overflow: visible;
+    }
+
+    .chart-grid-line {
+      stroke: #e9e5da;
+      stroke-width: 1;
+    }
+
+    .chart-axis-label {
+      fill: #7a8792;
+      font-family: var(--mf-mono);
+      font-size: 8px;
+    }
+
+    .chart-train {
+      fill: none;
+      stroke: #4b74d8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      stroke-width: 2.1;
+    }
+
+    .chart-area {
+      fill: url(#lossArea);
+      opacity: 0.7;
+    }
+
+    .chart-eval {
+      fill: #fffdf8;
+      stroke: #178a70;
+      stroke-width: 2;
+    }
+
+    .chart-callout {
+      fill: #fff9e8;
+      stroke: #dac683;
+      stroke-width: 1;
+    }
+
+    .chart-callout-text {
+      fill: #6c5718;
+      font-family: var(--mf-sans);
+      font-size: 8.5px;
+      font-weight: 600;
+    }
+
+    .chart-lr {
+      fill: none;
+      stroke: #bf8727;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      stroke-width: 1.8;
+    }
+
+    .chart-lr-grid {
+      display: grid;
+      grid-template-columns: 150px minmax(0, 1fr);
+      align-items: center;
+      gap: 12px;
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid #ece7dc;
+    }
+
+    .chart-lr-grid strong {
+      display: block;
+      font-family: var(--mf-mono);
+      font-size: 11px;
+    }
+
+    .chart-lr-grid span {
+      display: block;
+      margin-top: 2px;
+      color: var(--mf-muted);
+      font-size: 8px;
+    }
+
+    .data-table {
+      margin-top: 9px;
+      color: var(--mf-muted);
+      font-size: 9px;
+    }
+
+    .data-table summary {
+      width: fit-content;
+      color: var(--mf-brand);
+      font-weight: 650;
+    }
+
+    .data-table table {
+      width: 100%;
+      margin-top: 8px;
+      border-collapse: collapse;
+      font-family: var(--mf-mono);
+      font-size: 8px;
+    }
+
+    .data-table th,
+    .data-table td {
+      padding: 5px 6px;
+      border: 1px solid #e8e3d8;
+      text-align: left;
+    }
+
+    .limit-card {
+      padding: 17px 18px;
+      background: #fbfaf5;
+    }
+
+    .limit-card h2 {
+      margin-top: 2px;
+      font-size: 16px;
+      letter-spacing: -0.02em;
+    }
+
+    .limit-list {
+      display: grid;
+      gap: 0;
+      margin-top: 12px;
+    }
+
+    .limit-list li {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      padding: 9px 0;
+      border-top: 1px solid #e8e2d6;
+      color: var(--mf-muted);
+      font-size: 9px;
+      line-height: 1.6;
+      list-style: none;
+    }
+
+    .limit-list li::before {
+      display: grid;
+      place-items: center;
+      width: 16px;
+      height: 16px;
+      flex: 0 0 16px;
+      border: 1px dashed #a8b2b8;
+      border-radius: 50%;
+      color: #75838c;
+      content: "i";
+      font: 8px var(--mf-mono);
+    }
+
+    .experiment-panel {
+      margin-top: 14px;
+      overflow: hidden;
+    }
+
+    .experiment-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 17px 18px 14px;
+      border-bottom: 1px solid var(--mf-line);
+    }
+
+    .experiment-head h2 {
+      margin-top: 2px;
+      font-size: 17px;
+      letter-spacing: -0.025em;
+    }
+
+    .experiment-head p {
+      margin-top: 4px;
+      color: var(--mf-muted);
+      font-size: 9px;
+    }
+
+    .experiment-list {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .experiment {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      padding: 16px 18px;
+      border-right: 1px solid var(--mf-line);
+    }
+
+    .experiment:last-child {
+      border-right: 0;
+    }
+
+    .experiment-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .experiment h3 {
+      margin-top: 8px;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .experiment p {
+      margin-top: 6px;
+      color: var(--mf-muted);
+      font-size: 9px;
+      line-height: 1.65;
+    }
+
+    .experiment .expectation {
+      margin-top: 8px;
+      padding: 8px;
+      border: 1px dashed #d7cfbc;
+      border-radius: 5px;
+      color: #5b5a50;
+      background: #fdfbf5;
+      font-size: 9px;
+      line-height: 1.55;
+    }
+
+    .experiment-actions {
+      display: flex;
+      gap: 5px;
+      flex-wrap: wrap;
+      margin-top: auto;
+      padding-top: 12px;
+    }
+
+    .experiment-actions .mf-button {
+      min-height: 32px;
+      padding: 5px 9px;
+      font-size: 9px;
+    }
+
+    .ask-box {
+      margin-top: 14px;
+      padding: 16px 18px;
+      border: 1px solid var(--mf-line);
+      border-radius: 11px;
+      background: var(--mf-surface);
+    }
+
+    .ask-box form {
+      display: flex;
+      gap: 8px;
+      margin-top: 9px;
+    }
+
+    .ask-box input {
+      flex: 1;
+      min-width: 0;
+      min-height: 38px;
+      padding: 8px 10px;
+      border: 1px solid var(--mf-line-strong);
+      border-radius: 7px;
+      color: var(--mf-ink);
+      background: #fff;
+      font-size: 11px;
+    }
+
+    .ask-response {
+      margin-top: 10px;
+      padding: 10px 11px;
+      border-left: 2px solid var(--mf-brand);
+      color: #38546c;
+      background: #f4f7ff;
+      font-size: 10px;
+      line-height: 1.65;
+    }
+
+    .empty-state {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 330px;
+      gap: 14px;
+      margin-top: 16px;
+    }
+
+    .empty-main {
+      padding: 26px;
+      border: 1px dashed #bbb39f;
+      border-radius: 11px;
+      background: rgba(255, 253, 248, 0.76);
+    }
+
+    .empty-icon {
+      display: grid;
+      place-items: center;
+      width: 42px;
+      height: 42px;
+      border: 1px solid #c9c2b3;
+      border-radius: 9px;
+      color: var(--mf-brand);
+      background: #fff;
+    }
+
+    .empty-main h2 {
+      margin-top: 13px;
+      font-size: 22px;
+      letter-spacing: -0.03em;
+    }
+
+    .empty-main p {
+      max-width: 680px;
+      margin-top: 7px;
+      color: var(--mf-muted);
+      font-size: 11px;
+      line-height: 1.7;
+    }
+
+    .empty-main .entry-actions {
+      margin-top: 16px;
+    }
+
+    .coverage-card {
+      padding: 18px;
+      border: 1px solid var(--mf-line);
+      border-radius: 11px;
+      background: var(--mf-surface);
+    }
+
+    .coverage-card h2 {
+      font-size: 15px;
+    }
+
+    .coverage-card ul {
+      display: grid;
+      gap: 0;
+      margin-top: 11px;
+    }
+
+    .coverage-card li {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 8px 0;
+      border-top: 1px solid #ece7dc;
+      color: var(--mf-muted);
+      font-size: 9px;
+      list-style: none;
+    }
+
+    .coverage-card li b {
+      color: var(--mf-ink-soft);
+      font-weight: 650;
+    }
+
+    .coverage-card li span {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      white-space: nowrap;
+    }
+
+    .coverage-card li i {
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--mf-success);
+    }
+
+    .coverage-card li i.missing {
+      background: #b8c0c7;
+    }
+
+    .loading-view {
+      display: grid;
+      place-items: center;
+      min-height: 580px;
+      padding: 30px;
+    }
+
+    .loading-card {
+      width: min(680px, 100%);
+      padding: 28px;
+      border: 1px solid #c7d1e6;
+      border-radius: 13px;
+      background: var(--mf-surface);
+      box-shadow: var(--mf-shadow);
+    }
+
+    .loading-mark {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .spinner {
+      width: 25px;
+      height: 25px;
+      border: 2px solid #d5dded;
+      border-top-color: var(--mf-brand);
+      border-radius: 50%;
+      animation: spin 900ms linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .loading-card h1 {
+      margin-top: 18px;
+      font-size: 25px;
+      letter-spacing: -0.035em;
+    }
+
+    .loading-card > p {
+      margin-top: 7px;
+      color: var(--mf-muted);
+      font-size: 11px;
+      line-height: 1.7;
+    }
+
+    .loading-steps {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 20px;
+    }
+
+    .loading-step {
+      min-width: 0;
+      padding: 10px;
+      border: 1px solid #e1dcd1;
+      border-radius: 7px;
+      color: var(--mf-muted);
+      background: #fbf8f0;
+      font-size: 9px;
+      line-height: 1.5;
+    }
+
+    .loading-step.is-current {
+      border-color: #9db0e3;
+      color: var(--mf-brand-deep);
+      background: var(--mf-brand-soft);
+    }
+
+    .loading-step::before {
+      display: block;
+      width: 6px;
+      height: 6px;
+      margin-bottom: 6px;
+      border-radius: 50%;
+      background: #adb6bf;
+      content: "";
+    }
+
+    .loading-step.is-current::before {
+      background: var(--mf-brand);
+    }
+
+    .report-jump {
+      display: none;
+    }
+
+    .report-shell [id],
+    #report-summary,
+    #report-findings,
+    #report-evidence,
+    #chart-observed,
+    #report-experiments,
+    #report-limits {
+      scroll-margin-top: calc(var(--a-top) + 16px);
+    }
+
+    .limited-callout {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      margin-bottom: 13px;
+      padding: 12px 13px;
+      border: 1px solid #dfc987;
+      border-radius: 8px;
+      color: #65531e;
+      background: #fff9e8;
+      font-size: 10px;
+      line-height: 1.65;
+    }
+
+    .dialog-config {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    .dialog-config div {
+      padding: 9px 10px;
+      border: 1px solid #e3ded4;
+      border-radius: 6px;
+      background: #fbfaf5;
+    }
+
+    .dialog-config span {
+      display: block;
+      color: var(--mf-muted);
+      font-size: 9px;
+    }
+
+    .dialog-config strong {
+      display: block;
+      margin-top: 3px;
+      font-family: var(--mf-mono);
+      font-size: 12px;
+    }
+
+    .dialog-alert {
+      margin-top: 14px;
+      padding: 10px 11px;
+      border-left: 3px solid var(--mf-warning);
+      color: #675a39;
+      background: #fff9e8;
+      font-size: 10px;
+      line-height: 1.65;
+    }
+
+    @media (max-width: 1220px) {
+      .diagnosis-layout {
+        grid-template-columns: minmax(0, 1fr) 300px;
+      }
+
+      .entry-hero {
+        grid-template-columns: minmax(0, 1.3fr) minmax(260px, 0.7fr);
+      }
+    }
+
+    @media (max-width: 1080px) {
+      :root {
+        --a-rail: 190px;
+      }
+
+      main {
+        padding-right: 20px;
+        padding-left: 20px;
+      }
+
+      .topbar {
+        padding-right: 20px;
+        padding-left: 20px;
+      }
+
+      .diagnosis-layout {
+        grid-template-columns: minmax(0, 1fr);
+      }
+
+      .inspector {
+        position: static;
+      }
+
+      .overview-grid,
+      .empty-state {
+        grid-template-columns: minmax(0, 1fr);
+      }
+
+      .experiment-list {
+        grid-template-columns: 1fr;
+      }
+
+      .experiment {
+        border-right: 0;
+        border-bottom: 1px solid var(--mf-line);
+      }
+
+      .experiment:last-child {
+        border-bottom: 0;
+      }
+    }
+
+    @media (max-width: 840px) {
+      .app-frame {
+        display: block;
+      }
+
+      .rail {
+        position: relative;
+        height: auto;
+        padding: 13px 16px 10px;
+        border-right: 0;
+        border-bottom: 1px solid var(--mf-line);
+      }
+
+      .brand {
+        padding: 0;
+      }
+
+      .brand-mark {
+        width: 31px;
+        height: 31px;
+      }
+
+      .side-nav,
+      .rail-context,
+      .rail-report-nav,
+      .rail-foot,
+      .nav-label {
+        display: none;
+      }
+
+      .topbar {
+        position: relative;
+        flex-wrap: wrap;
+        padding: 9px 16px;
+      }
+
+      .demo-copy {
+        display: none;
+      }
+
+      .crumbs {
+        width: 100%;
+      }
+
+      .topbar-right {
+        width: 100%;
+        justify-content: space-between;
+      }
+
+      .top-select {
+        flex: 1;
+      }
+
+      .top-select select {
+        width: 100%;
+        max-width: none;
+      }
+
+      main {
+        padding: 17px 16px 44px;
+      }
+
+      .detail-heading,
+      .report-heading {
+        display: block;
+      }
+
+      .report-jump {
+        position: sticky;
+        top: var(--a-top);
+        z-index: 24;
+        display: flex;
+        gap: 4px;
+        margin: 0 -20px 14px;
+        padding: 7px 20px;
+        overflow-x: auto;
+        border-top: 1px solid #e8e2d7;
+        border-bottom: 1px solid #e8e2d7;
+        background: rgba(255, 253, 248, 0.96);
+        scrollbar-width: thin;
+        backdrop-filter: blur(8px);
+      }
+
+      .report-jump a {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 40px;
+        padding: 7px 12px;
+        border: 1px solid #ddd7ca;
+        border-radius: 999px;
+        color: #556575;
+        background: #fffefa;
+        font-size: 10px;
+        white-space: nowrap;
+      }
+
+      .report-jump a:hover,
+      .report-jump a:focus-visible {
+        border-color: #b9c7e8;
+        color: var(--mf-brand-deep);
+        background: var(--mf-brand-soft);
+      }
+
+      .detail-actions,
+      .report-actions {
+        margin-top: 13px;
+        justify-content: flex-start;
+      }
+
+      .entry-hero {
+        grid-template-columns: 1fr;
+        padding: 21px;
+      }
+
+      .entry-hero::after {
+        display: none;
+      }
+
+      .entry-side {
+        padding-top: 17px;
+        padding-left: 0;
+        border-top: 1px solid var(--mf-line);
+        border-left: 0;
+      }
+
+      .overview-metrics {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .overview-metrics div:nth-child(2) {
+        border-right: 0;
+      }
+
+      .overview-metrics div:nth-child(-n + 2) {
+        border-bottom: 1px solid #e2ded3;
+      }
+
+      .lifecycle {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 7px;
+      }
+
+      .verdict-grid,
+      .summary-grid,
+      .chart-section {
+        grid-template-columns: minmax(0, 1fr);
+      }
+
+      .summary-answers {
+        grid-template-columns: 1fr;
+      }
+
+      .summary-answer {
+        border-right: 0;
+        border-bottom: 1px solid var(--mf-line);
+      }
+
+      .summary-answer:nth-last-child(-n + 2) {
+        border-bottom: 1px solid var(--mf-line);
+      }
+
+      .summary-answer:last-child {
+        border-bottom: 0;
+      }
+
+      .findings-toolbar {
+        display: block;
+      }
+
+      .filter-row {
+        justify-content: flex-start;
+        margin-top: 11px;
+      }
+
+      .chart-lr-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .empty-state {
+        grid-template-columns: 1fr;
+      }
+
+      .status-band {
+        align-items: flex-start;
+        flex-wrap: wrap;
+      }
+
+      .status-band .boundary {
+        width: 100%;
+        margin-left: 20px;
+      }
+    }
+
+    @media (max-width: 520px) {
+      h1,
+      .report-heading h1 {
+        font-size: 26px;
+      }
+
+      .entry-copy h2 {
+        font-size: 23px;
+      }
+
+      .detail-tabs {
+        margin-right: -16px;
+        margin-left: -16px;
+        padding-left: 10px;
+      }
+
+      .topbar-left {
+        display: none;
+      }
+
+      .overview-metrics {
+        grid-template-columns: 1fr;
+      }
+
+      .overview-metrics div {
+        border-right: 0;
+        border-bottom: 1px solid #e2ded3;
+      }
+
+      .overview-metrics div:last-child {
+        border-bottom: 0;
+      }
+
+      .lifecycle {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .finding-copy div {
+        grid-template-columns: 1fr;
+        gap: 2px;
+      }
+
+      .report-jump {
+        margin-right: -16px;
+        margin-left: -16px;
+        padding-right: 16px;
+        padding-left: 16px;
+      }
+
+      .loading-steps {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .dialog-config {
+        grid-template-columns: 1fr;
+      }
+
+      .ask-box form {
+        flex-direction: column;
+      }
+
+      .ask-box .mf-button {
+        width: 100%;
+      }
+
+      .experiment-actions {
+        display: grid;
+        grid-template-columns: 1fr;
+      }
+
+      .verdict-actions {
+        justify-content: flex-start;
+      }
+
+      .verdict-action,
+      .summary-next .mf-button,
+      .evidence-index button {
+        min-height: 44px;
+      }
+
+      .finding > summary {
+        padding: 15px 16px 12px;
+      }
+
+      .finding-content {
+        padding: 0 16px 16px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#viewRoot">跳到报告内容</a>
+  <div class="app-frame">
+    <aside class="rail" aria-label="ModelForge 全局导航">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">M</div>
+        <div class="brand-copy">
+          <strong>ModelForge</strong>
+          <small>模型微调工作台</small>
+        </div>
+      </div>
+
+      <div class="nav-label">Workspace</div>
+      <nav class="side-nav" aria-label="主导航">
+        <a href="#overview">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+          工作台
+        </a>
+        <a href="#datasets">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 5h16v14H4z"/><path d="M8 9h8M8 13h8M8 17h5"/></svg>
+          数据集
+        </a>
+        <a href="#models">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="m12 3 9 5-9 5-9-5 9-5Z"/><path d="m3 12 9 5 9-5M3 16l9 5 9-5"/></svg>
+          模型
+        </a>
+        <a href="#compute">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="4" y="4" width="16" height="12" rx="1"/><path d="M8 20h8M12 16v4"/></svg>
+          计算环境
+        </a>
+        <a href="#training" class="is-active" aria-current="page">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="m4 18 6-6 4 3 6-10"/><path d="M14 5h6v6"/></svg>
+          训练
+        </a>
+        <a href="#serving">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 4h16v13H9l-5 4V4Z"/><path d="M8 9h8M8 13h5"/></svg>
+          推理试用
+        </a>
+      </nav>
+
+      <div class="rail-context">
+        <div class="mf-eyebrow">AI REPORT LAYER</div>
+        <strong>运行后诊断</strong>
+        <p>只读取当前 Attempt 的冻结输入与已归档证据，不替代硬门禁。</p>
+      </div>
+
+      <nav class="rail-report-nav" id="reportRailNav" aria-label="报告章节">
+        <a href="#report-summary">结论与摘要</a>
+        <a href="#report-findings">关键发现</a>
+        <a href="#report-evidence">证据检查器</a>
+        <a href="#report-experiments">下一步实验</a>
+        <a href="#report-limits">限制与覆盖</a>
+      </nav>
+
+      <div class="rail-foot">
+        <strong>本地控制面已就绪</strong>
+        PostgreSQL · MinIO · 只读证据
+      </div>
+    </aside>
+
+    <div class="workspace">
+      <header class="topbar">
+        <div class="topbar-left">
+          <div class="crumbs">
+            <a href="index.html">方案对比</a>
+            <span>/</span>
+            <span>训练 / AI 智能报告</span>
+          </div>
+        </div>
+        <div class="topbar-right">
+          <span class="mf-demo-stamp">原型示例</span>
+          <label class="top-select">
+            <span class="mf-sr-only">切换 Attempt</span>
+            <select id="attemptSelect" aria-label="切换 Attempt"></select>
+          </label>
+          <span class="demo-copy">不提交训练 · 不连接模型</span>
+        </div>
+      </header>
+
+      <main id="viewRoot" tabindex="-1"></main>
+    </div>
+  </div>
+
+  <div class="mf-dialog-backdrop" id="applyDialog" hidden>
+    <section class="mf-dialog" role="dialog" aria-modal="true" aria-labelledby="applyDialogTitle" aria-describedby="applyDialogDescription" tabindex="-1">
+      <header class="mf-dialog-head">
+        <div>
+          <span class="mf-eyebrow">DRAFT ONLY · 原型示例</span>
+          <h2 id="applyDialogTitle">应用建议配置？</h2>
+          <p id="applyDialogDescription">只会创建一份新训练配置草稿，不修改当前 Attempt，也不会提交训练或创建实例。</p>
+        </div>
+        <button class="mf-button quiet" type="button" data-dialog-close aria-label="关闭对话框">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
+        </button>
+      </header>
+      <div class="mf-dialog-body" id="applyDialogBody"></div>
+      <footer class="mf-dialog-actions">
+        <button class="mf-button quiet" type="button" data-dialog-close>取消</button>
+        <button class="mf-button primary" type="button" id="confirmApply">创建配置草稿</button>
+      </footer>
+    </section>
+  </div>
+
+  <script src="shared/prototype-data.js"></script>
+  <script src="shared/prototype-core.js"></script>
+  <script>
+    (() => {
+      const data = window.MF_PROTOTYPE;
+      const ui = window.MFUI;
+      const root = document.getElementById("viewRoot");
+      const attemptSelect = document.getElementById("attemptSelect");
+      const applyDialogRoot = document.getElementById("applyDialog");
+      const applyDialogBody = document.getElementById("applyDialogBody");
+      const confirmApply = document.getElementById("confirmApply");
+      const reportRailNav = document.getElementById("reportRailNav");
+      const applyDialog = ui.initDialog(applyDialogRoot);
+      const params = new URLSearchParams(location.search);
+      let attempt = data.getAttempt(params.get("attempt") || data.defaults.attempt);
+      let requestedView = params.get("view");
+      let view = ["report", "empty"].includes(requestedView) ? requestedView : "entry";
+      let filter = "all";
+      let selectedEvidence = "E-01";
+      let generationTimer = 0;
+      let currentExperiment = null;
+      let limitedGenerated = false;
+
+      function syncReportChrome() {
+        if (reportRailNav) reportRailNav.hidden = view !== "report";
+      }
+
+      attemptSelect.innerHTML = data.attempts.map((item) => {
+        const suffix = item.state === "succeeded"
+          ? "已成功"
+          : item.state === "failed"
+            ? "已失败"
+            : "已取消";
+        return `<option value="${ui.escapeHtml(item.id)}">${ui.escapeHtml(item.displayName)} · ${suffix}</option>`;
+      }).join("");
+      attemptSelect.value = attempt.id;
+
+      function evidenceFor(attemptData, evidenceId) {
+        return attemptData.report?.evidence?.find((item) => item.id === evidenceId)
+          || (attemptData.report?.evidence || [])[0]
+          || null;
+      }
+
+      function severityClass(tone) {
+        return {blocked: "danger", attention: "warning", passed: "success", info: "neutral", unknown: "unknown"}[tone] || "neutral";
+      }
+
+      function renderEntry() {
+        const hasReport = attempt.report?.exists;
+        const isFailed = attempt.state === "failed";
+        const isCancelled = attempt.state === "cancelled";
+        const statusText = isFailed
+          ? "运行已失败，保留错误码与缺失证据矩阵；没有生成训练指标。"
+          : isCancelled
+            ? "运行已取消，未发布部分 Adapter；当前没有完整 AI 报告。"
+            : "训练和实例回收已结束；Adapter 可用性仍需独立核对。";
+        const title = isFailed
+          ? "失败复盘：这次运行没有走到训练"
+          : isCancelled
+            ? "报告尚未生成：当前 Attempt 缺少训练指标"
+            : "训练内信号可读，但模型可用性尚未验证";
+        const summary = isFailed
+          ? "安全首启阶段终止；metrics、runtime 与执行清单均未形成，当前不能确认根因。"
+          : isCancelled
+            ? "当前有 Attempt 快照、runtime 与 6 个执行文件，但没有 metrics、Adapter 或推理验收。"
+            : "22 个 Train Loss / LR 采样、1 个 Eval 点、12 个证据文件和 Best / Final 2/2 可用；独立推理验收未关联。";
+        const reportBadge = hasReport
+          ? `<span class="mf-status ${isFailed ? "danger" : "warning"}">${isFailed ? "失败复盘已生成" : "可用性未验证"}</span>`
+          : `<span class="mf-status neutral">无报告</span>`;
+
+        root.innerHTML = `
+          <div class="view">
+            <div class="detail-heading">
+              <div>
+                <div class="mf-eyebrow">RUN DETAIL / ATTEMPT #${attempt.number} / ${ui.escapeHtml(attempt.mode)}</div>
+                <h1>${ui.escapeHtml(attempt.name)}</h1>
+                <div class="meta">
+                  <span class="mf-mono">${ui.escapeHtml(attempt.id)}</span>
+                  <span>${ui.escapeHtml(attempt.model)} · ${ui.escapeHtml(attempt.method)}</span>
+                  <span>更新于 ${ui.escapeHtml(attempt.updatedAt)}</span>
+                </div>
+              </div>
+              <div class="detail-actions">
+                <span class="mf-status ${isFailed ? "danger" : isCancelled ? "neutral" : "success"}">${ui.escapeHtml(attempt.stateLabel)}</span>
+                <button class="mf-button" type="button" id="refreshEntry">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg>
+                  刷新
+                </button>
+                <button class="mf-button" type="button">${isFailed ? "创建重试 Attempt" : "查看运行产物"}</button>
+              </div>
+            </div>
+
+            <nav class="detail-tabs" aria-label="运行详情页签">
+              <button type="button" aria-current="page">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 18l6-6 4 3 6-10"/></svg>
+                运行总览
+              </button>
+              <button type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="8" cy="6" r="1.5" fill="currentColor"/><circle cx="15" cy="12" r="1.5" fill="currentColor"/><circle cx="10" cy="18" r="1.5" fill="currentColor"/></svg>运行分析</button>
+              <button type="button" class="active" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="m12 3 1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5L12 3Z"/><path d="m19 15 .8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8L19 15Z"/></svg>智能报告</button>
+              <button type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 9 3 3-3 3M13 15h4"/></svg>训练日志</button>
+              <button type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="m12 3 9 5-9 5-9-5 9-5Z"/><path d="m3 12 9 5 9-5M3 16l9 5 9-5"/></svg>训练产物</button>
+              <button type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>冻结输入</button>
+            </nav>
+
+            <div class="status-band ${isFailed ? "failure" : ""}">
+              <span class="mark" aria-hidden="true"></span>
+              <strong>${ui.escapeHtml(attempt.stateLabel)}</strong>
+              <span>${statusText}</span>
+              <span class="boundary">${isFailed ? "失败状态 ≠ 根因已确认" : "训练成功 ≠ Adapter 可用 ≠ 模型可用"}</span>
+            </div>
+
+            <section class="entry-hero" aria-labelledby="entryTitle">
+              <div class="entry-copy">
+                <div class="entry-kicker">
+                  <span class="mf-eyebrow">AI RUN DIAGNOSIS · ADVISORY</span>
+                  ${reportBadge}
+                  ${hasReport ? `<span class="mf-status neutral">${ui.escapeHtml(attempt.report.generatedAt)} 生成</span>` : ""}
+                </div>
+                <h2 id="entryTitle">${ui.escapeHtml(title)}</h2>
+                <p>${ui.escapeHtml(summary)}</p>
+                <div class="entry-badges">
+                  ${renderEntryBadges()}
+                </div>
+                <div class="entry-actions">
+                  <button class="mf-button primary" type="button" data-action="${hasReport ? "open-report" : "generate-report"}">
+                    ${hasReport ? "查看完整诊断" : "生成有限报告"}
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M5 12h14M14 7l5 5-5 5"/></svg>
+                  </button>
+                  <button class="mf-button" type="button">查看原始运行分析</button>
+                  ${hasReport ? `<button class="mf-button quiet" type="button" data-action="regenerate">重新生成</button>` : ""}
+                </div>
+              </div>
+              <aside class="entry-side" aria-label="证据覆盖">
+                <h3>Evidence coverage</h3>
+                ${renderCoverageSummary()}
+              </aside>
+            </section>
+
+            <div class="overview-grid">
+              <section class="overview-card">
+                <div class="card-head">
+                  <div><span class="mf-eyebrow">LATEST SAMPLES</span><h2>运行事实与真实指标</h2></div>
+                  <span class="mf-status neutral">只展示接口事实</span>
+                </div>
+                <div class="overview-metrics">
+                  <div><span>最新 Step</span><strong>${attempt.metrics.trainCount ? "22" : "—"}</strong><small>${attempt.metrics.trainCount ? "Epoch 1.00" : "指标未形成"}</small></div>
+                  <div><span>Train Loss</span><strong>${attempt.metrics.lastTrain === null ? "—" : attempt.metrics.lastTrain}</strong><small>${attempt.metrics.trainCount} 个真实采样</small></div>
+                  <div><span>Eval Loss</span><strong>${attempt.metrics.bestEval === null ? "—" : attempt.metrics.bestEval}</strong><small>${attempt.metrics.evalCount ? "仅 step 22 一点" : "验证点未形成"}</small></div>
+                  <div><span>显存峰值</span><strong>${attempt.memory ? attempt.memory.peakGiB + " GiB" : "—"}</strong><small>${attempt.memory ? attempt.memory.samples + " 次采样" : "未上报"}</small></div>
+                </div>
+                <div class="lifecycle" aria-label="托管生命周期">
+                  <span>创建实例</span><span>费用守卫</span><span>首启与运行时</span><span>训练</span><span>产物同步</span><span>回收</span>
+                </div>
+              </section>
+              <aside class="overview-card">
+                <div class="card-head">
+                  <div><span class="mf-eyebrow">RUN FACTS</span><h2>冻结输入</h2></div>
+                  <button class="mf-button quiet" type="button">查看全部</button>
+                </div>
+                <dl class="fact-list">
+                  <div><dt>数据集</dt><dd class="mf-mono">${ui.escapeHtml(attempt.dataset.shortId)} · ${attempt.dataset.samples} 条</dd></div>
+                  <div><dt>基座</dt><dd class="mf-mono">${ui.escapeHtml(attempt.base.shortId)} · ${ui.escapeHtml(attempt.model)}</dd></div>
+                  <div><dt>运行配置</dt><dd>${attempt.config.epochs} epoch · LR ${attempt.config.learning_rate} · LoRA r${attempt.config.lora_rank}</dd></div>
+                  <div><dt>GPU / 镜像</dt><dd>${ui.escapeHtml(attempt.gpu)} · ${ui.escapeHtml(attempt.image)}</dd></div>
+                  <div><dt>Adapter</dt><dd>${attempt.adapters.length ? "Best / Final 2/2 available" : "未发布"}</dd></div>
+                </dl>
+              </aside>
+            </div>
+          </div>
+        `;
+      }
+
+      function renderEntryBadges() {
+        if (attempt.state === "succeeded") {
+          return `
+            <span><b>训练健康度</b> 部分可判断</span>
+            <span><b>Adapter</b> 2/2 available</span>
+            <span><b>推理验收</b> 未关联</span>
+          `;
+        }
+        if (attempt.state === "failed") {
+          return `
+            <span><b>失败阶段</b> 安全首启</span>
+            <span><b>Metrics</b> 0</span>
+            <span><b>Adapter</b> 未生成</span>
+          `;
+        }
+        return `
+          <span><b>运行结果</b> 已取消</span>
+          <span><b>Metrics</b> 0</span>
+          <span><b>部分产物</b> 禁止发布</span>
+        `;
+      }
+
+      function renderCoverageSummary() {
+        if (attempt.state === "succeeded") {
+          return `
+            <div class="coverage-number"><strong>8</strong><span>/ 11 类证据可用</span></div>
+            <div class="coverage-bar"><span></span></div>
+            <div class="coverage-list">
+              <div><span>指标 / runtime / manifest</span><strong>有</strong></div>
+              <div><span>Token / 显存 / 产物</span><strong>有</strong></div>
+              <div><span>独立推理验收</span><strong>未关联</strong></div>
+            </div>
+            <p class="inspector-note">${ui.escapeHtml(attempt.report.sourceNote)}</p>
+          `;
+        }
+        if (attempt.state === "failed") {
+          return `
+            <div class="coverage-number"><strong>3</strong><span>/ 11 类证据可用</span></div>
+            <div class="coverage-bar"><span style="width:27%"></span></div>
+            <div class="coverage-list">
+              <div><span>Attempt / provisioning</span><strong>有</strong></div>
+              <div><span>Metrics / runtime / manifest</span><strong>缺失</strong></div>
+              <div><span>日志</span><strong>0 chunk</strong></div>
+            </div>
+            <p class="inspector-note">失败报告会先区分“已确认失败阶段”和“尚未确认根因”。</p>
+          `;
+        }
+        return `
+          <div class="coverage-number"><strong>3</strong><span>/ 8 类证据可用</span></div>
+          <div class="coverage-bar"><span style="width:38%"></span></div>
+          <div class="coverage-list">
+            <div><span>Attempt snapshot</span><strong>有</strong></div>
+            <div><span>Runtime / 6 files</span><strong>有</strong></div>
+            <div><span>Metrics / Adapter</span><strong>缺失</strong></div>
+          </div>
+          <p class="inspector-note">没有完整指标时，AI 只能生成“有限复盘”，不能判断训练健康度。</p>
+        `;
+      }
+
+      function renderLoading() {
+        root.innerHTML = `
+          <div class="view loading-view" role="status" aria-live="polite">
+            <section class="loading-card">
+              <div class="loading-mark">
+                <span class="spinner" aria-hidden="true"></span>
+                <span class="mf-eyebrow">GENERATING ADVISORY REPORT</span>
+              </div>
+              <h1>正在整理已归档证据</h1>
+              <p>不会重新训练，也不会创建 GPU。报告只读取该 Attempt 的快照、指标、runtime、执行清单与 Adapter 状态。</p>
+              <div class="loading-steps" aria-label="生成阶段">
+                <div class="loading-step is-current" data-loading-step>读取冻结快照</div>
+                <div class="loading-step" data-loading-step>核对指标与证据</div>
+                <div class="loading-step" data-loading-step>归纳发现与限制</div>
+                <div class="loading-step" data-loading-step>生成下一步实验</div>
+              </div>
+              <p class="inspector-note">原型示例：这里用本地定时器模拟等待状态，不调用任何生成模型。</p>
+            </section>
+          </div>
+        `;
+        const steps = [...root.querySelectorAll("[data-loading-step]")];
+        steps.forEach((step, index) => {
+          window.setTimeout(() => {
+            steps.forEach((node) => node.classList.remove("is-current"));
+            step.classList.add("is-current");
+          }, 360 * index);
+        });
+      }
+
+      function startGeneration() {
+        if (generationTimer) window.clearTimeout(generationTimer);
+        view = "loading";
+        renderLoading();
+        syncReportChrome();
+        generationTimer = window.setTimeout(() => {
+          if (attempt.report?.exists) {
+            view = "report";
+            selectedEvidence = attempt.state === "failed" ? "E-F1" : "E-01";
+            render();
+            ui.toast("报告已重新生成；旧版本仍代表同一 Attempt 的已归档证据。");
+          } else {
+            view = "limited";
+            limitedGenerated = true;
+            render();
+          }
+        }, 1650);
+      }
+
+      function renderReport() {
+        if (!attempt.report?.exists) {
+          renderEmpty();
+          return;
+        }
+        const report = attempt.report;
+        const evidence = evidenceFor(attempt, selectedEvidence);
+        root.innerHTML = `
+          <div class="view report-shell">
+            <div class="report-heading">
+              <div>
+                <div class="report-title-line">
+                  <span class="mf-eyebrow">AI RUN DIAGNOSIS / ADVISORY</span>
+                  <span class="mf-demo-stamp">原型示例</span>
+                  <span class="mf-status ${attempt.state === "failed" ? "danger" : "warning"}">${attempt.state === "failed" ? "失败复盘" : "可用性未验证"}</span>
+                </div>
+                <h1>${ui.escapeHtml(report.headline)}</h1>
+                <p>${ui.escapeHtml(report.summary)}</p>
+                <div class="report-meta">
+                  <span>版本 <b class="mf-mono">${ui.escapeHtml(report.version)}</b></span>
+                  <span>生成于 ${ui.escapeHtml(report.generatedAt)}</span>
+                  <span>证据截至 ${ui.escapeHtml(attempt.updatedAt)}</span>
+                  <span>只读快照 · 不写回 Attempt</span>
+                  <span>${ui.escapeHtml(attempt.displayName)}</span>
+                  <span>${ui.escapeHtml(attempt.mode)} · ${ui.escapeHtml(attempt.method)}</span>
+                </div>
+              </div>
+              <div class="report-actions">
+                <button class="mf-button quiet" type="button" data-action="back-entry">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M19 12H5M10 7l-5 5 5 5"/></svg>
+                  返回详情
+                </button>
+                <button class="mf-button" type="button" data-action="regenerate">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg>
+                  重新生成
+                </button>
+                <button class="mf-button primary" type="button" data-action="copy-report">复制报告摘要</button>
+              </div>
+            </div>
+
+            <nav class="report-jump" aria-label="报告章节">
+              <a href="#report-summary">结论</a>
+              <a href="#report-findings">关键发现</a>
+              <a href="#report-evidence">证据</a>
+              <a href="#chart-observed">趋势</a>
+              <a href="#report-experiments">下一步</a>
+            </nav>
+
+            <div class="verdict-grid" id="report-summary">
+              ${renderVerdictCard("健康度", report.health, "")}
+              ${renderVerdictCard("可交付性", report.delivery, "delivery")}
+            </div>
+
+            <div class="summary-grid">
+              <section class="summary-lead">
+                <span class="mf-eyebrow">REPORT POSITION</span>
+                <h2>${attempt.state === "failed" ? "先确认失败阶段与证据缺口，不把缺失当根因。" : "训练内信号与业务可用性，必须分开回答。"}</h2>
+                <p>${ui.escapeHtml(report.sourceNote)}</p>
+                <p><strong>硬门禁仍由原系统负责：</strong>Attempt 状态、Adapter available、runtime lock、Adapters 存储校验和独立推理验收，都不会被 AI 报告覆盖。</p>
+                ${renderNextAction(report)}
+              </section>
+              <section class="summary-answers" aria-label="四个问题摘要">
+                ${report.answers.map((answer) => `
+                  <article class="summary-answer">
+                    <span>${ui.escapeHtml(answer.label)}</span>
+                    <strong>${ui.escapeHtml(answer.verdict)}</strong>
+                    <p>${ui.escapeHtml(answer.text)}</p>
+                  </article>
+                `).join("")}
+              </section>
+            </div>
+
+            <div class="diagnosis-layout">
+              <section class="findings-panel" id="report-findings" aria-labelledby="findingsTitle">
+                <div class="findings-toolbar">
+                  <div>
+                    <span class="mf-eyebrow">FINDING LEDGER</span>
+                    <h2 id="findingsTitle">关键发现</h2>
+                  </div>
+                  ${renderFilters(report.findings)}
+                </div>
+                <div class="findings-live" id="findingsLive" aria-live="polite">${filterDescription(report.findings)}</div>
+                <div id="findingList">${renderFindings(report.findings)}</div>
+              </section>
+
+              <aside class="inspector" id="report-evidence" aria-labelledby="inspectorTitle">
+                <div class="inspector-head">
+                  <span class="mf-eyebrow">EVIDENCE INSPECTOR</span>
+                  <h2 id="inspectorTitle">原始证据</h2>
+                </div>
+                <div class="inspector-body" id="inspectorBody">
+                  ${evidence ? renderInspector(evidence) : renderInspectorEmpty()}
+                </div>
+              </aside>
+            </div>
+
+            ${attempt.state === "succeeded" ? renderCharts() : renderNoChart()}
+
+            <section class="experiment-panel" id="report-experiments" aria-labelledby="experimentsTitle">
+              <div class="experiment-head">
+                <div>
+                  <span class="mf-eyebrow">NEXT EXPERIMENTS</span>
+                  <h2 id="experimentsTitle">下一步实验</h2>
+                  <p>建议不自动执行；先验证假设，再决定是否修改训练配置。</p>
+                </div>
+                <span class="mf-status neutral">只生成草稿</span>
+              </div>
+              <div class="experiment-list">
+                ${report.experiments.map(renderExperiment).join("")}
+              </div>
+            </section>
+
+            <section class="limit-card" id="report-limits" style="margin-top:14px">
+              <span class="mf-eyebrow">LIMITATIONS</span>
+              <h2>这份报告不能回答什么</h2>
+              <ul class="limit-list">
+                ${report.limitations.map((item) => `<li>${ui.escapeHtml(item)}</li>`).join("")}
+              </ul>
+            </section>
+
+            <section class="ask-box">
+              <span class="mf-eyebrow">FOLLOW-UP · FRONTEND ONLY</span>
+              <form id="askForm">
+                <label class="mf-sr-only" for="askInput">追问报告证据</label>
+                <input id="askInput" placeholder="例如：为什么不能根据 0.2148 判断模型可用？" autocomplete="off">
+                <button class="mf-button" type="submit">追问原型</button>
+              </form>
+              <p class="ask-response" id="askResponse" hidden></p>
+            </section>
+          </div>
+        `;
+        ui.initAskBox(
+          document.getElementById("askForm"),
+          document.getElementById("askResponse"),
+          {
+            "为什么不能根据 0.2148 判断模型可用？": "观测：0.2148 只是一个 Eval Loss 点，并且没有推理验收。推断：它只能说明当前验证集的优化目标值，不能说明问答质量、事实性或服务可用。",
+            "最应该先做什么？": "先完成独立推理验收。Adapter available 只说明两个文件可校验、可下载；没有推理请求与人工观察，不能进入“模型可用”结论。",
+          },
+        );
+      }
+
+      function renderNextAction(report) {
+        if (attempt.state === "failed") {
+          return `
+            <div class="summary-next">
+              <span>建议先做</span>
+              <strong>先补齐失败阶段上下文，再决定是否重试</strong>
+              <p>错误码只定位到安全首启；日志为 0 chunk，不能据此确认根因。</p>
+              <button class="mf-button quiet" type="button" data-action="scroll-to" data-scroll-target="#report-findings">查看证据缺口</button>
+            </div>
+          `;
+        }
+        return `
+          <div class="summary-next">
+            <span>建议先做</span>
+            <strong>先用 Best Adapter 完成独立推理验收</strong>
+            <p>当前没有关联当前 Adapter 的推理 Trial；先验证服务与代表性问题，再考虑重复训练或调参。</p>
+            <button class="mf-button quiet" type="button" data-action="scroll-to" data-scroll-target="#experiment-X-01">查看 P0 验收步骤</button>
+          </div>
+        `;
+      }
+
+      function renderVerdictCard(kind, value, extraClass) {
+        const toneClass = value.tone === "blocked" ? "blocked" : "";
+        const evidenceId = attempt.state === "failed" ? "E-F1" : "E-06";
+        const healthTarget = attempt.state === "failed" ? "#report-findings" : "#chart-observed";
+        const deliveryAction = attempt.state === "failed"
+          ? `<button class="verdict-action" type="button" data-action="open-evidence" data-evidence-id="${evidenceId}">查看失败证据 <span aria-hidden="true">→</span></button>`
+          : `<button class="verdict-action" type="button" data-action="open-evidence" data-evidence-id="${evidenceId}">查看 Adapter 证据 <span aria-hidden="true">→</span></button>`;
+        return `
+          <article class="verdict-card ${extraClass} ${toneClass}">
+            <div class="verdict-top">
+              <span>${kind === "健康度" ? "TRAINING HEALTH" : "DELIVERABILITY"}</span>
+              <span class="mf-status ${value.tone === "blocked" ? "danger" : value.tone === "watch" ? "warning" : "unknown"}">${ui.escapeHtml(value.label)}</span>
+            </div>
+            <h2>${ui.escapeHtml(value.title)}</h2>
+            <p>${ui.escapeHtml(value.detail)}</p>
+            <div class="verdict-facts">
+              ${kind === "健康度"
+                ? `<span>Train ${attempt.metrics.trainCount} pts</span><span>Eval ${attempt.metrics.evalCount} pt</span><span>No hard fail</span>`
+                : `<span>Best/Final ${attempt.adapters.length}/2</span><span>Inference ${ui.escapeHtml(attempt.inferenceAcceptance.label)}</span><span>${attempt.state === "failed" ? "artifact pending" : "artifact verified"}</span>`}
+            </div>
+            <div class="verdict-actions">
+              ${kind === "健康度"
+                ? `<button class="verdict-action" type="button" data-action="scroll-to" data-scroll-target="${healthTarget}">${attempt.state === "failed" ? "查看失败发现" : "查看图表依据"} <span aria-hidden="true">→</span></button>`
+                : deliveryAction}
+            </div>
+          </article>
+        `;
+      }
+
+      function renderFilters(findings) {
+        const counts = {
+          all: findings.length,
+          blocked: findings.filter((item) => item.severity === "blocked").length,
+          attention: findings.filter((item) => item.severity === "attention").length,
+          passed: findings.filter((item) => item.severity === "passed").length,
+          info: findings.filter((item) => item.severity === "info").length,
+          unknown: findings.filter((item) => item.severity === "unknown").length,
+        };
+        const options = [
+          ["all", "全部"],
+          ["blocked", "阻断"],
+          ["attention", "需关注"],
+          ["passed", "已通过"],
+          ["info", "提示"],
+          ["unknown", "无法判断"],
+        ];
+        return `<div class="filter-row" role="group" aria-label="按严重度筛选">${options.map(([key, label]) => `
+          <button type="button" class="mf-chip ${filter === key ? "is-active" : ""}" data-filter="${key}" aria-pressed="${filter === key}">
+            ${label}<span class="count">${counts[key]}</span>
+          </button>
+        `).join("")}</div>`;
+      }
+
+      function filterDescription(findings) {
+        const shown = filter === "all" ? findings.length : findings.filter((item) => item.severity === filter).length;
+        return `当前显示 ${shown} 条发现；展开条目查看观测、推断、建议与证据，不只依赖颜色。`;
+      }
+
+      function renderFindings(findings) {
+        const order = [
+          ["blocked", "阻断"],
+          ["attention", "需关注"],
+          ["passed", "已通过"],
+          ["info", "提示"],
+          ["unknown", "无法判断"],
+        ];
+        const filteredGroups = order
+          .filter(([key]) => filter === "all" || filter === key)
+          .map(([key, label]) => {
+            const rows = findings.filter((item) => item.severity === key);
+            if (!rows.length) return "";
+            return `
+              <section class="finding-group" aria-label="${label}">
+                <div class="finding-group-head">${label}<span class="mf-status ${severityClass(key)}">${rows.length}</span></div>
+                ${rows.map(renderFinding).join("")}
+              </section>
+            `;
+          }).join("");
+        return filteredGroups || `<div class="empty-main" style="margin:16px"><h2>没有符合筛选的发现</h2><p>选择“全部”恢复全部证据。</p></div>`;
+      }
+
+      function renderFinding(item) {
+        const open = filter !== "all"
+          || item.severity === "attention"
+          || attempt.report?.findings?.[0]?.id === item.id;
+        return `
+          <details class="finding" id="${ui.escapeHtml(item.id)}" ${open ? "open" : ""}>
+            <summary>
+              <div class="finding-headline">
+                <div>
+                  <div class="finding-id">${ui.escapeHtml(item.id)} · ${ui.escapeHtml(item.category)}</div>
+                  <h3>${ui.escapeHtml(item.title)}</h3>
+                </div>
+                <span class="finding-state">
+                  <span class="mf-status ${severityClass(item.severity)}">${ui.escapeHtml(item.severityLabel)}</span>
+                  <span class="finding-chevron" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m6 9 6 6 6-6"/></svg>
+                  </span>
+                </span>
+              </div>
+              <div class="finding-meta">
+                <span class="mf-layer ${item.layer === "推断" ? "inference" : item.layer === "建议" ? "advice" : item.layer === "限制" ? "limit" : ""}">${ui.escapeHtml(item.layer)}</span>
+                <span>${ui.escapeHtml(item.category)}</span>
+                <span class="confidence">置信度 ${ui.escapeHtml(item.confidence)}</span>
+              </div>
+              <p class="finding-preview">${ui.escapeHtml(item.observation)}</p>
+            </summary>
+            <div class="finding-content">
+              <dl class="finding-copy">
+                <div><dt>观测</dt><dd>${ui.escapeHtml(item.observation)}</dd></div>
+                <div><dt>推断</dt><dd>${ui.escapeHtml(item.inference)}</dd></div>
+                <div><dt>建议</dt><dd>${ui.escapeHtml(item.recommendation)}</dd></div>
+              </dl>
+              <div class="finding-foot">
+                <div class="evidence-row">
+                  ${item.evidence.map((id) => `
+                    <button type="button" class="mf-evidence-chip" data-evidence="${ui.escapeHtml(id)}" aria-pressed="${selectedEvidence === id}" title="展开证据 ${ui.escapeHtml(id)}">${ui.escapeHtml(id)}</button>
+                  `).join("")}
+                </div>
+                <span class="confidence">点击证据 chip 查看原始字段</span>
+              </div>
+            </div>
+          </details>
+        `;
+      }
+
+      function renderInspector(item) {
+        if (!item) return renderInspectorEmpty();
+        return `
+          <span class="evidence-tag">${ui.escapeHtml(item.id)} · ${ui.escapeHtml(item.kind)}</span>
+          <h3 style="margin-top:10px;font-size:13px">${ui.escapeHtml(item.title)}</h3>
+          <div class="inspector-value">${ui.escapeHtml(item.value)}</div>
+          <p class="inspector-detail">${ui.escapeHtml(item.detail)}</p>
+          <dl class="inspector-facts">
+            <div><dt>来源</dt><dd>${ui.escapeHtml(item.source)}</dd></div>
+            <div><dt>字段 / 文件</dt><dd class="mf-mono">${ui.escapeHtml(item.path)}</dd></div>
+            <div><dt>样本</dt><dd>${ui.escapeHtml(item.samples)}</dd></div>
+            ${item.hash ? `<div><dt>摘要</dt><dd class="mf-mono">${ui.escapeHtml(item.hash)}</dd></div>` : ""}
+          </dl>
+          <div class="inspector-note"><strong>限制：</strong>${ui.escapeHtml(item.limitation)}</div>
+          <button type="button" class="mf-button quiet" style="margin-top:10px" data-action="copy-evidence" data-evidence-id="${ui.escapeHtml(item.id)}">复制证据说明</button>
+          ${renderEvidenceIndex()}
+        `;
+      }
+
+      function renderEvidenceIndex() {
+        const evidenceRows = attempt.report?.evidence || [];
+        if (!evidenceRows.length) return "";
+        return `
+          <div class="evidence-index" aria-label="证据索引">
+            <div class="evidence-index-head"><span>Evidence index</span><span>${evidenceRows.length} 类</span></div>
+            ${evidenceRows.map((item) => `
+              <button type="button" class="${item.id === selectedEvidence ? "is-active" : ""}" data-evidence="${ui.escapeHtml(item.id)}" aria-pressed="${item.id === selectedEvidence}">
+                <span class="id">${ui.escapeHtml(item.id)}</span>
+                <span class="title">${ui.escapeHtml(item.title)}</span>
+                <span class="kind">${ui.escapeHtml(item.kind)}</span>
+              </button>
+            `).join("")}
+          </div>
+        `;
+      }
+
+      function renderInspectorEmpty() {
+        return `<p class="inspector-detail">选择任一 evidence chip 查看字段、文件路径、样本数、摘要与限制。</p>`;
+      }
+
+      function renderCharts() {
+        const width = 780;
+        const height = 230;
+        const padding = {left: 44, right: 22, top: 18, bottom: 30};
+        const max = Math.max(...attempt.trainLoss);
+        const min = Math.min(...attempt.trainLoss);
+        const lossPath = ui.linePath(attempt.trainLoss, width, height, padding, min, max);
+        const baselineY = height - padding.bottom;
+        const xFor = (index) => padding.left + (index / Math.max(attempt.trainLoss.length - 1, 1)) * (width - padding.left - padding.right);
+        const yFor = (value) => padding.top + (1 - (value - min) / Math.max(max - min, 0.000001)) * (height - padding.top - padding.bottom);
+        const evalX = xFor(attempt.trainLoss.length - 1);
+        const evalY = yFor(attempt.metrics.bestEval);
+        const lrWidth = 560;
+        const lrHeight = 94;
+        const lrMin = Math.min(...attempt.learningRate);
+        const lrMax = Math.max(...attempt.learningRate);
+        const lrPath = ui.linePath(attempt.learningRate, lrWidth, lrHeight, {left: 5, right: 5, top: 7, bottom: 8}, lrMin, lrMax);
+        const tableRows = attempt.trainLoss.map((value, index) => `
+          <tr><td>${index + 1}</td><td>${value.toFixed(4)}</td><td>${attempt.learningRate[index].toExponential(2)}</td></tr>
+        `).join("");
+        return `
+          <div class="chart-section" id="chart-observed" aria-label="训练图表与限制">
+            <section class="chart-card">
+              <div class="chart-title">
+                <div>
+                  <span class="mf-eyebrow">OBSERVED SERIES</span>
+                  <h2>Loss 与学习率</h2>
+                  <p>只画 trainer_state 中已上报的 22 个训练点与 1 个验证点，不外推完成度。</p>
+                </div>
+                <div class="legend" aria-label="图表图例">
+                  <span><i></i>Train Loss</span>
+                  <span><i class="eval"></i>Eval Loss</span>
+                  <span><i class="lr"></i>Learning Rate</span>
+                </div>
+              </div>
+              <svg class="chart-svg" viewBox="0 0 ${width} ${height}" role="img" aria-labelledby="lossTitle lossDesc">
+                <title id="lossTitle">Train Loss 从 11.682 降至 0.200，Eval Loss 在 step 22 为 0.215</title>
+                <desc id="lossDesc">22 个 Train Loss 采样和一个 Eval Loss 点。图表明确标出验证证据只有一个点。</desc>
+                <defs>
+                  <linearGradient id="lossArea" x1="0" x2="0" y1="0" y2="1">
+                    <stop offset="0" stop-color="#4b74d8" stop-opacity="0.16"/>
+                    <stop offset="1" stop-color="#4b74d8" stop-opacity="0"/>
+                  </linearGradient>
+                </defs>
+                ${[0, 1, 2, 3, 4].map((i) => {
+                  const y = padding.top + i * ((height - padding.top - padding.bottom) / 4);
+                  const value = max - i * ((max - min) / 4);
+                  return `<line class="chart-grid-line" x1="${padding.left}" x2="${width - padding.right}" y1="${y}" y2="${y}"></line><text class="chart-axis-label" x="3" y="${y + 3}">${value.toFixed(2)}</text>`;
+                }).join("")}
+                <path class="chart-area" d="${lossPath} L${xFor(attempt.trainLoss.length - 1)},${baselineY} L${padding.left},${baselineY} Z"></path>
+                <path class="chart-train" d="${lossPath}"></path>
+                <circle class="chart-eval" cx="${evalX}" cy="${evalY}" r="5"></circle>
+                <line x1="${evalX}" x2="${evalX}" y1="${evalY + 7}" y2="${baselineY}" stroke="#a6bbb1" stroke-width="1" stroke-dasharray="3 3"></line>
+                <rect class="chart-callout" x="${width - 260}" y="18" width="238" height="35" rx="6"></rect>
+                <text class="chart-callout-text" x="${width - 248}" y="34">Eval 只有 1 个点，趋势无法判断</text>
+                <text class="chart-callout-text" x="${width - 248}" y="45">0.2148 @ step 22 · 不做外推</text>
+                ${[1, 6, 12, 17, 22].map((step) => `<text class="chart-axis-label" x="${xFor(step - 1) - 4}" y="${height - 8}">${step}</text>`).join("")}
+              </svg>
+              <div class="chart-lr-grid">
+                <div>
+                  <span class="mf-eyebrow">LEARNING RATE</span>
+                  <strong>2.00e-4 → 1.02e-6</strong>
+                  <span>cosine · 22 个真实采样</span>
+                </div>
+                <svg viewBox="0 0 ${lrWidth} ${lrHeight}" role="img" aria-label="Learning Rate 按 cosine 轨迹从 2e-4 衰减至 1.02e-6">
+                  <path d="M5,${lrHeight - 8} H${lrWidth - 5}" stroke="#e9e5da" stroke-width="1"></path>
+                  <path class="chart-lr" d="${lrPath}"></path>
+                </svg>
+              </div>
+              <details class="data-table">
+                <summary>查看可访问数据表</summary>
+                <table>
+                  <thead><tr><th>step</th><th>train loss</th><th>learning rate</th></tr></thead>
+                  <tbody>${tableRows}</tbody>
+                </table>
+              </details>
+            </section>
+            <section class="limit-card">
+              <span class="mf-eyebrow">WHAT CHANGED</span>
+              <h2>可观测信号</h2>
+              <p class="inspector-detail">以下数字是实际 API 返回事实；报告不会把它们解释成业务准确率。</p>
+              <ul class="limit-list">
+                <li><strong>Train Loss</strong> 11.682 → 0.1998；仅反映优化目标在训练样本上的变化。</li>
+                <li><strong>Eval Loss</strong> 0.2148 @ step 22；只有一个点，不能判断过拟合趋势。</li>
+                <li><strong>Token</strong> 24 条样本 41–43 tokens，overflow=[]，未观察到上下文截断。</li>
+                <li><strong>显存</strong> 设备峰值 2.40 GiB；不是实时 GPU 曲线，也不能直接外推更大模型。</li>
+              </ul>
+            </section>
+          </div>
+        `;
+      }
+
+      function renderNoChart() {
+        return `
+          <section class="limit-card" style="margin-top:14px">
+            <div class="mf-eyebrow">NO METRIC SERIES</div>
+            <h2>没有可绘制的训练曲线</h2>
+            <p class="inspector-detail">${attempt.state === "failed" ? "失败发生在指标产生之前，因此没有 Loss、学习率或显存轨迹。" : "取消前的 Attempt 未形成训练指标；缺失不是 0，也不是健康。"}</p>
+            <ul class="limit-list">
+              <li>不生成虚假的完成度、Loss 曲线或 GPU 使用率。</li>
+              <li>以失败阶段、配置和已有证据矩阵进行复盘。</li>
+              <li>禁止据此生成超参数调优建议。</li>
+            </ul>
+          </section>
+        `;
+      }
+
+      function renderExperiment(experiment) {
+        return `
+          <article class="experiment" id="experiment-${ui.escapeHtml(experiment.id)}">
+            <div class="experiment-top">
+              <span class="mf-status ${experiment.priority === "P0" ? "danger" : experiment.priority === "P1" ? "warning" : "neutral"}">${ui.escapeHtml(experiment.priority)}</span>
+              <span class="mf-layer advice">建议</span>
+            </div>
+            <h3>${ui.escapeHtml(experiment.title)}</h3>
+            <p>${ui.escapeHtml(experiment.hypothesis)}</p>
+            <div class="expectation"><strong>预期观察：</strong>${ui.escapeHtml(experiment.expectation)}</div>
+            <div class="experiment-actions">
+              <button type="button" class="mf-button" data-action="copy-experiment" data-experiment-id="${ui.escapeHtml(experiment.id)}">复制建议</button>
+              ${experiment.apply
+                ? `<button type="button" class="mf-button primary" data-action="apply-experiment" data-experiment-id="${ui.escapeHtml(experiment.id)}">应用建议配置</button>`
+                : `<button type="button" class="mf-button quiet">查看证据 ${experiment.evidence.join(" / ")}</button>`}
+            </div>
+          </article>
+        `;
+      }
+
+      function renderEmpty() {
+        const report = attempt.report;
+        root.innerHTML = `
+          <div class="view">
+            <div class="report-heading">
+              <div>
+                <div class="report-title-line">
+                  <span class="mf-eyebrow">AI RUN DIAGNOSIS / NO REPORT</span>
+                  <span class="mf-demo-stamp">原型示例</span>
+                  <span class="mf-status neutral">无报告</span>
+                </div>
+                <h1>这个 Attempt 还没有可用的 AI 报告</h1>
+                <p>${ui.escapeHtml(report.sourceNote)} 报告只整理已归档事实，不会为了补齐故事而推测训练结果。</p>
+              </div>
+              <div class="report-actions">
+                <button class="mf-button quiet" type="button" data-action="back-entry">返回详情</button>
+                <button class="mf-button primary" type="button" data-action="generate-report">生成有限报告</button>
+              </div>
+            </div>
+            <div class="empty-state">
+              <section class="empty-main">
+                <div class="empty-icon" aria-hidden="true">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M6 3h9l4 4v14H6z"/><path d="M15 3v5h4M9 13h7M9 17h5"/></svg>
+                </div>
+                <h2>证据不足以回答四个问题</h2>
+                <p>已有 Attempt 快照、runtime_report 与 6 个执行文件；缺少 metrics、Adapter 与独立推理验收。可以将这份记录整理成“有限复盘”，但不能生成训练健康度或模型效果结论。</p>
+                <div class="entry-actions">
+                  <button class="mf-button primary" type="button" data-action="generate-report">生成有限复盘</button>
+                  <button class="mf-button" type="button">查看训练日志</button>
+                </div>
+              </section>
+              <aside class="coverage-card">
+                <h2>证据覆盖</h2>
+                <p class="inspector-detail">3 / 8 类证据可用</p>
+                <ul>
+                  ${attempt.evidenceCoverage.map(([label, present, note]) => `
+                    <li><b>${ui.escapeHtml(label)}</b><span><i class="${present ? "" : "missing"}"></i>${ui.escapeHtml(present ? "有" : "缺失")}</span></li>
+                  `).join("")}
+                </ul>
+              </aside>
+            </div>
+          </div>
+        `;
+      }
+
+      function renderLimited() {
+        const covered = attempt.evidenceCoverage || [];
+        root.innerHTML = `
+          <div class="view">
+            <div class="report-heading">
+              <div>
+                <div class="report-title-line">
+                  <span class="mf-eyebrow">LIMITED REVIEW / ADVISORY</span>
+                  <span class="mf-demo-stamp">原型示例</span>
+                  <span class="mf-status unknown">证据不足</span>
+                </div>
+                <h1>这次 Attempt 已取消；现有证据只能说明“未形成训练结论”</h1>
+                <p>已读取 Attempt 快照、runtime 与 6 个执行文件。没有 metrics、Adapter 或推理验收，因此不能评价训练健康度或模型效果。</p>
+                <div class="report-meta">
+                  <span>有限复盘 <b class="mf-mono">R-LIMITED</b></span>
+                  <span>生成于 11/06 19:58</span>
+                  <span>${ui.escapeHtml(attempt.displayName)}</span>
+                </div>
+              </div>
+              <div class="report-actions">
+                <button class="mf-button quiet" type="button" data-action="back-entry">返回详情</button>
+                <button class="mf-button" type="button" data-action="generate-report">重新读取证据</button>
+              </div>
+            </div>
+            <div class="limited-callout">
+              <span class="mf-layer limit">限制</span>
+              <span>这是“有限复盘”，不是失败根因或训练质量报告。所有缺失项都会显示为“未上报”，不会以 0 代替。</span>
+            </div>
+            <div class="verdict-grid">
+              <article class="verdict-card blocked">
+                <div class="verdict-top"><span>TRAINING HEALTH</span><span class="mf-status unknown">无法判断</span></div>
+                <h2>没有训练指标，不能评价健康度</h2>
+                <p>取消前的 Attempt 未形成 Train/Eval Loss、学习率或显存轨迹。</p>
+                <div class="verdict-facts"><span>Train 0 pts</span><span>Eval 0 pts</span><span>GPU peak —</span></div>
+              </article>
+              <article class="verdict-card delivery blocked">
+                <div class="verdict-top"><span>DELIVERABILITY</span><span class="mf-status danger">不可交付</span></div>
+                <h2>取消不发布部分 Adapter</h2>
+                <p>当前没有 Best / Final Adapter，推理验收未到达。</p>
+                <div class="verdict-facts"><span>Adapter 0/2</span><span>Inference 未到达</span><span>6 evidence files</span></div>
+              </article>
+            </div>
+            <div class="diagnosis-layout">
+              <section class="findings-panel">
+                <div class="findings-toolbar">
+                  <div><span class="mf-eyebrow">LIMITED FINDINGS</span><h2>有限复盘</h2></div>
+                  <span class="mf-status neutral">2 条观测 · 3 条缺失</span>
+                </div>
+                <article class="finding">
+                  <div class="finding-headline"><div><div class="finding-id">L-01 · 运行事实</div><h3>Attempt 已取消，未发布部分产物</h3></div><span class="mf-status neutral">已观测</span></div>
+                  <dl class="finding-copy">
+                    <div><dt>观测</dt><dd>state=cancelled，outcome=cancelled；Adapter 记录为 0。</dd></div>
+                    <div><dt>推断</dt><dd>现有状态符合“取消后不发布部分 Adapter”的硬门禁。</dd></div>
+                    <div><dt>建议</dt><dd>保留证据，不把尝试进入推理试用。</dd></div>
+                  </dl>
+                  <div class="finding-foot"><span class="confidence">来源：Attempt API / Adapter API</span></div>
+                </article>
+                <article class="finding">
+                  <div class="finding-headline"><div><div class="finding-id">L-02 · 缺失证据</div><h3>无法判断训练健康度</h3></div><span class="mf-status unknown">无法判断</span></div>
+                  <dl class="finding-copy">
+                    <div><dt>观测</dt><dd>metrics=0，显存峰值为空，没有可绘制的 Loss 曲线。</dd></div>
+                    <div><dt>推断</dt><dd>没有数据意味着“不知道”，不是“健康”。</dd></div>
+                    <div><dt>建议</dt><dd>如需要训练结论，重新运行并确保指标归档。</dd></div>
+                  </dl>
+                  <div class="finding-foot"><span class="confidence">来源：metrics / GPU snapshot</span></div>
+                </article>
+              </section>
+              <aside class="inspector">
+                <div class="inspector-head"><span class="mf-eyebrow">EVIDENCE COVERAGE</span><h2>只读证据矩阵</h2></div>
+                <div class="inspector-body">
+                  <div class="coverage-number"><strong>3</strong><span>/ 8 类</span></div>
+                  <div class="coverage-bar"><span style="width:38%"></span></div>
+                  <ul class="limit-list" style="margin-top:13px">
+                    ${covered.map(([label, present, note]) => `<li><strong style="color:${present ? "var(--mf-success)" : "var(--mf-muted)"}">${present ? "有" : "缺失"}</strong>${ui.escapeHtml(label)} · ${ui.escapeHtml(note)}</li>`).join("")}
+                  </ul>
+                </div>
+              </aside>
+            </div>
+          </div>
+        `;
+      }
+
+      function render() {
+        if (view === "loading") {
+          renderLoading();
+        } else if (view === "report") {
+          if (attempt.report?.exists) renderReport();
+          else renderEmpty();
+        } else if (view === "limited") {
+          renderLimited();
+        } else if (view === "empty") {
+          renderEmpty();
+        } else {
+          renderEntry();
+        }
+        syncReportChrome();
+      }
+
+      function rerenderFindings() {
+        const list = document.getElementById("findingList");
+        const filters = root.querySelector(".filter-row");
+        const live = document.getElementById("findingsLive");
+        if (!list || !attempt.report) return;
+        list.innerHTML = renderFindings(attempt.report.findings);
+        if (filters) filters.outerHTML = renderFilters(attempt.report.findings);
+        if (live) live.textContent = filterDescription(attempt.report.findings);
+      }
+
+      function selectEvidence(id) {
+        const item = evidenceFor(attempt, id);
+        if (!item) return;
+        selectedEvidence = id;
+        const body = document.getElementById("inspectorBody");
+        if (body) body.innerHTML = renderInspector(item);
+        root.querySelectorAll(".mf-evidence-chip, .evidence-index button").forEach((button) => {
+          const active = button.dataset.evidence === id;
+          button.setAttribute("aria-pressed", String(active));
+          if (button.closest(".evidence-index")) button.classList.toggle("is-active", active);
+        });
+        const inspector = document.getElementById("report-evidence");
+        if (window.matchMedia("(max-width: 1080px)").matches) {
+          inspector?.scrollIntoView({behavior: "smooth", block: "start"});
+        }
+      }
+
+      function openApply(experimentId) {
+        const experiment = attempt.report?.experiments.find((item) => item.id === experimentId);
+        if (!experiment) return;
+        currentExperiment = experiment;
+        applyDialogBody.innerHTML = `
+          <p style="color:var(--mf-muted);font-size:11px;line-height:1.7">${ui.escapeHtml(experiment.title)}</p>
+          <div class="dialog-config">
+            ${experiment.changes.map(([key, before, after]) => `
+              <div><span>${ui.escapeHtml(key)}</span><strong>${ui.escapeHtml(before)} → ${ui.escapeHtml(after)}</strong></div>
+            `).join("")}
+          </div>
+          <div class="dialog-alert"><strong>这只是对照实验：</strong>${ui.escapeHtml(experiment.hypothesis)} 应用后会进入未提交草稿，仍需重新核对数据、基座、兼容性和费用守卫。</div>
+        `;
+        applyDialog.open(document.activeElement);
+      }
+
+      root.addEventListener("click", async (event) => {
+        const action = event.target.closest("[data-action]")?.dataset.action;
+        const filterButton = event.target.closest("[data-filter]");
+        const evidenceButton = event.target.closest("[data-evidence]");
+        if (filterButton) {
+          filter = filterButton.dataset.filter;
+          rerenderFindings();
+          return;
+        }
+        if (evidenceButton) {
+          selectEvidence(evidenceButton.dataset.evidence);
+          return;
+        }
+        if (!action) return;
+        if (action === "open-report") {
+          view = "report";
+          selectedEvidence = attempt.state === "failed" ? "E-F1" : "E-01";
+          render();
+          document.getElementById("viewRoot")?.focus({preventScroll: true});
+        } else if (action === "scroll-to") {
+          const targetSelector = event.target.closest("[data-scroll-target]")?.dataset.scrollTarget;
+          const target = targetSelector ? document.querySelector(targetSelector) : null;
+          target?.scrollIntoView({behavior: "smooth", block: "start"});
+        } else if (action === "open-evidence") {
+          const evidenceId = event.target.closest("[data-evidence-id]")?.dataset.evidenceId;
+          if (evidenceId) selectEvidence(evidenceId);
+        } else if (action === "generate-report" || action === "regenerate") {
+          startGeneration();
+        } else if (action === "back-entry") {
+          view = "entry";
+          render();
+        } else if (action === "copy-report") {
+          const text = `${attempt.displayName}\n${attempt.report.summary}\n训练健康度：${attempt.report.health.label}\n可交付性：${attempt.report.delivery.label}`;
+          const ok = await ui.copyText(text);
+          ui.toast(ok ? "报告摘要已复制。" : "复制失败，请手动选择文本。");
+        } else if (action === "copy-experiment") {
+          const experiment = attempt.report?.experiments.find((item) => item.id === event.target.closest("[data-experiment-id]").dataset.experimentId);
+          if (!experiment) return;
+          const text = `${experiment.priority} ${experiment.title}\n假设：${experiment.hypothesis}\n预期观察：${experiment.expectation}`;
+          const ok = await ui.copyText(text);
+          ui.toast(ok ? "建议已复制，不包含虚构指标。" : "复制失败，请手动选择文本。");
+        } else if (action === "apply-experiment") {
+          openApply(event.target.closest("[data-experiment-id]").dataset.experimentId);
+        } else if (action === "copy-evidence") {
+          const item = evidenceFor(attempt, event.target.closest("[data-evidence-id]").dataset.evidenceId);
+          if (!item) return;
+          const text = `${item.id} ${item.title}\n${item.source}\n${item.value}\n限制：${item.limitation}`;
+          const ok = await ui.copyText(text);
+          ui.toast(ok ? "证据说明已复制。" : "复制失败，请手动选择文本。");
+        } else if (action === "refresh") {
+          ui.toast("原型示例：未向后端发起刷新请求。");
+        }
+      });
+
+      root.addEventListener("click", (event) => {
+        if (event.target.closest("#refreshEntry")) {
+          ui.toast("原型示例：未向后端发起刷新请求。");
+        }
+      });
+
+      attemptSelect.addEventListener("change", () => {
+        if (generationTimer) window.clearTimeout(generationTimer);
+        attempt = data.getAttempt(attemptSelect.value);
+        filter = "all";
+        limitedGenerated = false;
+        selectedEvidence = attempt.state === "failed" ? "E-F1" : "E-01";
+        view = attempt.report?.exists ? "entry" : "empty";
+        render();
+        window.scrollTo({top: 0, behavior: "matchMedia('(prefers-reduced-motion: reduce)').matches" ? "auto" : "smooth"});
+      });
+
+      confirmApply.addEventListener("click", () => {
+        if (!currentExperiment) return;
+        applyDialog.close();
+        ui.toast("已创建原型配置草稿；未提交训练、未创建 GPU、未修改当前 Attempt。");
+      });
+
+      render();
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,84 @@
+{
+  "A": {
+    "initial": {
+      "findings": 8,
+      "hasApply": true,
+      "hasRegenerate": true,
+      "bodyOverflow": 0
+    },
+    "filtered": {
+      "findings": 2,
+      "activeFilter": "attention"
+    },
+    "evidenceChanged": true,
+    "evidenceExpanded": true,
+    "dialogHasDraftBoundary": true,
+    "toast": "已创建原型配置草稿；未提交训练、未创建 GPU、未修改当前 Attempt。",
+    "regenerated": true,
+    "copyToast": "报告摘要已复制。",
+    "switched": {
+      "selected": "f3801f77-48e1-4b30-b6f3-5448f4a7bb4f",
+      "bodyHasFailure": true,
+      "bodyHasBootstrap": false
+    },
+    "errors": []
+  },
+  "B": {
+    "initial": {
+      "findings": 8,
+      "hasApply": true,
+      "hasRegenerate": true,
+      "bodyOverflow": 0
+    },
+    "filtered": {
+      "findings": 2,
+      "activeFilter": "attention"
+    },
+    "evidenceChanged": false,
+    "evidenceExpanded": true,
+    "dialogHasDraftBoundary": true,
+    "toast": "已创建原型配置草稿；未提交、未创建 GPU、未修改历史 Attempt。",
+    "regenerated": true,
+    "copyToast": "结论摘要已复制。",
+    "switched": {
+      "selected": "f3801f77-48e1-4b30-b6f3-5448f4a7bb4f",
+      "bodyHasFailure": true,
+      "bodyHasBootstrap": false
+    },
+    "errors": []
+  },
+  "C_rawEvidenceAvailable": true,
+  "C": {
+    "initial": {
+      "findings": 8,
+      "hasApply": true,
+      "hasRegenerate": true,
+      "bodyOverflow": 0
+    },
+    "filtered": {
+      "findings": 2,
+      "activeFilter": "attention"
+    },
+    "evidenceChanged": true,
+    "evidenceExpanded": true,
+    "dialogHasDraftBoundary": true,
+    "toast": "已创建原型配置草稿；未提交训练、未创建 GPU、未修改当前 Attempt。",
+    "regenerated": true,
+    "copyToast": "结论摘要已复制。",
+    "switched": {
+      "selected": "f3801f77-48e1-4b30-b6f3-5448f4a7bb4f",
+      "bodyHasFailure": true,
+      "bodyHasBootstrap": false
+    },
+    "errors": []
+  },
+  "C_limited": {
+    "text": "LIMITED REVIEW / NO METRICS 证据不足 原型示例 这次 Attempt 已取消；现有证据只能说明“未形成训练结论” 已读取 Attempt 快照、runtime 与 6 个执行文件。没有 metrics、Adapter 或推理验收，因此不能评价训练健康度或模型效果。 有限复盘 R-LIMITED-C01 生成于 11/06 20:20 Qwen3-0.6B · 取消与回收 r2 限制 这是“有限复盘”，不是失败根因或训练质量报告。所有缺失项显示为“未上报”，不以 0 代替。 返回详情 重新读取证据 复制有限结论 TRAINING HEALTH 没有训练指标，不能评价健康度 取消前未形成 Train/Eval Loss、学习率或显存轨迹。 DELIVERABILITY 取消不发布部分 Adapter 没有 Best / Final，推理验收未到达。 L-01 Attempt 已取消，未发布部分产物 观测 ",
+    "errors": []
+  },
+  "finalViewport": {
+    "width": 1440,
+    "htmlScrollWidth": 1440,
+    "bodyScrollWidth": 1440
+  }
+}

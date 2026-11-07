@@ -18,6 +18,7 @@ import {
   filterModelGroups,
   groupModelRows,
   mergeVersionRow,
+  modelImportProgress,
   modelShortId,
   summarizeModelGroup,
   type Limits,
@@ -647,11 +648,46 @@ export function Models({writable, workerUp}: {writable: boolean; workerUp: boole
           </div>
 
           <div className="model-workbench-panel" id="model-workbench-panel-overview" role="tabpanel" aria-labelledby="model-workbench-tab-overview" tabIndex={0} hidden={detailTab !== 'overview'}>
-            {selected.import && ['queued', 'running'].includes(selected.import.state) && <section className="model-import-progress">
-              <div><strong>后台导入进行中</strong><ModelState value={selected.import.state}/></div>
-              <p><code>{selected.import.current_path ?? '等待 Worker 领取任务'}</code><span>{bytes(selected.import.current_bytes)} 已传输</span></p>
-              <p>Worker 会按固定 commit 继续导入；取消请求不会提前改写最终状态。</p>
-            </section>}
+            {selected.import && ['queued', 'running'].includes(selected.import.state) && (() => {
+              const progress = modelImportProgress(selected);
+              const percentText = progress.percent > 0 && progress.percent < 0.1
+                ? '<0.1%'
+                : `${progress.percent.toLocaleString('zh-CN', {maximumFractionDigits: 1, minimumFractionDigits: progress.percent < 10 ? 1 : 0})}%`;
+              const currentPercentText = progress.currentPercent === null
+                ? '等待 Worker 领取'
+                : `${progress.currentPercent.toLocaleString('zh-CN', {maximumFractionDigits: 1, minimumFractionDigits: progress.currentPercent < 10 ? 1 : 0})}%`;
+              return <section className="model-import-progress" aria-labelledby="model-import-progress-title">
+                <div className="model-import-progress-head">
+                  <div><span>MODELSCOPE TRANSFER</span><strong id="model-import-progress-title">魔塔社区模型导入中</strong></div>
+                  <ModelState value={selected.import!.state}/>
+                </div>
+                <div className="model-import-progress-value">
+                  <span>总体进度</span>
+                  <strong>{percentText}</strong>
+                </div>
+                <div
+                  className="model-import-progress-meter"
+                  role="progressbar"
+                  aria-label="魔塔社区模型导入总进度"
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={Number(progress.percent.toFixed(2))}
+                  aria-valuetext={`${percentText}，已传输 ${bytes(progress.transferredBytes)} / ${bytes(progress.totalBytes)}`}
+                >
+                  <span style={{width: `${progress.transferredBytes > 0 ? Math.max(progress.percent, 0.6) : 0}%`}}/>
+                </div>
+                <dl className="model-import-progress-stats">
+                  <div><dt>已传输</dt><dd>{bytes(progress.transferredBytes)} <span>/ {bytes(progress.totalBytes)}</span></dd></div>
+                  <div><dt>文件回读</dt><dd>{progress.verifiedFiles} <span>/ {progress.totalFiles}</span></dd></div>
+                  <div><dt>当前文件</dt><dd>{currentPercentText}</dd></div>
+                </dl>
+                <div className="model-import-progress-current">
+                  <code title={selected.import.current_path ?? undefined}>{selected.import.current_path ?? '等待 Worker 领取任务'}</code>
+                  <span>{progress.currentFileSize === null ? `${bytes(progress.currentBytes)} 已传输` : `${bytes(progress.currentBytes)} / ${bytes(progress.currentFileSize)}`}</span>
+                </div>
+                <p className="model-import-progress-note">页面每 2.5 秒读取真实传输状态；当前文件从持久分片的实际字节继续下载，Worker 重启不会重置已完成进度。</p>
+              </section>;
+            })()}
             {selected.import?.error_code && <div className="model-inline-error" role="alert"><strong>{selected.import.error_code}</strong><p>{selected.import.error_message}</p></div>}
             <div className="model-overview-grid">
               <section className="model-evidence-block" aria-labelledby="model-identity-title">

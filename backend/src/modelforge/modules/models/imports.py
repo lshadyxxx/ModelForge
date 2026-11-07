@@ -1,9 +1,10 @@
 """Model-owned background imports. A session lock enforces one importer."""
 from __future__ import annotations
 
-from pathlib import Path
-import tempfile
+import hashlib
+import shutil
 import threading
+from pathlib import Path
 
 from minio.error import S3Error
 
@@ -29,6 +30,9 @@ class ModelImports:
 
     def cleanup_status(self, version_id):
         return self.transfers.status(version_id)
+
+    def discard_local(self, version_id):
+        shutil.rmtree(Path(self.settings.model_temporary_directory) / str(version_id), ignore_errors=True)
 
     def create(self, name, repository, revision, model_id=None):
         snapshot = self.source.snapshot(repository, revision)
@@ -95,8 +99,7 @@ class ModelImports:
     def _transfer(self, lock, version_id, attempt, stop):
         row = self.registry.get(version_id)
         snapshot = row['import']['source_snapshot']
-        directory = Path(self.settings.model_temporary_directory)
-        directory.mkdir(parents=True, exist_ok=True)
+        directory = Path(self.settings.model_temporary_directory) / str(version_id)
         for file in row['files']:
             checkpoint = lambda size: self._checkpoint(lock, version_id, attempt, file['path'], size, stop)
             checkpoint(0)
@@ -115,10 +118,34 @@ class ModelImports:
                     self.registry._version(connection, version_id)
                     self.registry._import_running(connection, version_id, attempt)
                     connection.execute("UPDATE model_version_files SET state='pending',verified_at=NULL WHERE model_version_id=%s AND path=%s", (version_id, file['path']))
-            with tempfile.TemporaryFile(dir=directory) as stream:
-                self.source.download(snapshot['repository'], snapshot['revision'], file, stream, checkpoint)
+            directory.mkdir(parents=True, exist_ok=True)
+            partial = directory / (hashlib.sha256(file['path'].encode('utf-8')).hexdigest() + '.part')
+            if partial.exists() and partial.stat().st_size > file['size_bytes']:
+                partial.unlink()
+            stream = partial.open('r+b' if partial.exists() else 'w+b')
+            try:
+                stream.seek(0, 2)
+                resume_from = stream.tell()
+                stream.seek(resume_from)
+                try:
+                    self.source.download(
+                        snapshot['repository'], snapshot['revision'], file, stream, checkpoint,
+                        resume_from=resume_from)
+                except AppError as error:
+                    if error.code == 'model_checksum_mismatch' and not stream.closed:
+                        stream.close()
+                        partial.unlink(missing_ok=True)
+                    raise
                 checkpoint(file['size_bytes'])
                 self.registry.upload(version_id, file['path'], stream, file['size_bytes'], file['sha256'], import_attempt=attempt)
+            finally:
+                if not stream.closed:
+                    stream.close()
+            partial.unlink(missing_ok=True)
+        try:
+            directory.rmdir()
+        except OSError:
+            pass
         self._checkpoint(lock, version_id, attempt, None, 0, stop)
         self.registry.complete(version_id, import_attempt=attempt)
 

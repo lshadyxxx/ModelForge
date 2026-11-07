@@ -69,7 +69,8 @@ def limits(request: Request):
     s = request.app.state.resources.settings
     return {'file_limit_bytes': s.model_file_limit_bytes, 'total_limit_bytes': s.model_total_limit_bytes,
             'file_count_limit': s.model_file_count_limit, 'configuration_version': s.model_limits_version,
-            'locked': s.model_limits_locked, 'resume_granularity': 'file'}
+            'locked': s.model_limits_locked, 'resume_granularity': 'file',
+            'modelscope_resume_granularity': 'byte'}
 
 
 @router.post('/models/directory-imports', status_code=201)
@@ -140,7 +141,12 @@ def cancel(version_id: uuid.UUID, request: Request):
 
 @router.delete('/model-versions/{version_id}', status_code=204)
 def delete(version_id: uuid.UUID, request: Request):
-    result = ModelRegistry(request.app.state.resources).delete(version_id)
+    resources = request.app.state.resources
+    registry = ModelRegistry(resources)
+    source_kind = registry.get(version_id).get('source_kind')
+    result = registry.delete(version_id)
+    if source_kind == 'modelscope':
+        ModelImports(resources).discard_local(version_id)
     if result and result['storage_cleanup'] == 'pending':
         return JSONResponse(result, status_code=202)
     return Response(status_code=204)

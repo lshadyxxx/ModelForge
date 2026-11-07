@@ -87,7 +87,10 @@ def test_missing_idempotency_header_uses_domain_error():
     configure_errors(app)
     app.include_router(compute_router)
     app.state.resources = SimpleNamespace(
-        settings=SimpleNamespace(ucloud_write_enabled=True)
+        settings=SimpleNamespace(
+            ucloud_public_key="fixture-public",
+            ucloud_private_key="fixture-private",
+        )
     )
     app.state.compute_environments_service = RejectingService()
     response = TestClient(app).post(
@@ -102,16 +105,19 @@ def test_missing_idempotency_header_uses_domain_error():
     assert response.json()["error"]["code"] == "compute_idempotency_required"
 
 
-def test_compute_write_gate_blocks_every_mutation_when_disabled():
+def test_compute_write_gate_requires_provider_credentials():
     class MustNotRun:
         def create(self, body, idempotency_key):
-            raise AssertionError("write service must not run while the gate is closed")
+            raise AssertionError("write service must not run without provider credentials")
 
     app = FastAPI()
     configure_errors(app)
     app.include_router(compute_router)
     app.state.resources = SimpleNamespace(
-        settings=SimpleNamespace(ucloud_write_enabled=False)
+        settings=SimpleNamespace(
+            ucloud_public_key=None,
+            ucloud_private_key=None,
+        )
     )
     app.state.compute_environments_service = MustNotRun()
     client = TestClient(app)
@@ -125,8 +131,8 @@ def test_compute_write_gate_blocks_every_mutation_when_disabled():
             "spec": SPEC,
         },
     )
-    assert response.status_code == 403
-    assert response.json()["error"]["code"] == "compute_write_disabled"
+    assert response.status_code == 503
+    assert response.json()["error"]["code"] == "cloud_not_configured"
 
 
 if os.getenv("MF_TEST_COMPUTE_INTEGRATION") == "1":

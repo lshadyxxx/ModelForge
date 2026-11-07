@@ -10,12 +10,19 @@ x-backend: &backend
     MF_PG_HOST: postgres
     MF_MINIO_ENDPOINT: minio:9000
     MF_WORKER_URL: http://worker:8103
-    MF_UCLOUD_WRITE_ENABLED: ${MF_UCLOUD_WRITE_ENABLED:-false}
+  # Container-only resolvers. They do not change the Windows host DNS. Keep
+  # this configurable because some LANs provide provider-only DNS servers.
+  dns:
+    - ${MF_DNS_PRIMARY:-223.5.5.5}
+    - ${MF_DNS_SECONDARY:-119.29.29.29}
   init: true
   volumes:
     # Managed training generates per-instance endpoint metadata after the
     # provider instance exists. API processes read; Worker writes atomically.
     - ./.runtime/ssh:/run/modelforge/ssh
+    # Byte-level ModelScope continuation must survive application container
+    # recreation; only PostgreSQL and MinIO were durable before this mount.
+    - ./.runtime/model-imports:/tmp/modelforge-models
 
 services:
   postgres:

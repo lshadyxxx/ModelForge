@@ -22,6 +22,19 @@ from .runtime_lock import (
 _BASELINE_PATH = Path(__file__).with_name("compatibility-baseline.json")
 _TRAINING_IMAGES_PATH = Path(__file__).with_name("training-image-profiles.json")
 
+# LLaMA-Factory templates used by the pinned training runtime. A model is
+# trainable when its inspected architecture has an explicit template mapping;
+# the measured baseline remains the recommended starting point, not the only
+# selectable model.
+TRAINING_TEMPLATE_BY_ARCHITECTURE = {
+    "qwen3": "qwen3_nothink",
+    "qwen2": "qwen",
+    "qwen": "qwen",
+    "llama": "llama3",
+    "llama3": "llama3",
+    "mistral": "mistral",
+}
+
 
 class _StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
@@ -540,6 +553,69 @@ def _training_mismatches(config: Any, expected: TrainingPreset) -> list[dict[str
     return mismatches
 
 
+def _training_model_blockers(model: dict[str, Any], config: Any) -> list[dict[str, Any]]:
+    """Only block combinations the pinned runtime cannot express at all."""
+    summary = model.get("format_summary")
+    summary = summary if isinstance(summary, dict) else {}
+    architecture = summary.get("model_type")
+    template = TRAINING_TEMPLATE_BY_ARCHITECTURE.get(str(architecture or ""))
+    if template is None:
+        return [{
+            "field": "model.architecture",
+            "expected": sorted(TRAINING_TEMPLATE_BY_ARCHITECTURE),
+            "actual": architecture,
+            "reason": "训练运行时没有该架构的模板映射",
+        }]
+    values = config.model_dump() if hasattr(config, "model_dump") else dict(config)
+    if values.get("template") != template:
+        return [{
+            "field": "config.template",
+            "expected": template,
+            "actual": values.get("template"),
+            "reason": "训练模板必须与基础模型架构匹配",
+        }]
+    return []
+
+
+def _training_warnings(
+    model: dict[str, Any],
+    config: Any,
+    instance: Any,
+    baseline: "CompatibilityBaseline",
+    *,
+    allowed_images: set[str] | None = None,
+) -> list[dict[str, Any]]:
+    fingerprint = model.get("manifest_sha256") or model.get("fingerprint")
+    warnings = []
+    if fingerprint not in baseline.model.allowed_fingerprints:
+        warnings.append({
+            "code": "runtime_model_version_unverified",
+            "field": "model.fingerprint",
+            "message": "基础模型可以提交训练，但尚未列入实测基线；需要重新完成推理验收。",
+        })
+    config_mismatches = _training_mismatches(config, baseline.training.verified_preset)
+    if config_mismatches:
+        warnings.append({
+            "code": "runtime_parameters_unverified",
+            "field": "config",
+            "message": "训练参数已离开实测推荐值；平台会按当前值冻结快照并由运行时预检兜底。",
+            "mismatches": config_mismatches,
+        })
+    hardware_mismatches = _hardware_mismatches(
+        instance,
+        baseline.training.hardware,
+        allowed_images=allowed_images,
+    )
+    if hardware_mismatches:
+        warnings.append({
+            "code": "runtime_hardware_unverified",
+            "field": "instance",
+            "message": "计算规格已离开实测推荐值；云端可用性、运行时和费用上限会在执行前重新核对。",
+            "mismatches": hardware_mismatches,
+        })
+    return warnings
+
+
 def training_compatibility(
     model: dict[str, Any],
     config: Any,
@@ -548,18 +624,12 @@ def training_compatibility(
     image_profile: TrainingImageProfile | None = None,
 ) -> dict[str, Any]:
     baseline = compatibility_baseline()
-    model_mismatches = _model_mismatches(model, baseline)
-    if model_mismatches:
+    model_blockers = _training_model_blockers(model, config)
+    if model_blockers:
         code = ("runtime_model_unsupported"
-                if any(item["field"] == "model.architecture" for item in model_mismatches)
-                else "runtime_model_version_unsupported")
-        _runtime_error(code, "The selected base model is outside the verified runtime baseline", model_mismatches)
-    config_mismatches = _training_mismatches(config, baseline.training.verified_preset)
-    if config_mismatches:
-        _runtime_error("runtime_parameters_unsupported",
-                       "The selected training parameters are outside the verified runtime preset",
-                       config_mismatches)
-    allowed_images = None
+                if any(item["field"] == "model.architecture" for item in model_blockers)
+                else "runtime_parameters_unsupported")
+        _runtime_error(code, "The selected model cannot be mapped to the training runtime", model_blockers)
     if image_profile is not None:
         if image_profile.status != "available" or image_profile.image_id is None:
             _runtime_error(
@@ -582,19 +652,27 @@ def training_compatibility(
                     "actual": values.get("image_id"),
                 }],
             )
-        allowed_images = {image_profile.image_id}
-    hardware_mismatches = _hardware_mismatches(
+    allowed_images = (
+        {image_profile.image_id}
+        if image_profile is not None and image_profile.image_id is not None
+        else None
+    )
+    warnings = _training_warnings(
+        model,
+        config,
         instance,
-        baseline.training.hardware,
+        baseline,
         allowed_images=allowed_images,
     )
-    if hardware_mismatches:
-        _runtime_error("runtime_hardware_unsupported",
-                       "The selected instance is outside the verified training hardware and image",
-                       hardware_mismatches)
-    hardware = baseline.training.hardware.model_dump()
     values = instance.model_dump() if hasattr(instance, "model_dump") else dict(instance)
-    hardware["image_id"] = values.get("image_id")
+    hardware = baseline.training.hardware.model_dump()
+    hardware.update({
+        key: values.get(key, hardware.get(key))
+        for key in (
+            "region", "zone", "gpu_type", "cpu", "memory_mb", "image_id",
+            "cpu_platform", "charge_type", "boot_disk_gb", "boot_disk_type",
+        )
+    })
     result = {
         "baseline_id": baseline.id,
         "baseline_sha256": compatibility_baseline_sha256(),
@@ -604,6 +682,8 @@ def training_compatibility(
         "training_runtime_lock_sha256": baseline.training.runtime_lock_sha256,
         "training_preset": baseline.training.verified_preset.model_dump(),
         "hardware": hardware,
+        "selection_mode": "verified" if not warnings else "custom",
+        "warnings": warnings,
     }
     if image_profile is not None:
         result.update({

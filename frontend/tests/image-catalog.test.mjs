@@ -9,6 +9,7 @@ import {
   imageFamily,
   imageMonogram,
   imagePlatform,
+  imageTypeLabel,
   preferredAvailableImage,
   resolveImageSelection,
 } from '../src/features/resources/compute/image-catalog.ts';
@@ -171,4 +172,20 @@ test('monograms distinguish systems and app families', () => {
     imageMonogram(image({ Name: 'ComfyUI基础镜像', ImageType: 'App' })),
     'Co',
   );
+  assert.equal(
+    imageMonogram(
+      image({
+        Name: 'modelforge-training-base-qwen3',
+        ImageType: 'Custom',
+      }),
+    ),
+    'My',
+  );
+});
+
+test('custom images use a dedicated label without changing system and app labels', () => {
+  assert.equal(imageTypeLabel(undefined), '系统镜像');
+  assert.equal(imageTypeLabel('System'), '系统镜像');
+  assert.equal(imageTypeLabel('App'), '应用镜像');
+  assert.equal(imageTypeLabel('Custom'), '自定义镜像');
 });

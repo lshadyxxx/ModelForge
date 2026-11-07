@@ -24,6 +24,7 @@ import {CopyValue} from './CopyValue';
 import {LifecycleRail} from './LifecycleRail';
 import {TrainingIcon} from './TrainingIcon';
 import {TrainingStatusBadge} from './TrainingStatusBadge';
+import {AiReportEntryCard} from '../diagnosis/AiReportEntryCard';
 
 function DetailMetric({
   label,
@@ -215,6 +216,8 @@ export function RunOverview({
       </div>
 
       <aside className="training-detail-side">
+        <AiReportEntryCard attempt={attempt} onOpenTab={onOpenTab}/>
+
         <section className="training-detail-panel">
           <header><div><span className="training-kicker">EVIDENCE</span><h2>运行证据</h2></div><TrainingIcon name="database" size={17}/></header>
           <dl className="training-evidence-list">

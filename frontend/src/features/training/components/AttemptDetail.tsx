@@ -17,10 +17,13 @@ import {TrainingDialog} from './TrainingDialog';
 import {TrainingIcon, type TrainingIconName} from './TrainingIcon';
 import {TrainingLogs} from './TrainingLogs';
 import {TrainingStatusBadge} from './TrainingStatusBadge';
+import {AiDiagnosisTab} from '../diagnosis/AiDiagnosisTab';
+import {DiagnosisProvider} from '../diagnosis/DiagnosisContext';
 
 const tabs: Array<{id: TrainingTab; label: string; icon: TrainingIconName}> = [
   {id: 'overview', label: '运行总览', icon: 'play'},
   {id: 'analysis', label: '运行分析', icon: 'sliders'},
+  {id: 'diagnosis', label: 'AI 诊断', icon: 'spark'},
   {id: 'logs', label: '训练日志', icon: 'terminal'},
   {id: 'artifacts', label: '训练产物', icon: 'layers'},
   {id: 'config', label: '冻结输入', icon: 'lock'},
@@ -90,6 +93,7 @@ export function AttemptDetail({
 
   let content: ReactNode;
   if (tab === 'analysis') content = <RunAnalysis attempt={attempt}/>;
+  else if (tab === 'diagnosis') content = <AiDiagnosisTab attempt={attempt}/>;
   else if (tab === 'logs') content = <TrainingLogs
     attemptId={attempt.id}
     chunks={logs}
@@ -102,7 +106,7 @@ export function AttemptDetail({
   else if (tab === 'config') content = <FrozenInputs attempt={attempt}/>;
   else content = <RunOverview attempt={attempt} busy={busy} onBind={onBind} onOpenTab={onOpenTab}/>;
 
-  return <div className="training-detail-page">
+  const detailPage = <div className="training-detail-page">
     <button type="button" className="training-back" onClick={onBack}><TrainingIcon name="back" size={16}/>训练工作台</button>
     <header className="training-detail-heading">
       <div className="training-detail-title">
@@ -173,4 +177,8 @@ export function AttemptDetail({
       <DialogActions busy={busy} confirmLabel="创建重试 Attempt" onClose={() => setRetryOpen(false)} onConfirm={() => {setRetryOpen(false); void onRetry();}}/>
     </TrainingDialog>}
   </div>;
+
+  return tab === 'overview' || tab === 'diagnosis'
+    ? <DiagnosisProvider attemptId={attempt.id}>{detailPage}</DiagnosisProvider>
+    : detailPage;
 }

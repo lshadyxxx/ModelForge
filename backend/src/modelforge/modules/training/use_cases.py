@@ -58,8 +58,6 @@ class Training:
             settings = self.resources.settings
             if not settings.ucloud_public_key or not settings.ucloud_private_key:
                 raise AppError(403, 'cloud_not_configured', '尚未配置优云凭据，不能创建托管训练实例。')
-            if not settings.ucloud_write_enabled:
-                raise AppError(403, 'cloud_write_disabled', '后端尚未开启优云写入，不能创建托管训练实例。')
             if not body.training_image_profile_id:
                 raise AppError(422, 'training_image_profile_required', '托管训练必须选择已批准的训练镜像 profile。')
             image_profile = training_image_profile(body.training_image_profile_id)

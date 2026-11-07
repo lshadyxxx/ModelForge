@@ -1,0 +1,47 @@
+{
+  "indexDesktop": {
+    "title": "ModelForge · AI 智能报告设计探索",
+    "viewport": 1425,
+    "htmlScrollWidth": 1425,
+    "bodyScrollWidth": 1425,
+    "bodyHeight": 2868,
+    "errors": []
+  },
+  "indexCopy": {
+    "version": "已优化 · v2",
+    "baselineHref": "option-a-baseline.html?view=report",
+    "brokenImages": []
+  },
+  "indexMobile": {
+    "title": "ModelForge · AI 智能报告设计探索",
+    "viewport": 390,
+    "htmlScrollWidth": 390,
+    "bodyScrollWidth": 390,
+    "bodyHeight": 7666,
+    "errors": []
+  },
+  "emptyDesktop": {
+    "title": "方案 A · AI 训练诊断信号台 · ModelForge",
+    "viewport": 1440,
+    "htmlScrollWidth": 1440,
+    "bodyScrollWidth": 1440,
+    "bodyHeight": 1000,
+    "errors": []
+  },
+  "loadingDesktop": {
+    "title": "方案 A · AI 训练诊断信号台 · ModelForge",
+    "viewport": 1440,
+    "htmlScrollWidth": 1440,
+    "bodyScrollWidth": 1440,
+    "bodyHeight": 1000,
+    "errors": []
+  },
+  "limitedDesktop": {
+    "title": "方案 A · AI 训练诊断信号台 · ModelForge",
+    "viewport": 1440,
+    "htmlScrollWidth": 1440,
+    "bodyScrollWidth": 1440,
+    "bodyHeight": 1000,
+    "errors": []
+  }
+}

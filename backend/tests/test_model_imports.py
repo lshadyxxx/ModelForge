@@ -30,7 +30,8 @@ CONTENT = {'config.json': b'{"model_type":"fixture-only"}', 'tokenizer.json': b'
 def environment(tmp_path):
     from modelforge.modules.models import ModelImports, ModelRegistry
     resources = Resources.open(Settings(model_temporary_directory=str(tmp_path)))
-    state = {'fail': None, 'downloads': [], 'callback': None, 'head': COMMIT, 'discoveries': 0}
+    state = {'fail': None, 'downloads': [], 'ranges': [], 'range_support': False,
+             'callback': None, 'head': COMMIT, 'discoveries': 0}
     def serve(request):
         if request.url.path.endswith('/info/refs'):
             state['discoveries'] += 1
@@ -49,9 +50,21 @@ def environment(tmp_path):
                  'Sha256': hashlib.sha256(data).hexdigest()} for path, data in CONTENT.items()]}})
         path = request.url.params['FilePath']
         state['downloads'].append(path)
+        state['ranges'].append((path, request.headers.get('range')))
         if state['callback']:
             state['callback'](path)
-        return httpx.Response(503) if path == state['fail'] else httpx.Response(200, content=CONTENT[path])
+        if path == state['fail']:
+            return httpx.Response(503)
+        data = CONTENT[path]
+        value = request.headers.get('range')
+        if state['range_support'] and value:
+            start = int(value.removeprefix('bytes=').removesuffix('-'))
+            return httpx.Response(206, content=data[start:], headers={
+                'Content-Range': f'bytes {start}-{len(data) - 1}/{len(data)}',
+                'Content-Length': str(len(data) - start),
+                'Accept-Ranges': 'bytes',
+            })
+        return httpx.Response(200, content=data)
     resources.source_http.close()
     resources.source_http = httpx.Client(transport=httpx.MockTransport(serve))
     imports, registry, created = ModelImports(resources), ModelRegistry(resources), []
@@ -130,6 +143,41 @@ def test_failed_import_retries_fixed_snapshot_and_reuses_verified_file(environme
     assert row['verified_bytes'] == row['total_bytes']
     assert row['import']['source_snapshot']['revision'] == COMMIT
     assert state['downloads'].count('config.json') == 1
+
+
+def test_byte_resume_survives_worker_instance_replacement(environment):
+    from pathlib import Path
+    from modelforge.modules.models import ModelImports
+    from modelforge.modules.models.imports import Interrupted
+
+    resources, imports, registry, state, create = environment
+    row = create()
+    data = CONTENT['config.json']
+    interrupted_at = 7
+
+    def interrupt(repository, revision, file, output, checkpoint, *, resume_from=0):
+        assert file['path'] == 'config.json'
+        assert resume_from == 0
+        output.write(data[:interrupted_at])
+        output.flush()
+        checkpoint(interrupted_at)
+        raise Interrupted()
+
+    imports.source.download = interrupt
+    assert imports.run_once() is True
+    assert registry.get(row['id'])['import']['state'] == 'queued'
+    version_directory = Path(resources.settings.model_temporary_directory) / str(row['id'])
+    partials = list(version_directory.glob('*.part'))
+    assert len(partials) == 1
+    assert partials[0].stat().st_size == interrupted_at
+
+    state['range_support'] = True
+    replacement = ModelImports(resources)
+    assert replacement.run_once() is True
+    completed = registry.get(row['id'])
+    assert completed['state'] == 'available'
+    assert ('config.json', f'bytes={interrupted_at}-') in state['ranges']
+    assert list(version_directory.glob('*.part')) == []
 
 
 def test_running_cancel_is_prompt_and_delete_waits_for_worker(environment):

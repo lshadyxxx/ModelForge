@@ -421,6 +421,7 @@ export function ResourceConfigurator({
               {[
                 { value: 'System', label: '系统镜像' },
                 { value: 'App', label: '应用镜像' },
+                { value: 'Custom', label: '自定义镜像' },
               ].map((item) => (
                 <button
                   key={item.value}

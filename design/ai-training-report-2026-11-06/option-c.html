@@ -1,0 +1,3628 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>方案 C · AI 训练证据审计台 · ModelForge</title>
+  <link rel="stylesheet" href="shared/base.css">
+  <style>
+    :root {
+      --c-ink: #122535;
+      --c-navy: #173251;
+      --c-navy-2: #0f2945;
+      --c-paper: #fbf8ef;
+      --c-paper-2: #f3eee1;
+      --c-rule: #d5cdbd;
+      --c-rule-strong: #a99f8d;
+      --c-blue: #2457c5;
+      --c-blue-soft: #e9effc;
+      --c-amber: #a66f0b;
+      --c-amber-soft: #fff5d8;
+      --c-red: #aa332b;
+      --c-red-soft: #fff0ed;
+      --c-green: #176d4f;
+      --c-green-soft: #e9f5ef;
+      --c-gray-soft: #eef1ef;
+      --c-serif: "Iowan Old Style", "Palatino Linotype", "Noto Serif SC", "Songti SC", serif;
+    }
+
+    html {
+      background: #e6e0d3;
+    }
+
+    body {
+      color: var(--c-ink);
+      background:
+        linear-gradient(90deg, rgba(23, 50, 81, 0.025) 1px, transparent 1px),
+        linear-gradient(rgba(23, 50, 81, 0.025) 1px, transparent 1px),
+        #e9e4d8;
+      background-size: 24px 24px;
+    }
+
+    button,
+    select,
+    input {
+      letter-spacing: 0;
+    }
+
+    .skip-link {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      z-index: 100;
+      padding: 9px 13px;
+      border-radius: 4px;
+      color: #fff;
+      background: var(--c-navy);
+      transform: translateY(-150%);
+    }
+
+    .skip-link:focus {
+      transform: translateY(0);
+    }
+
+    .audit-top {
+      position: sticky;
+      top: 0;
+      z-index: 40;
+      display: grid;
+      grid-template-columns: 250px minmax(0, 1fr) auto;
+      align-items: stretch;
+      min-height: 62px;
+      border-bottom: 1px solid #08192a;
+      color: #eef4fb;
+      background: var(--c-navy-2);
+      box-shadow: 0 2px 10px rgba(15, 41, 69, 0.16);
+    }
+
+    .audit-brand {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      min-width: 0;
+      padding: 9px 20px;
+      border-right: 1px solid rgba(255, 255, 255, 0.12);
+    }
+
+    .audit-mark {
+      display: grid;
+      place-items: center;
+      width: 31px;
+      height: 31px;
+      border: 1px solid rgba(255, 255, 255, 0.42);
+      color: #fff;
+      background: transparent;
+      font-family: var(--c-serif);
+      font-size: 19px;
+      font-weight: 700;
+    }
+
+    .audit-brand strong {
+      display: block;
+      font-family: var(--c-serif);
+      font-size: 16px;
+      letter-spacing: 0.01em;
+      line-height: 1.1;
+    }
+
+    .audit-brand small {
+      display: block;
+      margin-top: 3px;
+      color: #aec0d4;
+      font-size: 9px;
+      letter-spacing: 0.13em;
+      text-transform: uppercase;
+    }
+
+    .audit-crumbs {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      padding: 0 22px;
+      color: #a9bcd0;
+      font-size: 11px;
+    }
+
+    .audit-crumbs a {
+      color: #dbe8f7;
+      text-decoration: underline;
+      text-decoration-color: rgba(219, 232, 247, 0.35);
+      text-underline-offset: 4px;
+    }
+
+    .audit-crumbs strong {
+      overflow: hidden;
+      color: #fff;
+      font-weight: 650;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .audit-tools {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 18px;
+    }
+
+    .audit-tools .mf-demo-stamp {
+      border-color: rgba(241, 205, 108, 0.45);
+      color: #f7dfa7;
+      background: rgba(152, 108, 15, 0.22);
+    }
+
+    .audit-tools .mf-demo-stamp::before {
+      background: #e8bd55;
+    }
+
+    .audit-select {
+      width: 240px;
+      min-height: 35px;
+      padding: 6px 30px 6px 9px;
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      border-radius: 3px;
+      color: #f3f8ff;
+      background: #183a5d;
+      font-size: 10px;
+    }
+
+    .audit-tools .mf-button {
+      min-height: 34px;
+      border-color: rgba(255, 255, 255, 0.23);
+      color: #e9f2fc;
+      background: rgba(255, 255, 255, 0.04);
+      font-size: 10px;
+    }
+
+    .audit-tools .mf-button:hover:not(:disabled) {
+      border-color: rgba(255, 255, 255, 0.45);
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .audit-shell {
+      width: min(1510px, calc(100% - 32px));
+      margin: 16px auto 52px;
+      border: 1px solid #bdb4a4;
+      background: var(--c-paper);
+      box-shadow: 0 20px 70px rgba(26, 43, 58, 0.12);
+    }
+
+    .case-ribbon {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      min-height: 34px;
+      padding: 7px 20px;
+      border-bottom: 1px solid #0d2036;
+      color: #bdd0e2;
+      background: var(--c-navy);
+      font-family: var(--mf-mono);
+      font-size: 9px;
+      letter-spacing: 0.04em;
+    }
+
+    .case-ribbon span {
+      min-width: 0;
+    }
+
+    .case-ribbon strong {
+      color: #fff;
+      font-weight: 600;
+    }
+
+    .case-ribbon .ribbon-push {
+      margin-left: auto;
+    }
+
+    .entry-wrap,
+    .report-wrap {
+      padding: 26px 28px 36px;
+    }
+
+    .entry-heading {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 270px;
+      gap: 26px;
+      align-items: start;
+      padding-bottom: 20px;
+      border-bottom: 2px solid var(--c-ink);
+    }
+
+    .entry-kicker,
+    .report-kicker {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 11px;
+    }
+
+    .entry-heading h1,
+    .report-heading h1,
+    .empty-heading h1,
+    .loading-heading h1 {
+      max-width: 900px;
+      color: var(--c-ink);
+      font-family: var(--c-serif);
+      font-size: clamp(28px, 3vw, 42px);
+      font-weight: 600;
+      line-height: 1.13;
+      letter-spacing: -0.035em;
+    }
+
+    .entry-meta,
+    .report-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px 16px;
+      margin-top: 15px;
+      color: var(--mf-muted);
+      font-size: 10px;
+      line-height: 1.6;
+    }
+
+    .entry-meta .mono,
+    .report-meta .mono {
+      font-family: var(--mf-mono);
+    }
+
+    .entry-actions {
+      display: grid;
+      gap: 8px;
+      justify-items: stretch;
+      padding: 14px;
+      border: 1px solid var(--c-rule);
+      background: #f6f1e5;
+    }
+
+    .entry-actions .mf-button {
+      width: 100%;
+      border-radius: 3px;
+    }
+
+    .entry-actions p {
+      margin-top: 3px;
+      color: var(--mf-muted);
+      font-size: 9px;
+      line-height: 1.55;
+    }
+
+    .status-slash {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      min-height: 25px;
+      padding: 2px 8px;
+      border: 1px solid currentColor;
+      color: var(--c-green);
+      background: var(--c-green-soft);
+      font-family: var(--mf-mono);
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .status-slash.warning {
+      color: var(--c-amber);
+      background: var(--c-amber-soft);
+    }
+
+    .status-slash.danger {
+      color: var(--c-red);
+      background: var(--c-red-soft);
+    }
+
+    .status-slash.neutral {
+      color: #5c6972;
+      background: var(--c-gray-soft);
+    }
+
+    .entry-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.65fr) minmax(300px, 0.85fr);
+      gap: 0;
+      border-right: 1px solid var(--c-rule);
+      border-bottom: 1px solid var(--c-rule);
+      border-left: 1px solid var(--c-rule);
+    }
+
+    .entry-main {
+      min-width: 0;
+      padding: 22px 24px 24px;
+      border-right: 1px solid var(--c-rule);
+    }
+
+    .entry-side {
+      min-width: 0;
+      padding: 20px;
+      background: #f5f0e4;
+    }
+
+    .section-label {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 11px;
+      color: #60707d;
+      font-family: var(--mf-mono);
+      font-size: 9px;
+      font-weight: 650;
+      letter-spacing: 0.11em;
+      text-transform: uppercase;
+    }
+
+    .section-label::after {
+      height: 1px;
+      flex: 1;
+      background: var(--c-rule);
+      content: "";
+    }
+
+    .section-label span {
+      white-space: nowrap;
+    }
+
+    .gate-pair {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      border: 1px solid var(--c-rule-strong);
+      background: #fffef9;
+    }
+
+    .gate {
+      position: relative;
+      min-width: 0;
+      padding: 16px 17px 14px;
+    }
+
+    .gate + .gate {
+      border-left: 1px solid var(--c-rule);
+    }
+
+    .gate::before {
+      position: absolute;
+      top: 0;
+      right: 0;
+      left: 0;
+      height: 3px;
+      background: var(--c-amber);
+      content: "";
+    }
+
+    .gate.delivery::before {
+      background: var(--c-blue);
+    }
+
+    .gate.failed::before {
+      background: var(--c-red);
+    }
+
+    .gate-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .gate-head > span:first-child {
+      color: var(--mf-muted);
+      font-family: var(--mf-mono);
+      font-size: 8px;
+      letter-spacing: 0.08em;
+    }
+
+    .gate h2 {
+      margin-top: 9px;
+      font-family: var(--c-serif);
+      font-size: 21px;
+      font-weight: 600;
+      line-height: 1.25;
+    }
+
+    .gate p {
+      margin-top: 7px;
+      color: var(--mf-muted);
+      font-size: 10px;
+      line-height: 1.7;
+    }
+
+    .gate-facts {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      margin-top: 12px;
+    }
+
+    .gate-facts span {
+      padding: 3px 6px;
+      border: 1px solid #ded7ca;
+      color: #52616c;
+      background: #f8f5ec;
+      font-family: var(--mf-mono);
+      font-size: 8px;
+    }
+
+    .entry-digest {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      margin-top: 16px;
+      border: 1px solid var(--c-rule);
+      background: #fffdf8;
+    }
+
+    .digest-cell {
+      min-width: 0;
+      padding: 11px 12px;
+      border-right: 1px solid var(--c-rule);
+    }
+
+    .digest-cell:last-child {
+      border-right: 0;
+    }
+
+    .digest-cell span {
+      display: block;
+      color: var(--mf-muted);
+      font-size: 8px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .digest-cell strong {
+      display: block;
+      overflow: hidden;
+      margin-top: 4px;
+      font-family: var(--mf-mono);
+      font-size: 12px;
+      font-weight: 650;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .entry-question-list {
+      display: grid;
+      gap: 0;
+      margin-top: 15px;
+      border-top: 1px solid var(--c-rule);
+    }
+
+    .entry-question {
+      display: grid;
+      grid-template-columns: 125px minmax(0, 1fr) auto;
+      gap: 12px;
+      align-items: baseline;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--c-rule);
+    }
+
+    .entry-question span:first-child {
+      color: var(--mf-muted);
+      font-size: 10px;
+    }
+
+    .entry-question strong {
+      font-family: var(--c-serif);
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .entry-question small {
+      color: var(--mf-muted);
+      font-size: 9px;
+    }
+
+    .ai-entry-card {
+      position: relative;
+      border: 1px solid #9eacbd;
+      background: #fffef9;
+      box-shadow: 7px 7px 0 #e2dbc9;
+    }
+
+    .ai-entry-card::before {
+      display: block;
+      height: 5px;
+      background: linear-gradient(90deg, var(--c-navy) 0 67%, var(--c-blue) 67% 82%, var(--c-amber) 82%);
+      content: "";
+    }
+
+    .ai-card-body {
+      padding: 17px;
+    }
+
+    .ai-card-body .mf-eyebrow {
+      color: var(--c-blue);
+    }
+
+    .ai-card-body h2 {
+      margin-top: 7px;
+      font-family: var(--c-serif);
+      font-size: 24px;
+      font-weight: 600;
+      line-height: 1.2;
+    }
+
+    .ai-card-body p {
+      margin-top: 9px;
+      color: var(--mf-muted);
+      font-size: 10px;
+      line-height: 1.75;
+    }
+
+    .ai-card-actions {
+      display: grid;
+      gap: 7px;
+      margin-top: 15px;
+    }
+
+    .ai-card-actions .mf-button {
+      border-radius: 3px;
+    }
+
+    .card-boundary {
+      margin-top: 13px;
+      padding: 9px 10px;
+      border-left: 3px solid var(--c-amber);
+      color: #665a40;
+      background: var(--c-amber-soft);
+      font-size: 9px;
+      line-height: 1.65;
+    }
+
+    .coverage-sheet {
+      margin-top: 18px;
+    }
+
+    .coverage-sheet h3 {
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .coverage-grid {
+      display: grid;
+      grid-template-columns: 18px minmax(0, 1fr) auto;
+      margin-top: 8px;
+      border-top: 1px solid var(--c-rule);
+    }
+
+    .coverage-grid > * {
+      padding: 6px 4px;
+      border-bottom: 1px solid #ded8cb;
+      font-size: 9px;
+    }
+
+    .coverage-grid .mark {
+      color: var(--c-green);
+      font-family: var(--mf-mono);
+      font-weight: 700;
+    }
+
+    .coverage-grid .mark.missing {
+      color: var(--c-red);
+    }
+
+    .coverage-grid .state {
+      color: var(--mf-muted);
+      font-family: var(--mf-mono);
+      font-size: 8px;
+    }
+
+    .report-heading {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 24px;
+      align-items: end;
+      padding-bottom: 16px;
+      border-bottom: 2px solid var(--c-ink);
+    }
+
+    .report-heading h1 {
+      max-width: 1000px;
+      font-size: clamp(26px, 2.6vw, 38px);
+    }
+
+    .report-actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 7px;
+    }
+
+    .report-actions .mf-button {
+      border-radius: 3px;
+    }
+
+    .verdict-ledger {
+      display: grid;
+      grid-template-columns: 160px repeat(2, minmax(0, 1fr));
+      border-right: 1px solid var(--c-rule);
+      border-bottom: 1px solid var(--c-rule);
+      border-left: 1px solid var(--c-rule);
+      background: #fffdf7;
+    }
+
+    .ledger-label {
+      display: grid;
+      place-items: center start;
+      padding: 14px 17px;
+      border-right: 1px solid var(--c-rule);
+      color: var(--mf-muted);
+      background: #f2ede2;
+      font-family: var(--mf-mono);
+      font-size: 8px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      writing-mode: vertical-rl;
+      transform: rotate(180deg);
+    }
+
+    .ledger-verdict {
+      min-width: 0;
+      padding: 15px 18px;
+    }
+
+    .ledger-verdict + .ledger-verdict {
+      border-left: 1px solid var(--c-rule);
+    }
+
+    .ledger-verdict-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      color: var(--mf-muted);
+      font-family: var(--mf-mono);
+      font-size: 8px;
+      letter-spacing: 0.07em;
+    }
+
+    .ledger-verdict h2 {
+      margin-top: 8px;
+      font-family: var(--c-serif);
+      font-size: 19px;
+      font-weight: 600;
+      line-height: 1.3;
+    }
+
+    .ledger-verdict p {
+      margin-top: 5px;
+      color: var(--mf-muted);
+      font-size: 9px;
+      line-height: 1.62;
+    }
+
+    .report-grid {
+      display: grid;
+      grid-template-columns: 218px minmax(0, 1fr) 306px;
+      align-items: start;
+      gap: 0;
+      border-right: 1px solid var(--c-rule);
+      border-left: 1px solid var(--c-rule);
+    }
+
+    .timeline-column {
+      position: sticky;
+      top: 78px;
+      align-self: start;
+      min-width: 0;
+      border-right: 1px solid var(--c-rule);
+      background: #f5f0e4;
+    }
+
+    .timeline-head {
+      padding: 15px 15px 11px;
+      border-bottom: 1px solid var(--c-rule);
+    }
+
+    .timeline-head h2 {
+      margin-top: 4px;
+      font-family: var(--c-serif);
+      font-size: 17px;
+      font-weight: 600;
+    }
+
+    .timeline {
+      padding: 6px 0 12px;
+    }
+
+    .timeline-event {
+      position: relative;
+      display: block;
+      width: 100%;
+      padding: 10px 12px 10px 37px;
+      border: 0;
+      border-bottom: 1px solid #ded7ca;
+      color: inherit;
+      background: transparent;
+      text-align: left;
+    }
+
+    .timeline-event::before {
+      position: absolute;
+      top: 15px;
+      left: 18px;
+      width: 8px;
+      height: 8px;
+      border: 2px solid var(--c-paper);
+      border-radius: 50%;
+      background: #94a0a8;
+      box-shadow: 0 0 0 1px #b6ada0;
+      content: "";
+    }
+
+    .timeline-event::after {
+      position: absolute;
+      top: 26px;
+      bottom: -11px;
+      left: 22px;
+      width: 1px;
+      background: #c6bcad;
+      content: "";
+    }
+
+    .timeline-event:last-child::after {
+      display: none;
+    }
+
+    .timeline-event:hover {
+      background: rgba(255, 255, 255, 0.6);
+    }
+
+    .timeline-event.is-active {
+      background: #fffaf0;
+      box-shadow: inset 3px 0 var(--c-blue);
+    }
+
+    .timeline-event.is-active::before {
+      background: var(--c-blue);
+      box-shadow: 0 0 0 1px var(--c-blue);
+    }
+
+    .timeline-event.danger::before {
+      background: var(--c-red);
+      box-shadow: 0 0 0 1px var(--c-red);
+    }
+
+    .timeline-event.warning::before {
+      background: var(--c-amber);
+      box-shadow: 0 0 0 1px var(--c-amber);
+    }
+
+    .timeline-event.passed::before {
+      background: var(--c-green);
+      box-shadow: 0 0 0 1px var(--c-green);
+    }
+
+    .timeline-event span {
+      display: block;
+      color: #7b837f;
+      font-family: var(--mf-mono);
+      font-size: 7px;
+      letter-spacing: 0.05em;
+    }
+
+    .timeline-event strong {
+      display: block;
+      margin-top: 2px;
+      font-size: 10px;
+      font-weight: 700;
+      line-height: 1.4;
+    }
+
+    .timeline-event small {
+      display: block;
+      margin-top: 3px;
+      color: var(--mf-muted);
+      font-size: 8px;
+      line-height: 1.5;
+    }
+
+    .timeline-foot {
+      margin: 4px 12px 14px;
+      padding: 10px;
+      border: 1px solid #d6cebe;
+      background: #fffaf0;
+    }
+
+    .timeline-foot strong {
+      display: block;
+      font-family: var(--mf-mono);
+      font-size: 10px;
+    }
+
+    .timeline-foot span {
+      display: block;
+      margin-top: 2px;
+      color: var(--mf-muted);
+      font-size: 8px;
+      line-height: 1.55;
+    }
+
+    .ledger-column {
+      min-width: 0;
+      padding: 17px 18px 0;
+    }
+
+    .ledger-toolbar {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      padding-bottom: 11px;
+      border-bottom: 1px solid var(--c-ink);
+    }
+
+    .ledger-toolbar h2 {
+      margin-top: 3px;
+      font-family: var(--c-serif);
+      font-size: 23px;
+      font-weight: 600;
+    }
+
+    .ledger-toolbar p {
+      margin-top: 4px;
+      color: var(--mf-muted);
+      font-size: 9px;
+    }
+
+    .filter-row {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 4px;
+    }
+
+    .filter-button {
+      min-height: 27px;
+      padding: 3px 8px;
+      border: 1px solid var(--c-rule);
+      border-radius: 2px;
+      color: var(--mf-muted);
+      background: #fff;
+      font-size: 8px;
+      font-weight: 650;
+    }
+
+    .filter-button:hover {
+      border-color: #a6b5c5;
+      color: var(--c-ink);
+    }
+
+    .filter-button.is-active {
+      border-color: var(--c-navy);
+      color: #fff;
+      background: var(--c-navy);
+    }
+
+    .filter-button b {
+      margin-left: 5px;
+      font-family: var(--mf-mono);
+      font-size: 8px;
+    }
+
+    .filter-note {
+      margin: 8px 0 0;
+      color: var(--mf-muted);
+      font-size: 8px;
+      line-height: 1.5;
+      text-align: right;
+    }
+
+    .finding-ledger {
+      margin-top: 10px;
+    }
+
+    .finding-entry {
+      position: relative;
+      display: grid;
+      grid-template-columns: 46px minmax(0, 1fr);
+      border-bottom: 1px solid var(--c-rule);
+      background: #fffef9;
+      transition: background 150ms ease;
+    }
+
+    .finding-entry:hover,
+    .finding-entry.is-selected {
+      background: #fffaf0;
+    }
+
+    .finding-entry.is-selected::after {
+      position: absolute;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      width: 3px;
+      background: var(--c-blue);
+      content: "";
+    }
+
+    .finding-index {
+      padding: 14px 8px;
+      border-right: 1px solid var(--c-rule);
+      color: #7d837f;
+      font-family: var(--mf-mono);
+      font-size: 9px;
+      text-align: center;
+    }
+
+    .finding-index b {
+      display: block;
+      margin-bottom: 4px;
+      color: var(--c-ink);
+      font-size: 12px;
+    }
+
+    .finding-main {
+      min-width: 0;
+      padding: 12px 13px 12px 14px;
+    }
+
+    .finding-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .finding-kind {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+      color: var(--mf-muted);
+      font-family: var(--mf-mono);
+      font-size: 8px;
+      letter-spacing: 0.04em;
+    }
+
+    .layer {
+      display: inline-flex;
+      align-items: center;
+      min-height: 18px;
+      padding: 1px 5px;
+      border: 1px solid currentColor;
+      font-family: var(--mf-mono);
+      font-size: 7px;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+    }
+
+    .layer.observed {
+      color: #2c7080;
+      background: #eaf5f6;
+    }
+
+    .layer.inferred {
+      color: var(--c-amber);
+      background: var(--c-amber-soft);
+    }
+
+    .layer.advice {
+      color: var(--c-blue);
+      background: var(--c-blue-soft);
+    }
+
+    .layer.limit {
+      color: #66717a;
+      background: #eef1f2;
+    }
+
+    .finding-head h3 {
+      margin-top: 5px;
+      font-family: var(--c-serif);
+      font-size: 16px;
+      font-weight: 600;
+      line-height: 1.35;
+    }
+
+    .severity-mark {
+      flex-shrink: 0;
+      min-width: 48px;
+      padding: 3px 5px;
+      border: 1px solid currentColor;
+      color: var(--mf-muted);
+      background: transparent;
+      font-family: var(--mf-mono);
+      font-size: 7px;
+      font-weight: 700;
+      text-align: center;
+    }
+
+    .severity-mark.blocked {
+      color: var(--c-red);
+      background: var(--c-red-soft);
+    }
+
+    .severity-mark.attention {
+      color: var(--c-amber);
+      background: var(--c-amber-soft);
+    }
+
+    .severity-mark.passed {
+      color: var(--c-green);
+      background: var(--c-green-soft);
+    }
+
+    .severity-mark.unknown {
+      color: #586873;
+      background: #edf0f1;
+    }
+
+    .claim-grid {
+      display: grid;
+      grid-template-columns: 54px minmax(0, 1fr);
+      margin-top: 10px;
+      border-top: 1px solid #e2dcd0;
+    }
+
+    .claim-grid dt,
+    .claim-grid dd {
+      padding: 6px 0;
+      border-bottom: 1px solid #eee9df;
+      font-size: 9px;
+      line-height: 1.62;
+    }
+
+    .claim-grid dt {
+      padding-right: 8px;
+      color: #77817f;
+      font-family: var(--mf-mono);
+      font-size: 7px;
+      letter-spacing: 0.03em;
+    }
+
+    .claim-grid dd {
+      margin: 0;
+      color: #394d5c;
+    }
+
+    .finding-foot {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 5px;
+      margin-top: 8px;
+    }
+
+    .evidence-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      min-height: 22px;
+      padding: 2px 6px;
+      border: 1px solid #b9c6d3;
+      border-radius: 2px;
+      color: #26517f;
+      background: #f5f9fd;
+      font-family: var(--mf-mono);
+      font-size: 7px;
+      font-weight: 650;
+    }
+
+    .evidence-chip:hover,
+    .evidence-chip[aria-pressed="true"] {
+      border-color: var(--c-blue);
+      color: #fff;
+      background: var(--c-blue);
+    }
+
+    .finding-foot .confidence {
+      margin-left: auto;
+      color: var(--mf-muted);
+      font-size: 8px;
+    }
+
+    .finding-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+
+    .text-action {
+      min-height: 22px;
+      padding: 2px 0;
+      border: 0;
+      border-bottom: 1px solid #9aa7b1;
+      color: #506678;
+      background: transparent;
+      font-size: 8px;
+    }
+
+    .text-action:hover {
+      border-color: var(--c-blue);
+      color: var(--c-blue);
+    }
+
+    .ledger-section {
+      margin-top: 18px;
+      border-top: 1px solid var(--c-ink);
+      padding-top: 11px;
+    }
+
+    .ledger-section-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .ledger-section h2 {
+      font-family: var(--c-serif);
+      font-size: 20px;
+      font-weight: 600;
+    }
+
+    .ledger-section p {
+      margin-top: 4px;
+      color: var(--mf-muted);
+      font-size: 9px;
+      line-height: 1.65;
+    }
+
+    .experiment-ledger {
+      margin-top: 9px;
+      border: 1px solid var(--c-rule);
+      background: #fffef9;
+    }
+
+    .experiment-row {
+      display: grid;
+      grid-template-columns: 50px minmax(0, 1fr) auto;
+      gap: 10px;
+      padding: 11px 12px;
+      border-bottom: 1px solid var(--c-rule);
+    }
+
+    .experiment-row:last-child {
+      border-bottom: 0;
+    }
+
+    .experiment-priority {
+      padding-top: 1px;
+      color: var(--c-red);
+      font-family: var(--mf-mono);
+      font-size: 10px;
+      font-weight: 700;
+    }
+
+    .experiment-row h3 {
+      font-size: 11px;
+      font-weight: 700;
+      line-height: 1.45;
+    }
+
+    .experiment-row p {
+      margin-top: 3px;
+      font-size: 9px;
+    }
+
+    .experiment-actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      align-items: flex-start;
+      gap: 4px;
+    }
+
+    .experiment-actions .mf-button {
+      min-height: 27px;
+      padding: 4px 7px;
+      border-radius: 2px;
+      font-size: 8px;
+    }
+
+    .limits-box {
+      margin-top: 10px;
+      padding: 12px 14px;
+      border: 1px solid #d8c58e;
+      background: #fff8e7;
+    }
+
+    .limits-box ul {
+      margin-top: 6px;
+      padding-left: 16px;
+      color: #655d49;
+      font-size: 9px;
+      line-height: 1.75;
+    }
+
+    .ask-ledger {
+      margin-top: 18px;
+      padding: 13px 14px;
+      border: 1px solid var(--c-rule);
+      background: #f8f4ea;
+    }
+
+    .ask-ledger form {
+      display: flex;
+      gap: 6px;
+      margin-top: 8px;
+    }
+
+    .ask-ledger input {
+      min-width: 0;
+      flex: 1;
+      min-height: 34px;
+      padding: 7px 9px;
+      border: 1px solid #bdb5a7;
+      border-radius: 2px;
+      color: var(--c-ink);
+      background: #fffef9;
+      font-size: 10px;
+    }
+
+    .ask-ledger .mf-button {
+      border-radius: 2px;
+      font-size: 9px;
+    }
+
+    .ask-response {
+      margin-top: 8px;
+      padding: 9px 10px;
+      border-left: 3px solid var(--c-blue);
+      color: #41596b;
+      background: var(--c-blue-soft);
+      font-size: 9px;
+      line-height: 1.65;
+    }
+
+    .inspector-column {
+      position: sticky;
+      top: 78px;
+      align-self: start;
+      min-width: 0;
+      margin: 17px 17px 18px 0;
+      border: 1px solid var(--c-rule-strong);
+      background: #fffef9;
+      box-shadow: 4px 4px 0 #e6dfd0;
+    }
+
+    .inspector-head {
+      padding: 11px 12px 9px;
+      border-bottom: 2px solid var(--c-ink);
+    }
+
+    .inspector-head h2 {
+      margin-top: 4px;
+      font-family: var(--c-serif);
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    .inspector-body {
+      padding: 12px;
+    }
+
+    .evidence-tagline {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 7px;
+    }
+
+    .evidence-tagline .mf-mono {
+      color: var(--c-blue);
+      font-size: 9px;
+      font-weight: 650;
+    }
+
+    .evidence-kind {
+      color: var(--mf-muted);
+      font-family: var(--mf-mono);
+      font-size: 8px;
+    }
+
+    .inspector-body h3 {
+      margin-top: 8px;
+      font-family: var(--c-serif);
+      font-size: 20px;
+      font-weight: 600;
+      line-height: 1.25;
+    }
+
+    .evidence-value {
+      margin-top: 10px;
+      padding: 10px;
+      border-top: 1px solid var(--c-rule);
+      border-bottom: 1px solid var(--c-rule);
+      color: var(--c-ink);
+      background: #faf6ea;
+      font-family: var(--mf-mono);
+      font-size: 10px;
+      font-weight: 650;
+      line-height: 1.6;
+      overflow-wrap: anywhere;
+    }
+
+    .evidence-detail {
+      margin-top: 9px;
+      color: #455a69;
+      font-size: 9px;
+      line-height: 1.72;
+    }
+
+    .field-pair {
+      display: grid;
+      grid-template-columns: 58px minmax(0, 1fr);
+      margin-top: 10px;
+      border-top: 1px solid #e0dacd;
+    }
+
+    .field-pair div {
+      min-width: 0;
+      padding: 6px 0;
+      border-bottom: 1px solid #e9e4da;
+      font-size: 8px;
+      line-height: 1.55;
+    }
+
+    .field-pair span {
+      color: var(--mf-muted);
+      font-family: var(--mf-mono);
+      font-size: 7px;
+    }
+
+    .field-pair strong {
+      display: block;
+      color: #344a5b;
+      font-family: var(--mf-mono);
+      font-size: 8px;
+      font-weight: 600;
+      overflow-wrap: anywhere;
+    }
+
+    .evidence-boundary {
+      margin-top: 10px;
+      padding: 8px 9px;
+      border-left: 3px solid var(--c-amber);
+      color: #665b43;
+      background: var(--c-amber-soft);
+      font-size: 8px;
+      line-height: 1.65;
+    }
+
+    .evidence-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      margin-top: 10px;
+    }
+
+    .evidence-actions .mf-button {
+      min-height: 27px;
+      padding: 4px 7px;
+      border-radius: 2px;
+      font-size: 8px;
+    }
+
+    .raw-evidence {
+      margin-top: 10px;
+      border-top: 1px solid var(--c-rule);
+    }
+
+    .raw-evidence summary {
+      padding: 7px 0 3px;
+      color: #536b7d;
+      font-family: var(--mf-mono);
+      font-size: 8px;
+    }
+
+    .raw-evidence pre {
+      max-height: 160px;
+      overflow: auto;
+      margin: 7px 0 0;
+      padding: 8px;
+      color: #dbe8f1;
+      background: #173044;
+      font-family: var(--mf-mono);
+      font-size: 7px;
+      line-height: 1.65;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .evidence-index {
+      margin-top: 13px;
+      border-top: 1px solid var(--c-ink);
+      padding-top: 9px;
+    }
+
+    .evidence-index-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: var(--mf-muted);
+      font-family: var(--mf-mono);
+      font-size: 8px;
+      letter-spacing: 0.05em;
+    }
+
+    .evidence-index-list {
+      display: grid;
+      gap: 2px;
+      margin-top: 6px;
+    }
+
+    .evidence-index-item {
+      display: grid;
+      grid-template-columns: 36px minmax(0, 1fr);
+      gap: 6px;
+      align-items: center;
+      width: 100%;
+      padding: 6px 5px;
+      border: 1px solid transparent;
+      color: inherit;
+      background: transparent;
+      font-size: 8px;
+      text-align: left;
+    }
+
+    .evidence-index-item b {
+      color: #5a6d79;
+      font-family: var(--mf-mono);
+      font-size: 7px;
+    }
+
+    .evidence-index-item span {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .evidence-index-item:hover,
+    .evidence-index-item.is-active {
+      border-color: #c7d1dd;
+      color: var(--c-blue);
+      background: #f3f7fd;
+    }
+
+    .inspector-seal {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 13px -12px -12px;
+      padding: 9px 12px;
+      border-top: 1px solid var(--c-rule);
+      color: var(--mf-muted);
+      background: #f4efe4;
+      font-size: 8px;
+      line-height: 1.55;
+    }
+
+    .inspector-seal::before {
+      display: grid;
+      place-items: center;
+      width: 27px;
+      height: 27px;
+      flex-shrink: 0;
+      border: 1px solid #a49b8b;
+      border-radius: 50%;
+      color: #786e5f;
+      font-family: var(--mf-mono);
+      font-size: 6px;
+      content: "READ ONLY";
+    }
+
+    .empty-wrap,
+    .loading-wrap {
+      padding: 29px 30px 38px;
+    }
+
+    .empty-heading,
+    .loading-heading {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 24px;
+      align-items: end;
+      padding-bottom: 18px;
+      border-bottom: 2px solid var(--c-ink);
+    }
+
+    .empty-heading h1,
+    .loading-heading h1 {
+      font-size: clamp(28px, 3.2vw, 44px);
+    }
+
+    .empty-actions,
+    .loading-actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 6px;
+    }
+
+    .empty-actions .mf-button,
+    .loading-actions .mf-button {
+      border-radius: 3px;
+    }
+
+    .empty-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.65fr);
+      gap: 0;
+      border-right: 1px solid var(--c-rule);
+      border-bottom: 1px solid var(--c-rule);
+      border-left: 1px solid var(--c-rule);
+    }
+
+    .empty-main {
+      min-width: 0;
+      padding: 25px 26px;
+      border-right: 1px solid var(--c-rule);
+    }
+
+    .empty-main .empty-icon {
+      display: grid;
+      place-items: center;
+      width: 44px;
+      height: 44px;
+      border: 1px solid var(--c-rule-strong);
+      color: var(--c-blue);
+      background: #f5f8fc;
+    }
+
+    .empty-main h2 {
+      margin-top: 16px;
+      font-family: var(--c-serif);
+      font-size: 28px;
+      font-weight: 600;
+    }
+
+    .empty-main > p {
+      max-width: 700px;
+      margin-top: 9px;
+      color: var(--mf-muted);
+      font-size: 11px;
+      line-height: 1.8;
+    }
+
+    .empty-questions {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      margin-top: 20px;
+      border: 1px solid var(--c-rule);
+    }
+
+    .empty-question {
+      padding: 12px;
+      border-right: 1px solid var(--c-rule);
+      border-bottom: 1px solid var(--c-rule);
+    }
+
+    .empty-question:nth-child(2n) {
+      border-right: 0;
+    }
+
+    .empty-question:nth-last-child(-n + 2) {
+      border-bottom: 0;
+    }
+
+    .empty-question span {
+      color: var(--mf-muted);
+      font-size: 8px;
+    }
+
+    .empty-question strong {
+      display: block;
+      margin-top: 3px;
+      color: #526574;
+      font-family: var(--mf-mono);
+      font-size: 9px;
+      font-weight: 650;
+    }
+
+    .coverage-column {
+      padding: 22px;
+      background: #f4efe4;
+    }
+
+    .coverage-column h2 {
+      font-family: var(--c-serif);
+      font-size: 20px;
+      font-weight: 600;
+    }
+
+    .coverage-column > p {
+      margin-top: 5px;
+      color: var(--mf-muted);
+      font-size: 9px;
+      line-height: 1.65;
+    }
+
+    .coverage-score {
+      display: flex;
+      align-items: baseline;
+      gap: 5px;
+      margin-top: 12px;
+    }
+
+    .coverage-score strong {
+      font-family: var(--mf-mono);
+      font-size: 36px;
+      font-weight: 500;
+      line-height: 1;
+    }
+
+    .coverage-score span {
+      color: var(--mf-muted);
+      font-family: var(--mf-mono);
+      font-size: 10px;
+    }
+
+    .coverage-rule {
+      height: 4px;
+      margin: 7px 0 13px;
+      background: #d9d0c1;
+    }
+
+    .coverage-rule span {
+      display: block;
+      height: 100%;
+      background: var(--c-blue);
+    }
+
+    .coverage-list {
+      display: grid;
+    }
+
+    .coverage-item {
+      display: grid;
+      grid-template-columns: 16px minmax(0, 1fr) auto;
+      gap: 6px;
+      align-items: start;
+      padding: 7px 0;
+      border-bottom: 1px solid #dcd4c5;
+      font-size: 9px;
+    }
+
+    .coverage-item i {
+      display: block;
+      width: 8px;
+      height: 8px;
+      margin-top: 3px;
+      border: 1px solid var(--c-green);
+      background: var(--c-green);
+    }
+
+    .coverage-item i.missing {
+      border-color: #9ba3a6;
+      background: transparent;
+    }
+
+    .coverage-item strong {
+      display: block;
+      font-weight: 650;
+    }
+
+    .coverage-item small {
+      display: block;
+      margin-top: 1px;
+      color: var(--mf-muted);
+      font-size: 8px;
+    }
+
+    .coverage-item em {
+      color: var(--mf-muted);
+      font-family: var(--mf-mono);
+      font-size: 7px;
+      font-style: normal;
+    }
+
+    .loading-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 305px;
+      gap: 0;
+      border-right: 1px solid var(--c-rule);
+      border-bottom: 1px solid var(--c-rule);
+      border-left: 1px solid var(--c-rule);
+    }
+
+    .loading-main {
+      padding: 27px;
+      border-right: 1px solid var(--c-rule);
+    }
+
+    .scan-visual {
+      position: relative;
+      height: 150px;
+      overflow: hidden;
+      border: 1px solid var(--c-rule);
+      background:
+        repeating-linear-gradient(0deg, rgba(28, 55, 81, 0.045) 0 1px, transparent 1px 22px),
+        #f2eee2;
+    }
+
+    .scan-visual::before {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 120px;
+      background: linear-gradient(90deg, transparent, rgba(50, 95, 190, 0.16), rgba(50, 95, 190, 0.35), transparent);
+      animation: audit-scan 2.2s linear infinite;
+      content: "";
+    }
+
+    .scan-lines {
+      position: absolute;
+      inset: 20px;
+      display: grid;
+      align-content: space-between;
+    }
+
+    .scan-line {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: #536775;
+      font-family: var(--mf-mono);
+      font-size: 8px;
+    }
+
+    .scan-line i {
+      display: block;
+      height: 4px;
+      background: #c8d0d3;
+    }
+
+    .scan-line:nth-child(1) i {
+      width: 72%;
+    }
+
+    .scan-line:nth-child(2) i {
+      width: 49%;
+    }
+
+    .scan-line:nth-child(3) i {
+      width: 84%;
+    }
+
+    .scan-line:nth-child(4) i {
+      width: 38%;
+    }
+
+    @keyframes audit-scan {
+      from {
+        left: -130px;
+      }
+      to {
+        left: calc(100% + 20px);
+      }
+    }
+
+    .loading-steps {
+      display: grid;
+      gap: 0;
+      margin-top: 16px;
+      border-top: 1px solid var(--c-rule);
+    }
+
+    .loading-step {
+      display: grid;
+      grid-template-columns: 30px minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: center;
+      padding: 9px 0;
+      border-bottom: 1px solid var(--c-rule);
+      color: var(--mf-muted);
+      font-size: 9px;
+    }
+
+    .loading-step .step-index {
+      color: #8c928c;
+      font-family: var(--mf-mono);
+      font-size: 8px;
+    }
+
+    .loading-step strong {
+      color: var(--c-ink);
+      font-size: 9px;
+    }
+
+    .loading-step .step-state {
+      font-family: var(--mf-mono);
+      font-size: 7px;
+    }
+
+    .loading-step.is-current {
+      color: var(--c-blue);
+    }
+
+    .loading-step.is-current strong {
+      color: var(--c-blue);
+    }
+
+    .loading-step.is-current .step-state::before {
+      display: inline-block;
+      width: 5px;
+      height: 5px;
+      margin-right: 5px;
+      border-radius: 50%;
+      background: currentColor;
+      animation: pulse 900ms ease-in-out infinite alternate;
+      content: "";
+    }
+
+    .loading-step.is-done .step-state {
+      color: var(--c-green);
+    }
+
+    @keyframes pulse {
+      to {
+        opacity: 0.25;
+      }
+    }
+
+    .loading-side {
+      padding: 22px;
+      background: #f4efe4;
+    }
+
+    .loading-side h2 {
+      font-family: var(--c-serif);
+      font-size: 21px;
+      font-weight: 600;
+    }
+
+    .loading-side p {
+      margin-top: 8px;
+      color: var(--mf-muted);
+      font-size: 9px;
+      line-height: 1.75;
+    }
+
+    .loading-evidence {
+      display: grid;
+      gap: 7px;
+      margin-top: 15px;
+    }
+
+    .loading-evidence div {
+      padding: 8px 9px;
+      border: 1px solid #d8d0c1;
+      background: #fffaf0;
+      font-size: 8px;
+      line-height: 1.55;
+    }
+
+    .loading-evidence strong {
+      display: block;
+      font-family: var(--mf-mono);
+      font-size: 8px;
+    }
+
+    .limited-wrap {
+      padding: 24px 28px 35px;
+    }
+
+    .limited-heading {
+      padding-bottom: 15px;
+      border-bottom: 2px solid var(--c-ink);
+    }
+
+    .limited-heading h1 {
+      max-width: 950px;
+      margin-top: 6px;
+      font-family: var(--c-serif);
+      font-size: clamp(27px, 3vw, 40px);
+      font-weight: 600;
+      line-height: 1.15;
+      letter-spacing: -0.025em;
+    }
+
+    .limited-heading p {
+      max-width: 900px;
+      margin-top: 9px;
+      color: var(--mf-muted);
+      font-size: 10px;
+      line-height: 1.7;
+    }
+
+    .limited-callout {
+      display: flex;
+      gap: 9px;
+      margin-top: 13px;
+      padding: 9px 11px;
+      border: 1px solid #d5bd7d;
+      color: #65583a;
+      background: var(--c-amber-soft);
+      font-size: 9px;
+      line-height: 1.65;
+    }
+
+    .limited-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 315px;
+      gap: 0;
+      border: 1px solid var(--c-rule);
+    }
+
+    .limited-main {
+      min-width: 0;
+      padding: 18px;
+      border-right: 1px solid var(--c-rule);
+    }
+
+    .limited-gates {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      border: 1px solid var(--c-rule);
+    }
+
+    .limited-gate {
+      padding: 13px;
+    }
+
+    .limited-gate + .limited-gate {
+      border-left: 1px solid var(--c-rule);
+    }
+
+    .limited-gate span {
+      color: var(--mf-muted);
+      font-family: var(--mf-mono);
+      font-size: 7px;
+      letter-spacing: 0.07em;
+    }
+
+    .limited-gate h2 {
+      margin-top: 5px;
+      font-family: var(--c-serif);
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    .limited-gate p {
+      margin-top: 5px;
+      color: var(--mf-muted);
+      font-size: 9px;
+      line-height: 1.65;
+    }
+
+    .limited-finding {
+      display: grid;
+      grid-template-columns: 40px minmax(0, 1fr);
+      margin-top: 10px;
+      border: 1px solid var(--c-rule);
+      border-bottom: 0;
+    }
+
+    .limited-finding:last-child {
+      border-bottom: 1px solid var(--c-rule);
+    }
+
+    .limited-finding .num {
+      padding: 11px 7px;
+      border-right: 1px solid var(--c-rule);
+      color: #7b827f;
+      font-family: var(--mf-mono);
+      font-size: 8px;
+      text-align: center;
+    }
+
+    .limited-finding .copy {
+      padding: 10px 11px;
+    }
+
+    .limited-finding h3 {
+      font-family: var(--c-serif);
+      font-size: 15px;
+      font-weight: 600;
+    }
+
+    .limited-finding dl {
+      display: grid;
+      grid-template-columns: 45px minmax(0, 1fr);
+      margin-top: 6px;
+    }
+
+    .limited-finding dt,
+    .limited-finding dd {
+      padding: 3px 0;
+      border-top: 1px solid #ece7dc;
+      font-size: 8px;
+      line-height: 1.55;
+    }
+
+    .limited-finding dt {
+      color: var(--mf-muted);
+      font-family: var(--mf-mono);
+      font-size: 7px;
+    }
+
+    .limited-finding dd {
+      margin: 0;
+    }
+
+    .limited-side {
+      padding: 17px;
+      background: #f4efe4;
+    }
+
+    .limited-side h2 {
+      font-family: var(--c-serif);
+      font-size: 19px;
+      font-weight: 600;
+    }
+
+    .limited-side p {
+      margin-top: 5px;
+      color: var(--mf-muted);
+      font-size: 9px;
+      line-height: 1.65;
+    }
+
+    .dialog-config {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 7px;
+      margin-top: 12px;
+    }
+
+    .dialog-config div {
+      padding: 8px 9px;
+      border: 1px solid var(--c-rule);
+      background: #faf7ee;
+    }
+
+    .dialog-config span {
+      display: block;
+      color: var(--mf-muted);
+      font-family: var(--mf-mono);
+      font-size: 8px;
+    }
+
+    .dialog-config strong {
+      display: block;
+      margin-top: 2px;
+      font-family: var(--mf-mono);
+      font-size: 10px;
+    }
+
+    .dialog-note {
+      margin-top: 12px;
+      padding: 9px 10px;
+      border-left: 3px solid var(--c-amber);
+      color: #655a40;
+      background: var(--c-amber-soft);
+      font-size: 9px;
+      line-height: 1.65;
+    }
+
+    .print-only {
+      display: none;
+    }
+
+    @media (max-width: 1240px) {
+      .report-grid {
+        grid-template-columns: 196px minmax(0, 1fr) 282px;
+      }
+
+      .audit-shell {
+        width: calc(100% - 22px);
+      }
+
+      .audit-top {
+        grid-template-columns: 225px minmax(0, 1fr) auto;
+      }
+
+      .audit-select {
+        width: 205px;
+      }
+    }
+
+    @media (max-width: 1080px) {
+      .audit-top {
+        grid-template-columns: 205px minmax(0, 1fr);
+      }
+
+      .audit-tools {
+        grid-column: 1 / -1;
+        justify-content: flex-end;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .audit-select {
+        width: min(340px, 52vw);
+      }
+
+      .report-grid {
+        grid-template-columns: minmax(0, 1fr) 294px;
+      }
+
+      .timeline-column {
+        position: static;
+        grid-column: 1 / -1;
+        display: grid;
+        grid-template-columns: 170px minmax(0, 1fr);
+        border-right: 0;
+        border-bottom: 1px solid var(--c-rule);
+      }
+
+      .timeline-head {
+        border-right: 1px solid var(--c-rule);
+        border-bottom: 0;
+      }
+
+      .timeline {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        padding: 0;
+      }
+
+      .timeline-event {
+        padding: 11px 9px 9px 25px;
+        border-right: 1px solid #ded7ca;
+        border-bottom: 0;
+      }
+
+      .timeline-event::before {
+        top: 14px;
+        left: 9px;
+      }
+
+      .timeline-event::after {
+        display: none;
+      }
+
+      .timeline-foot {
+        display: none;
+      }
+    }
+
+    @media (max-width: 900px) {
+      .entry-heading,
+      .report-heading,
+      .empty-heading,
+      .loading-heading {
+        grid-template-columns: 1fr;
+      }
+
+      .entry-actions,
+      .report-actions,
+      .empty-actions,
+      .loading-actions {
+        justify-content: flex-start;
+      }
+
+      .entry-grid,
+      .empty-grid,
+      .loading-grid,
+      .limited-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .entry-main,
+      .empty-main,
+      .loading-main,
+      .limited-main {
+        border-right: 0;
+        border-bottom: 1px solid var(--c-rule);
+      }
+
+      .verdict-ledger {
+        grid-template-columns: 1fr;
+      }
+
+      .ledger-label {
+        display: none;
+      }
+
+      .ledger-verdict + .ledger-verdict {
+        border-top: 1px solid var(--c-rule);
+        border-left: 0;
+      }
+
+      .report-grid {
+        grid-template-columns: minmax(0, 1fr);
+      }
+
+      .inspector-column {
+        position: static;
+        margin: 0 18px 18px;
+      }
+
+      .timeline-column {
+        grid-template-columns: 150px minmax(0, 1fr);
+      }
+
+      .timeline {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 660px) {
+      .audit-top {
+        position: relative;
+        display: block;
+      }
+
+      .audit-brand {
+        padding: 10px 15px;
+        border-right: 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.11);
+      }
+
+      .audit-crumbs {
+        min-height: 32px;
+        padding: 7px 15px;
+      }
+
+      .audit-tools {
+        flex-wrap: wrap;
+        justify-content: flex-start;
+        padding: 9px 15px 12px;
+      }
+
+      .audit-select {
+        width: 100%;
+        order: 2;
+      }
+
+      .audit-tools .mf-button {
+        order: 3;
+      }
+
+      .audit-shell {
+        width: calc(100% - 12px);
+        margin-top: 6px;
+        margin-bottom: 20px;
+      }
+
+      .case-ribbon {
+        flex-wrap: wrap;
+        gap: 3px 10px;
+        padding: 7px 12px;
+      }
+
+      .case-ribbon .ribbon-push {
+        margin-left: 0;
+      }
+
+      .entry-wrap,
+      .report-wrap,
+      .empty-wrap,
+      .loading-wrap,
+      .limited-wrap {
+        padding: 17px 13px 24px;
+      }
+
+      .entry-heading,
+      .report-heading,
+      .empty-heading,
+      .loading-heading {
+        gap: 14px;
+        padding-bottom: 15px;
+      }
+
+      .entry-heading h1,
+      .report-heading h1,
+      .empty-heading h1,
+      .loading-heading h1 {
+        font-size: 27px;
+      }
+
+      .entry-actions,
+      .report-actions,
+      .empty-actions,
+      .loading-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .entry-actions .mf-button:first-child,
+      .report-actions .mf-button:first-child,
+      .empty-actions .mf-button:first-child,
+      .loading-actions .mf-button:first-child {
+        grid-column: 1 / -1;
+      }
+
+      .entry-main,
+      .entry-side,
+      .empty-main,
+      .coverage-column,
+      .loading-main,
+      .loading-side,
+      .limited-main,
+      .limited-side {
+        padding: 14px;
+      }
+
+      .gate-pair,
+      .limited-gates {
+        grid-template-columns: 1fr;
+      }
+
+      .gate + .gate,
+      .limited-gate + .limited-gate {
+        border-top: 1px solid var(--c-rule);
+        border-left: 0;
+      }
+
+      .entry-digest {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .digest-cell:nth-child(2n) {
+        border-right: 0;
+      }
+
+      .digest-cell:nth-child(-n + 2) {
+        border-bottom: 1px solid var(--c-rule);
+      }
+
+      .entry-question {
+        grid-template-columns: 1fr;
+        gap: 2px;
+      }
+
+      .entry-question small {
+        display: none;
+      }
+
+      .empty-questions {
+        grid-template-columns: 1fr;
+      }
+
+      .empty-question {
+        border-right: 0;
+        border-bottom: 1px solid var(--c-rule);
+      }
+
+      .empty-question:nth-last-child(-n + 2) {
+        border-bottom: 1px solid var(--c-rule);
+      }
+
+      .empty-question:last-child {
+        border-bottom: 0;
+      }
+
+      .verdict-ledger {
+        border-top: 0;
+      }
+
+      .timeline-column {
+        display: block;
+      }
+
+      .timeline-head {
+        border-right: 0;
+        border-bottom: 1px solid var(--c-rule);
+      }
+
+      .timeline {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .timeline-event {
+        border-right: 1px solid #ded7ca;
+        border-bottom: 1px solid #ded7ca;
+      }
+
+      .timeline-event:nth-child(2n) {
+        border-right: 0;
+      }
+
+      .ledger-column {
+        padding: 14px 11px 0;
+      }
+
+      .ledger-toolbar {
+        display: block;
+      }
+
+      .filter-row {
+        justify-content: flex-start;
+        margin-top: 9px;
+      }
+
+      .filter-note {
+        text-align: left;
+      }
+
+      .finding-entry {
+        grid-template-columns: 34px minmax(0, 1fr);
+      }
+
+      .finding-index {
+        padding: 10px 4px;
+      }
+
+      .finding-head {
+        display: block;
+      }
+
+      .severity-mark {
+        display: inline-block;
+        margin-top: 6px;
+      }
+
+      .claim-grid {
+        grid-template-columns: 43px minmax(0, 1fr);
+      }
+
+      .experiment-row {
+        grid-template-columns: 38px minmax(0, 1fr);
+      }
+
+      .experiment-actions {
+        grid-column: 1 / -1;
+        justify-content: flex-start;
+      }
+
+      .ask-ledger form {
+        flex-direction: column;
+      }
+
+      .ask-ledger .mf-button {
+        width: 100%;
+      }
+
+      .inspector-column {
+        margin: 0 11px 14px;
+      }
+
+      .limited-grid {
+        border-top: 0;
+      }
+
+      .limited-finding {
+        grid-template-columns: 29px minmax(0, 1fr);
+      }
+
+      .loading-steps {
+        margin-top: 11px;
+      }
+
+      .loading-step {
+        grid-template-columns: 24px minmax(0, 1fr);
+      }
+
+      .loading-step .step-state {
+        grid-column: 2;
+      }
+
+      .scan-visual {
+        height: 120px;
+      }
+
+      .dialog-config {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        scroll-behavior: auto !important;
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#viewRoot">跳到审计内容</a>
+
+  <header class="audit-top">
+    <a class="audit-brand" href="index.html" aria-label="返回方案对比">
+      <span class="audit-mark" aria-hidden="true">M</span>
+      <span>
+        <strong>ModelForge</strong>
+        <small>Evidence audit / Training</small>
+      </span>
+    </a>
+    <div class="audit-crumbs">
+      <a href="index.html">方案对比</a>
+      <span>/</span>
+      <span>训练</span>
+      <span>/</span>
+      <strong>AI 证据审计</strong>
+    </div>
+    <div class="audit-tools">
+      <span class="mf-demo-stamp">原型示例</span>
+      <label>
+        <span class="mf-sr-only">切换 Attempt</span>
+        <select class="audit-select" id="attemptSelect" aria-label="切换 Attempt"></select>
+      </label>
+      <a class="mf-button" href="index.html">返回对比</a>
+    </div>
+  </header>
+
+  <main id="viewRoot" tabindex="-1"></main>
+
+  <div class="mf-dialog-backdrop" id="evidenceDialog" hidden>
+    <section class="mf-dialog" role="dialog" aria-modal="true" aria-labelledby="evidenceDialogTitle" tabindex="-1">
+      <header class="mf-dialog-head">
+        <div>
+          <span class="mf-eyebrow">EVIDENCE FILE · 原型示例</span>
+          <h2 id="evidenceDialogTitle">证据原文</h2>
+          <p>只复述已归档字段，不补写未上报值。</p>
+        </div>
+        <button class="mf-button quiet" type="button" data-dialog-close aria-label="关闭证据">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
+        </button>
+      </header>
+      <div class="mf-dialog-body" id="evidenceDialogBody"></div>
+      <footer class="mf-dialog-actions">
+        <button class="mf-button" type="button" data-dialog-close>关闭</button>
+      </footer>
+    </section>
+  </div>
+
+  <div class="mf-dialog-backdrop" id="applyDialog" hidden>
+    <section class="mf-dialog" role="dialog" aria-modal="true" aria-labelledby="applyDialogTitle" aria-describedby="applyDialogDescription" tabindex="-1">
+      <header class="mf-dialog-head">
+        <div>
+          <span class="mf-eyebrow">DRAFT CHANGE ORDER · 原型示例</span>
+          <h2 id="applyDialogTitle">应用建议配置</h2>
+          <p id="applyDialogDescription">只创建未提交的实验草稿；不修改历史 Attempt，不创建 GPU。</p>
+        </div>
+        <button class="mf-button quiet" type="button" data-dialog-close aria-label="关闭对话框">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
+        </button>
+      </header>
+      <div class="mf-dialog-body" id="applyDialogBody"></div>
+      <footer class="mf-dialog-actions">
+        <button class="mf-button quiet" type="button" data-dialog-close>先不应用</button>
+        <button class="mf-button primary" type="button" id="confirmApply">创建配置草稿</button>
+      </footer>
+    </section>
+  </div>
+
+  <script src="shared/prototype-data.js"></script>
+  <script src="shared/prototype-core.js"></script>
+  <script>
+    (() => {
+      const data = window.MF_PROTOTYPE;
+      const ui = window.MFUI;
+      const root = document.getElementById("viewRoot");
+      const attemptSelect = document.getElementById("attemptSelect");
+      const evidenceDialogRoot = document.getElementById("evidenceDialog");
+      const evidenceDialogBody = document.getElementById("evidenceDialogBody");
+      const applyDialogRoot = document.getElementById("applyDialog");
+      const applyDialogBody = document.getElementById("applyDialogBody");
+      const confirmApply = document.getElementById("confirmApply");
+      const evidenceDialog = ui.initDialog(evidenceDialogRoot);
+      const applyDialog = ui.initDialog(applyDialogRoot);
+      const params = new URLSearchParams(location.search);
+
+      let attempt = data.getAttempt(params.get("attempt") || data.defaults.attempt);
+      let view = ["report", "empty", "loading", "limited"].includes(params.get("view")) ? params.get("view") : "entry";
+      let selectedEvidence = "";
+      let filter = params.get("severity") || "all";
+      let selectedFinding = "";
+      let currentExperiment = null;
+      let generationTimer = 0;
+      let generationStep = 0;
+      let limitedGenerated = false;
+
+      const severityLabels = {
+        all: "全部",
+        blocked: "阻断",
+        attention: "需关注",
+        passed: "已通过",
+        info: "提示",
+        unknown: "无法判断",
+      };
+
+      attemptSelect.innerHTML = data.attempts.map((item) => {
+        const state = item.state === "succeeded" ? "已成功" : item.state === "failed" ? "已失败" : "已取消";
+        return `<option value="${ui.escapeHtml(item.id)}">${ui.escapeHtml(item.displayName)} · ${state}</option>`;
+      }).join("");
+      attemptSelect.value = attempt.id;
+
+      function reportExists() {
+        return Boolean(attempt.report?.exists || limitedGenerated);
+      }
+
+      function evidenceList() {
+        return attempt.report?.evidence || [];
+      }
+
+      function selectedEvidenceItem() {
+        return evidenceList().find((item) => item.id === selectedEvidence) || evidenceList()[0] || null;
+      }
+
+      function defaultEvidence() {
+        return attempt.state === "failed" ? "E-F1" : "E-01";
+      }
+
+      function severityCount(findings, key) {
+        if (key === "all") return findings.length;
+        return findings.filter((item) => item.severity === key).length;
+      }
+
+      function layerClass(layer) {
+        if (layer === "推断") return "inferred";
+        if (layer === "建议") return "advice";
+        if (layer === "限制") return "limit";
+        return "observed";
+      }
+
+      function severityTone(severity) {
+        return {
+          blocked: "danger",
+          attention: "warning",
+          passed: "success",
+          info: "neutral",
+          unknown: "neutral",
+        }[severity] || "neutral";
+      }
+
+      function statusClass() {
+        if (attempt.state === "failed") return "danger";
+        if (attempt.state === "cancelled") return "neutral";
+        return "warning";
+      }
+
+      function statusText() {
+        if (attempt.state === "failed") return "FAILED / 复盘";
+        if (attempt.state === "cancelled") return "CANCELLED / 无报告";
+        return "SUCCEEDED / 可用性未验证";
+      }
+
+      function evidenceCoverageFor(attemptData) {
+        if (attemptData.evidenceCoverage) return attemptData.evidenceCoverage;
+        if (attemptData.state === "failed") {
+          return [
+            ["Attempt snapshot", true, "身份与配置已冻结"],
+            ["Metrics", false, "训练开始前失败"],
+            ["Token preflight", false, "未形成"],
+            ["Runtime report", false, "runtime 为空"],
+            ["GPU 显存峰值", false, "未上报"],
+            ["Execution manifest", false, "0 个文件"],
+            ["Adapter", false, "未生成"],
+            ["推理验收", false, "未到达"],
+          ];
+        }
+        return [
+          ["Attempt snapshot", true, "配置与身份已冻结"],
+          ["Metrics", attemptData.metrics.trainCount > 0, `${attemptData.metrics.trainCount} train / ${attemptData.metrics.evalCount} eval`],
+          ["Token preflight", attemptData.dataset.overflow === 0, "24 samples · overflow 0"],
+          ["Runtime report", Boolean(attemptData.runtime), attemptData.runtime ? "lock 一致" : "未上报"],
+          ["GPU 显存峰值", Boolean(attemptData.memory), attemptData.memory ? `${attemptData.memory.peakGiB} GiB` : "未上报"],
+          ["Execution manifest", attemptData.execution.manifestFiles > 0, `${attemptData.execution.manifestFiles} 个文件`],
+          ["Adapter", attemptData.adapters.length > 0, `${attemptData.adapters.length}/2 available`],
+          ["推理验收", attemptData.inferenceAcceptance.state === "verified", attemptData.inferenceAcceptance.label],
+        ];
+      }
+
+      function renderRibbon() {
+        return `
+          <div class="case-ribbon">
+            <span>CASE <strong>${ui.escapeHtml(attempt.shortId)}</strong></span>
+            <span>${ui.escapeHtml(attempt.model)} / ${ui.escapeHtml(attempt.method)}</span>
+            <span>${ui.escapeHtml(attempt.gpu)}</span>
+            <span class="ribbon-push">READ-ONLY EVIDENCE · 原型示例</span>
+          </div>
+        `;
+      }
+
+      function renderEntry() {
+        const report = attempt.report;
+        const isFailed = attempt.state === "failed";
+        const isCancelled = attempt.state === "cancelled";
+        const coverage = evidenceCoverageFor(attempt);
+        const presentCount = coverage.filter((item) => item[1]).length;
+        const gates = report?.exists
+          ? `
+            <div class="gate ${isFailed ? "failed" : ""}">
+              <div class="gate-head">
+                <span>TRAINING HEALTH</span>
+                <span class="status-slash ${isFailed ? "danger" : "warning"}">${ui.escapeHtml(report.health.label)}</span>
+              </div>
+              <h2>${ui.escapeHtml(report.health.title)}</h2>
+              <p>${ui.escapeHtml(report.health.detail)}</p>
+              <div class="gate-facts">
+                <span>${attempt.metrics.trainCount} train pts</span>
+                <span>${attempt.metrics.evalCount} eval pts</span>
+                <span>${attempt.memory ? `${attempt.memory.peakGiB} GiB peak` : "GPU —"}</span>
+              </div>
+            </div>
+            <div class="gate delivery ${isFailed ? "failed" : ""}">
+              <div class="gate-head">
+                <span>DELIVERABILITY</span>
+                <span class="status-slash ${isFailed ? "danger" : "warning"}">${ui.escapeHtml(report.delivery.label)}</span>
+              </div>
+              <h2>${ui.escapeHtml(report.delivery.title)}</h2>
+              <p>${ui.escapeHtml(report.delivery.detail)}</p>
+              <div class="gate-facts">
+                <span>Adapter ${attempt.adapters.length}/2</span>
+                <span>${ui.escapeHtml(attempt.inferenceAcceptance.label)}</span>
+                <span>${attempt.execution.manifestFiles} files</span>
+              </div>
+            </div>
+          `
+          : `
+            <div class="gate">
+              <div class="gate-head">
+                <span>TRAINING HEALTH</span>
+                <span class="status-slash neutral">无法判断</span>
+              </div>
+              <h2>没有指标，不能评价训练健康度</h2>
+              <p>Attempt 已取消，未形成 Train/Eval Loss、学习率或显存轨迹。</p>
+              <div class="gate-facts"><span>Train 0 pts</span><span>Eval 0 pts</span><span>GPU —</span></div>
+            </div>
+            <div class="gate delivery">
+              <div class="gate-head">
+                <span>DELIVERABILITY</span>
+                <span class="status-slash neutral">不可交付</span>
+              </div>
+              <h2>取消后不发布部分 Adapter</h2>
+              <p>当前没有 Best / Final Adapter，推理验收未到达。</p>
+              <div class="gate-facts"><span>Adapter 0/2</span><span>Inference 未到达</span><span>${attempt.execution.manifestFiles} files</span></div>
+            </div>
+          `;
+
+        const aiCopy = report?.exists
+          ? {
+            eyebrow: isFailed ? "FAILURE REVIEW READY" : "AI REPORT READY",
+            title: isFailed ? "阅读失败复盘" : "进入证据审计台",
+            text: report.summary,
+            primary: "打开 AI 报告",
+            secondary: "重新生成报告",
+            action: "open-report",
+            secondaryAction: "regenerate",
+          }
+          : {
+            eyebrow: "NO COMPLETE REPORT",
+            title: "生成有限复盘",
+            text: "现有证据只有 Attempt 快照、runtime 与部分执行文件。报告会明确写出缺口，而不是补造训练结论。",
+            primary: "生成有限复盘",
+            secondary: "查看证据覆盖",
+            action: "generate",
+            secondaryAction: "scroll-coverage",
+          };
+
+        root.innerHTML = `
+          <div class="report-shell">
+            ${renderRibbon()}
+            <div class="entry-wrap">
+              <div class="entry-heading">
+                <div>
+                  <div class="entry-kicker">
+                    <span class="mf-eyebrow">RUN DOSSIER / ATTEMPT #${attempt.number}</span>
+                    <span class="status-slash ${statusClass()}">${ui.escapeHtml(statusText())}</span>
+                    <span class="mf-demo-stamp">原型示例</span>
+                  </div>
+                  <h1>${ui.escapeHtml(attempt.name)}</h1>
+                  <div class="entry-meta">
+                    <span class="mono">${ui.escapeHtml(attempt.id)}</span>
+                    <span>${ui.escapeHtml(attempt.model)} · ${ui.escapeHtml(attempt.method)}</span>
+                    <span>${ui.escapeHtml(attempt.mode)}</span>
+                    <span>更新于 ${ui.escapeHtml(attempt.updatedAt)}</span>
+                  </div>
+                </div>
+                <div class="entry-actions">
+                  <button class="mf-button primary" type="button" data-action="${aiCopy.action}">${ui.escapeHtml(aiCopy.primary)}</button>
+                  <button class="mf-button" type="button" data-action="${aiCopy.secondaryAction}">${ui.escapeHtml(aiCopy.secondary)}</button>
+                  <button class="mf-button quiet" type="button" data-action="copy-summary">复制 AI 结论</button>
+                  <p>AI 报告是 advisory 诊断层；硬门禁、产物校验和推理验收仍独立生效。</p>
+                </div>
+              </div>
+
+              <div class="entry-grid">
+                <div class="entry-main">
+                  <div class="section-label"><span>Gate ledger / 双门禁</span></div>
+                  <div class="gate-pair">${gates}</div>
+                  <div class="entry-digest">
+                    <div class="digest-cell"><span>Train points</span><strong>${attempt.metrics.trainCount}</strong></div>
+                    <div class="digest-cell"><span>Eval points</span><strong>${attempt.metrics.evalCount}</strong></div>
+                    <div class="digest-cell"><span>Best / Final</span><strong>${attempt.adapters.length}/2 available</strong></div>
+                    <div class="digest-cell"><span>Evidence files</span><strong>${attempt.execution.manifestFiles}</strong></div>
+                  </div>
+                  ${report?.exists ? `
+                    <div class="entry-question-list">
+                      ${report.answers.map((item) => `
+                        <div class="entry-question">
+                          <span>${ui.escapeHtml(item.label)}</span>
+                          <strong>${ui.escapeHtml(item.verdict)}</strong>
+                          <small>${ui.escapeHtml(item.text)}</small>
+                        </div>
+                      `).join("")}
+                    </div>
+                  ` : `
+                    <div class="card-boundary" style="margin-top:16px">
+                      <strong>为什么还不能生成完整报告：</strong>当前缺少 metrics、Adapter 和推理验收。空字段会保留为“未上报/无法判断”，不会被当作 0 或健康。
+                    </div>
+                  `}
+                </div>
+
+                <aside class="entry-side">
+                  <div class="ai-entry-card">
+                    <div class="ai-card-body">
+                      <span class="mf-eyebrow">${ui.escapeHtml(aiCopy.eyebrow)}</span>
+                      <h2>${ui.escapeHtml(aiCopy.title)}</h2>
+                      <p>${ui.escapeHtml(aiCopy.text)}</p>
+                      <div class="ai-card-actions">
+                        <button class="mf-button primary" type="button" data-action="${aiCopy.action}">${ui.escapeHtml(aiCopy.primary)}</button>
+                        <button class="mf-button" type="button" data-action="${aiCopy.secondaryAction}">${ui.escapeHtml(aiCopy.secondary)}</button>
+                      </div>
+                      <div class="card-boundary">
+                        不替代硬门禁。Adapter available ≠ 推理 ready ≠ 模型可用；Loss 也不能证明业务效果。
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="coverage-sheet" id="coverageSheet">
+                    <h3>证据覆盖 · ${presentCount}/8</h3>
+                    <div class="coverage-grid">
+                      ${coverage.map(([label, present, note]) => `
+                        <span class="mark ${present ? "" : "missing"}">${present ? "✓" : "×"}</span>
+                        <span>${ui.escapeHtml(label)}<small style="display:block;color:var(--mf-muted);font-size:8px">${ui.escapeHtml(note)}</small></span>
+                        <span class="state">${present ? "AVAILABLE" : "MISSING"}</span>
+                      `).join("")}
+                    </div>
+                  </div>
+                </aside>
+              </div>
+            </div>
+          </div>
+        `;
+        bindAskBox();
+      }
+
+      function buildTimeline(report) {
+        if (attempt.state === "failed") {
+          return [
+            {time: "19:09:18", title: "Attempt snapshot 冻结", note: "身份、配置与重试序号已写入。", tone: "passed", evidence: "E-F1"},
+            {time: "19:09:2x", title: "实例创建后进入安全首启", note: "provisioning.runtime_state=absent。", tone: "warning", evidence: "E-F3"},
+            {time: "19:09:49", title: "bootstrap_key_install_failed", note: "失败发生在训练进程启动前。", tone: "danger", evidence: "E-F1"},
+            {time: "19:10:xx", title: "证据回读为空", note: "metrics=0 · manifest=0 · logs=0 chunk。", tone: "danger", evidence: "E-F2"},
+            {time: "20:24:23", title: "费用守卫到期并清理", note: "未发现继续计费；无部分 Adapter。", tone: "passed", evidence: "E-F4"},
+          ];
+        }
+        return [
+          {time: "19:17:02", title: "Attempt snapshot 冻结", note: "模型、数据与训练配置进入本次运行。", tone: "passed", evidence: "E-01"},
+          {time: "19:18:xx", title: "Token 预检完成", note: "24 条序列，0 溢出。", tone: "passed", evidence: "E-02"},
+          {time: "19:19:xx", title: "Runtime lock 校验", note: "运行时身份与冻结 lock 一致。", tone: "passed", evidence: "E-05"},
+          {time: "19:20–19:24", title: "SFT / LoRA 训练", note: "22 个 Train/LR 点、1 个 Eval 点。", tone: "warning", evidence: "E-01"},
+          {time: "19:24:xx", title: "显存与执行证据归档", note: "device peak 2.40 GiB；12 个文件。", tone: "passed", evidence: "E-04"},
+          {time: "19:25:04", title: "Best / Final 校验通过", note: "2/2 available，均指向 step 22。", tone: "passed", evidence: "E-06"},
+          {time: "19:25:16", title: "托管资源回收", note: "训练链路结束，未触发新实例。", tone: "passed", evidence: "E-03"},
+          {time: "未发生", title: "独立推理验收未关联", note: "现有 Trials 不匹配当前 Adapter ID。", tone: "warning", evidence: "E-07"},
+        ];
+      }
+
+      function renderTimeline() {
+        const events = buildTimeline();
+        return `
+          <div class="timeline-head">
+            <span class="mf-eyebrow">CHRONOLOGY</span>
+            <h2>证据时间线</h2>
+            <p style="margin-top:4px;color:var(--mf-muted);font-size:8px;line-height:1.55">点击事件定位可引用证据。</p>
+          </div>
+          <div class="timeline">
+            ${events.map((event, index) => `
+              <button class="timeline-event ${event.tone} ${selectedEvidence === event.evidence ? "is-active" : ""}" type="button" data-evidence="${ui.escapeHtml(event.evidence)}" data-event-index="${index}">
+                <span>${ui.escapeHtml(event.time)}</span>
+                <strong>${ui.escapeHtml(event.title)}</strong>
+                <small>${ui.escapeHtml(event.note)}</small>
+              </button>
+            `).join("")}
+          </div>
+          <div class="timeline-foot">
+            <strong>${attempt.state === "failed" ? "5 个阶段事件" : "8 个阶段事件"}</strong>
+            <span>时间线来自 Attempt / provisioning / manifest；不补造缺失时间。</span>
+          </div>
+        `;
+      }
+
+      function renderFilters(findings) {
+        const keys = ["all", "blocked", "attention", "passed", "info", "unknown"];
+        return `
+          <div class="filter-row" role="group" aria-label="按严重度筛选发现">
+            ${keys.map((key) => `
+              <button class="filter-button ${filter === key ? "is-active" : ""}" type="button" data-filter="${key}" aria-pressed="${filter === key}">
+                ${ui.escapeHtml(severityLabels[key])}<b>${severityCount(findings, key)}</b>
+              </button>
+            `).join("")}
+          </div>
+        `;
+      }
+
+      function renderFinding(item, index) {
+        return `
+          <article class="finding-entry ${selectedFinding === item.id ? "is-selected" : ""}" data-finding-id="${ui.escapeHtml(item.id)}">
+            <div class="finding-index"><b>${ui.escapeHtml(item.id.replace(/^F-/, ""))}</b>${String(index + 1).padStart(2, "0")}</div>
+            <div class="finding-main">
+              <div class="finding-head">
+                <div>
+                  <div class="finding-kind">
+                    <span>${ui.escapeHtml(item.category)}</span>
+                    <span class="layer ${layerClass(item.layer)}">${ui.escapeHtml(item.layer)}</span>
+                  </div>
+                  <h3>${ui.escapeHtml(item.title)}</h3>
+                </div>
+                <span class="severity-mark ${ui.escapeHtml(item.severity)}">${ui.escapeHtml(item.severityLabel)}</span>
+              </div>
+              <dl class="claim-grid">
+                <dt>OBSERVED</dt><dd>${ui.escapeHtml(item.observation)}</dd>
+                <dt>INFERRED</dt><dd>${ui.escapeHtml(item.inference)}</dd>
+                <dt>ADVISORY</dt><dd>${ui.escapeHtml(item.recommendation)}</dd>
+              </dl>
+              <div class="finding-foot">
+                ${item.evidence.map((id) => `
+                  <button class="evidence-chip" type="button" data-evidence="${ui.escapeHtml(id)}" aria-pressed="${selectedEvidence === id}">${ui.escapeHtml(id)}</button>
+                `).join("")}
+                <span class="confidence">置信度 ${ui.escapeHtml(item.confidence)}</span>
+                <span class="finding-actions">
+                  <button class="text-action" type="button" data-action="copy-finding" data-finding-id="${ui.escapeHtml(item.id)}">复制论断</button>
+                </span>
+              </div>
+            </div>
+          </article>
+        `;
+      }
+
+      function renderFindings(findings) {
+        const list = filter === "all" ? findings : findings.filter((item) => item.severity === filter);
+        if (!list.length) {
+          return `<div style="padding:24px 12px;border-bottom:1px solid var(--c-rule);color:var(--mf-muted);font-size:10px;text-align:center">此严重度下没有发现。切换筛选查看其他证据。</div>`;
+        }
+        return list.map((item, index) => renderFinding(item, index)).join("");
+      }
+
+      function renderInspector(item) {
+        if (!item) {
+          return `<div class="inspector-body"><p class="evidence-detail">当前没有可展开证据。</p></div>`;
+        }
+        const related = (attempt.report?.findings || []).filter((finding) => finding.evidence.includes(item.id));
+        return `
+          <div class="inspector-head">
+            <span class="mf-eyebrow">EVIDENCE INSPECTOR</span>
+            <h2>证据检查器</h2>
+          </div>
+          <div class="inspector-body" id="inspectorBody">
+            <div class="evidence-tagline">
+              <span class="mf-mono">${ui.escapeHtml(item.id)}</span>
+              <span class="evidence-kind">${ui.escapeHtml(item.kind)}</span>
+            </div>
+            <h3>${ui.escapeHtml(item.title)}</h3>
+            <div class="evidence-value">${ui.escapeHtml(item.value)}</div>
+            <p class="evidence-detail">${ui.escapeHtml(item.detail)}</p>
+            <div class="field-pair">
+              <div><span>SOURCE</span><strong>${ui.escapeHtml(item.source)}</strong></div>
+              <div><span>PATH</span><strong>${ui.escapeHtml(item.path)}</strong></div>
+              <div><span>SAMPLES</span><strong>${ui.escapeHtml(item.samples)}</strong></div>
+              <div><span>HASH</span><strong>${ui.escapeHtml(item.hash || "未提供")}</strong></div>
+              <div><span>RELATED</span><strong>${ui.escapeHtml(related.map((finding) => finding.id).join(" / ") || "无")}</strong></div>
+            </div>
+            <div class="evidence-boundary"><strong>边界：</strong>${ui.escapeHtml(item.limitation)}</div>
+            <div class="evidence-actions">
+              <button class="mf-button" type="button" data-action="open-evidence" data-evidence-id="${ui.escapeHtml(item.id)}">展开原文</button>
+              <button class="mf-button" type="button" data-action="copy-evidence" data-evidence-id="${ui.escapeHtml(item.id)}">复制证据</button>
+            </div>
+            <details class="raw-evidence">
+              <summary>原始字段摘录 / RAW FIELDS</summary>
+              <pre>${ui.escapeHtml(JSON.stringify({
+                evidence_id: item.id,
+                kind: item.kind,
+                source: item.source,
+                path: item.path,
+                value: item.value,
+                samples: item.samples,
+                sha256: item.hash || null,
+              }, null, 2))}</pre>
+            </details>
+            <div class="evidence-index">
+              <div class="evidence-index-head"><span>EVIDENCE INDEX</span><span>${evidenceList().length} FILES</span></div>
+              <div class="evidence-index-list">
+                ${evidenceList().map((entry) => `
+                  <button class="evidence-index-item ${entry.id === item.id ? "is-active" : ""}" type="button" data-evidence="${ui.escapeHtml(entry.id)}" aria-pressed="${entry.id === item.id}">
+                    <b>${ui.escapeHtml(entry.id)}</b><span>${ui.escapeHtml(entry.title)}</span>
+                  </button>
+                `).join("")}
+              </div>
+            </div>
+            <div class="inspector-seal">只读证据视图。展开原文不重新查询后端，也不会改变 Attempt。</div>
+          </div>
+        `;
+      }
+
+      function renderExperiments(report) {
+        return `
+          <section class="ledger-section" id="report-experiments">
+            <div class="ledger-section-head">
+              <div>
+                <span class="mf-eyebrow">NEXT CHECKLIST / 建议</span>
+                <h2>下一步实验账页</h2>
+                <p>每项均绑定证据。优先级是研究顺序，不是效果保证。</p>
+              </div>
+            </div>
+            <div class="experiment-ledger">
+              ${report.experiments.map((experiment) => `
+                <article class="experiment-row">
+                  <div class="experiment-priority">${ui.escapeHtml(experiment.priority)}</div>
+                  <div>
+                    <h3>${ui.escapeHtml(experiment.title)}</h3>
+                    <p>${ui.escapeHtml(experiment.hypothesis)}</p>
+                    <div style="margin-top:5px;display:flex;flex-wrap:wrap;gap:4px">
+                      ${experiment.evidence.map((id) => `<button class="evidence-chip" type="button" data-evidence="${ui.escapeHtml(id)}">${ui.escapeHtml(id)}</button>`).join("")}
+                    </div>
+                  </div>
+                  <div class="experiment-actions">
+                    <button class="mf-button" type="button" data-action="copy-experiment" data-experiment-id="${ui.escapeHtml(experiment.id)}">复制</button>
+                    ${experiment.apply ? `<button class="mf-button primary" type="button" data-action="apply-experiment" data-experiment-id="${ui.escapeHtml(experiment.id)}">应用配置</button>` : ""}
+                  </div>
+                </article>
+              `).join("")}
+            </div>
+          </section>
+        `;
+      }
+
+      function renderReport() {
+        const report = attempt.report;
+        if (!report?.exists) {
+          renderEmpty();
+          return;
+        }
+        if (!selectedEvidence || !evidenceList().some((item) => item.id === selectedEvidence)) {
+          selectedEvidence = defaultEvidence();
+        }
+        const currentEvidence = selectedEvidenceItem();
+        const isFailed = attempt.state === "failed";
+
+        root.innerHTML = `
+          <div class="report-shell">
+            ${renderRibbon()}
+            <div class="report-wrap">
+              <div class="report-heading">
+                <div>
+                  <div class="report-kicker">
+                    <span class="mf-eyebrow">${isFailed ? "FAILURE REVIEW" : "AI ADVISORY REPORT"} / ${ui.escapeHtml(report.version)}</span>
+                    <span class="status-slash ${isFailed ? "danger" : "warning"}">${isFailed ? "失败复盘" : "可用性未验证"}</span>
+                    <span class="mf-demo-stamp">原型示例</span>
+                  </div>
+                  <h1>${ui.escapeHtml(report.headline)}</h1>
+                  <div class="report-meta">
+                    <span class="mono">ATTEMPT ${ui.escapeHtml(attempt.shortId)}</span>
+                    <span>${ui.escapeHtml(report.sourceNote)}</span>
+                    <span>生成于 ${ui.escapeHtml(report.generatedAt)}</span>
+                  </div>
+                </div>
+                <div class="report-actions">
+                  <button class="mf-button quiet" type="button" data-action="back-entry">返回 Attempt 详情</button>
+                  <button class="mf-button" type="button" data-action="regenerate">重新生成</button>
+                  <button class="mf-button primary" type="button" data-action="copy-summary">复制结论</button>
+                </div>
+              </div>
+
+              <div class="verdict-ledger">
+                <div class="ledger-label">Decision ledger · 双门禁</div>
+                <article class="ledger-verdict">
+                  <div class="ledger-verdict-top">
+                    <span>TRAINING HEALTH</span>
+                    <span class="status-slash ${isFailed ? "danger" : "warning"}">${ui.escapeHtml(report.health.label)}</span>
+                  </div>
+                  <h2>${ui.escapeHtml(report.health.title)}</h2>
+                  <p>${ui.escapeHtml(report.health.detail)}</p>
+                </article>
+                <article class="ledger-verdict">
+                  <div class="ledger-verdict-top">
+                    <span>DELIVERABILITY</span>
+                    <span class="status-slash ${isFailed ? "danger" : "warning"}">${ui.escapeHtml(report.delivery.label)}</span>
+                  </div>
+                  <h2>${ui.escapeHtml(report.delivery.title)}</h2>
+                  <p>${ui.escapeHtml(report.delivery.detail)}</p>
+                </article>
+              </div>
+
+              <div class="report-grid">
+                <aside class="timeline-column" aria-label="证据时间线">
+                  ${renderTimeline()}
+                </aside>
+
+                <section class="ledger-column" aria-labelledby="claimLedgerTitle">
+                  <div class="ledger-toolbar">
+                    <div>
+                      <span class="mf-eyebrow">CLAIM LEDGER / OBSERVED → INFERRED → ADVISORY</span>
+                      <h2 id="claimLedgerTitle">结论账页</h2>
+                      <p>每条论断拆成事实、推断与建议；点击 evidence chip 追踪来源。</p>
+                    </div>
+                    ${renderFilters(report.findings)}
+                  </div>
+                  <p class="filter-note" id="filterNote" aria-live="polite">当前显示 ${severityLabels[filter] || "全部"} · ${severityCount(report.findings, filter)} 条</p>
+                  <div class="finding-ledger" id="findingList">
+                    ${renderFindings(report.findings)}
+                  </div>
+
+                  ${renderExperiments(report)}
+
+                  <section class="ledger-section" id="report-limits">
+                    <div class="ledger-section-head">
+                      <div>
+                        <span class="mf-eyebrow">LIMITS / 审计边界</span>
+                        <h2>这份报告不能回答什么</h2>
+                      </div>
+                    </div>
+                    <div class="limits-box">
+                      <strong>限制不是免责声明，而是结论边界。</strong>
+                      <ul>${report.limitations.map((item) => `<li>${ui.escapeHtml(item)}</li>`).join("")}</ul>
+                    </div>
+                  </section>
+
+                  <section class="ask-ledger" aria-labelledby="askHeading">
+                    <span class="mf-eyebrow" id="askHeading">FOLLOW-UP / FRONTEND ONLY</span>
+                    <form id="askForm">
+                      <label class="mf-sr-only" for="askInput">追问这份报告</label>
+                      <input id="askInput" placeholder="例如：为什么 Adapter available 不能写成模型可用？">
+                      <button class="mf-button primary" type="submit">追问</button>
+                    </form>
+                    <p class="ask-response" id="askResponse" hidden></p>
+                  </section>
+                </section>
+
+                <aside class="inspector-column" id="report-evidence" aria-label="证据检查器">
+                  ${renderInspector(currentEvidence)}
+                </aside>
+              </div>
+            </div>
+          </div>
+        `;
+        bindAskBox();
+      }
+
+      function renderEmpty() {
+        const coverage = evidenceCoverageFor(attempt);
+        const present = coverage.filter((item) => item[1]).length;
+        root.innerHTML = `
+          <div class="report-shell">
+            ${renderRibbon()}
+            <div class="empty-wrap">
+              <div class="empty-heading">
+                <div>
+                  <div class="report-kicker">
+                    <span class="mf-eyebrow">REPORT ABSENT / EVIDENCE GAP</span>
+                    <span class="status-slash neutral">无报告</span>
+                    <span class="mf-demo-stamp">原型示例</span>
+                  </div>
+                  <h1>这个 Attempt 还没有可用的 AI 报告</h1>
+                  <div class="report-meta">
+                    <span class="mono">ATTEMPT ${ui.escapeHtml(attempt.shortId)}</span>
+                    <span>${ui.escapeHtml(attempt.report?.sourceNote || "当前没有报告。")}</span>
+                  </div>
+                </div>
+                <div class="empty-actions">
+                  <button class="mf-button quiet" type="button" data-action="back-entry">返回 Attempt 详情</button>
+                  <button class="mf-button primary" type="button" data-action="generate">生成有限复盘</button>
+                </div>
+              </div>
+
+              <div class="empty-grid">
+                <section class="empty-main">
+                  <div class="empty-icon" aria-hidden="true">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 3h9l4 4v14H6z"/><path d="M15 3v5h4M9 13h7M9 17h5"/></svg>
+                  </div>
+                  <h2>证据不足以回答四个问题</h2>
+                  <p>当前有 Attempt 快照、runtime report 与 ${attempt.execution.manifestFiles} 个执行文件；缺少 metrics、Adapter 与独立推理验收。可以整理成“有限复盘”，但不能生成训练健康度或模型效果结论。</p>
+                  <div class="empty-questions">
+                    <div class="empty-question"><span>这次训练做对了吗？</span><strong>未形成训练结果</strong></div>
+                    <div class="empty-question"><span>训练过程健康吗？</span><strong>没有 metrics，无法判断</strong></div>
+                    <div class="empty-question"><span>产物是否可交付？</span><strong>Adapter 0/2</strong></div>
+                    <div class="empty-question"><span>下一步怎么改？</span><strong>先补证 / 重新运行</strong></div>
+                  </div>
+                </section>
+                <aside class="coverage-column">
+                  <span class="mf-eyebrow">COVERAGE</span>
+                  <h2>证据覆盖账</h2>
+                  <p>缺失不是负向验收结果，也不是 0；它表示报告无法据此判断。</p>
+                  <div class="coverage-score"><strong>${present}</strong><span>/ 8 类可用</span></div>
+                  <div class="coverage-rule"><span style="width:${(present / 8) * 100}%"></span></div>
+                  <div class="coverage-list">
+                    ${coverage.map(([label, isPresent, note]) => `
+                      <div class="coverage-item">
+                        <i class="${isPresent ? "" : "missing"}"></i>
+                        <div><strong>${ui.escapeHtml(label)}</strong><small>${ui.escapeHtml(note)}</small></div>
+                        <em>${isPresent ? "YES" : "NO"}</em>
+                      </div>
+                    `).join("")}
+                  </div>
+                </aside>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      function renderLoading() {
+        const steps = [
+          ["冻结 Attempt 快照", "snapshot"],
+          ["读取指标与 runtime", "metrics"],
+          ["核对 manifest 与 Adapter", "artifacts"],
+          ["标注缺失与边界", "boundaries"],
+        ];
+        root.innerHTML = `
+          <div class="report-shell">
+            ${renderRibbon()}
+            <div class="loading-wrap">
+              <div class="loading-heading">
+                <div>
+                  <div class="report-kicker">
+                    <span class="mf-eyebrow">AI REPORT / GENERATING</span>
+                    <span class="status-slash warning" id="generationLabel">正在读取证据</span>
+                    <span class="mf-demo-stamp">原型示例</span>
+                  </div>
+                  <h1>正在把已归档事实整理成可追溯的结论账页</h1>
+                  <div class="report-meta">
+                    <span class="mono">ATTEMPT ${ui.escapeHtml(attempt.shortId)}</span>
+                    <span>只读 Attempt、runtime、manifest、Adapter 与推理 Trials</span>
+                  </div>
+                </div>
+                <div class="loading-actions">
+                  <button class="mf-button quiet" type="button" data-action="cancel-generation">取消</button>
+                </div>
+              </div>
+              <div class="loading-grid">
+                <div class="loading-main" aria-live="polite">
+                  <div class="scan-visual" aria-hidden="true">
+                    <div class="scan-lines">
+                      <div class="scan-line"><i></i><span>Attempt snapshot</span></div>
+                      <div class="scan-line"><i></i><span>metrics / runtime</span></div>
+                      <div class="scan-line"><i></i><span>manifest / adapter</span></div>
+                      <div class="scan-line"><i></i><span>limitations</span></div>
+                    </div>
+                  </div>
+                  <div class="loading-steps">
+                    ${steps.map(([label, key], index) => `
+                      <div class="loading-step ${index < generationStep ? "is-done" : index === generationStep ? "is-current" : ""}" data-loading-step="${index}">
+                        <span class="step-index">${String(index + 1).padStart(2, "0")}</span>
+                        <strong>${ui.escapeHtml(label)}</strong>
+                        <span class="step-state">${index < generationStep ? "DONE" : index === generationStep ? "READING" : "QUEUED"}</span>
+                      </div>
+                    `).join("")}
+                  </div>
+                </div>
+                <aside class="loading-side">
+                  <span class="mf-eyebrow">WHAT WILL BE CHECKED</span>
+                  <h2>报告生成边界</h2>
+                  <p>只读取本 Attempt 已归档证据。没有的字段会显示“未上报/无法判断”，不会猜测数字或根因。</p>
+                  <div class="loading-evidence">
+                    <div><strong>HEALTH</strong>用 Loss / LR / Token / runtime / GPU 证据做有限判断。</div>
+                    <div><strong>DELIVERY</strong>单独核对 Adapter 完整性、存储校验和推理验收关联。</div>
+                    <div><strong>ADVISORY</strong>建议只创建未提交草稿，不绕过现有硬门禁。</div>
+                  </div>
+                </aside>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      function renderLimited() {
+        const coverage = evidenceCoverageFor(attempt);
+        root.innerHTML = `
+          <div class="report-shell">
+            ${renderRibbon()}
+            <div class="limited-wrap">
+              <div class="limited-heading">
+                <div class="report-kicker">
+                  <span class="mf-eyebrow">LIMITED REVIEW / NO METRICS</span>
+                  <span class="status-slash neutral">证据不足</span>
+                  <span class="mf-demo-stamp">原型示例</span>
+                </div>
+                <h1>这次 Attempt 已取消；现有证据只能说明“未形成训练结论”</h1>
+                <p>已读取 Attempt 快照、runtime 与 ${attempt.execution.manifestFiles} 个执行文件。没有 metrics、Adapter 或推理验收，因此不能评价训练健康度或模型效果。</p>
+                <div class="report-meta">
+                  <span>有限复盘 <b class="mono">R-LIMITED-C01</b></span>
+                  <span>生成于 11/06 20:20</span>
+                  <span>${ui.escapeHtml(attempt.displayName)}</span>
+                </div>
+              </div>
+              <div class="limited-callout">
+                <span class="layer limit">限制</span>
+                <span>这是“有限复盘”，不是失败根因或训练质量报告。所有缺失项显示为“未上报”，不以 0 代替。</span>
+              </div>
+              <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:11px">
+                <button class="mf-button quiet" type="button" data-action="back-entry">返回详情</button>
+                <button class="mf-button" type="button" data-action="regenerate">重新读取证据</button>
+                <button class="mf-button primary" type="button" data-action="copy-summary">复制有限结论</button>
+              </div>
+              <div class="limited-grid" style="margin-top:12px">
+                <div class="limited-main">
+                  <div class="limited-gates">
+                    <div class="limited-gate">
+                      <span>TRAINING HEALTH</span>
+                      <h2>没有训练指标，不能评价健康度</h2>
+                      <p>取消前未形成 Train/Eval Loss、学习率或显存轨迹。</p>
+                    </div>
+                    <div class="limited-gate">
+                      <span>DELIVERABILITY</span>
+                      <h2>取消不发布部分 Adapter</h2>
+                      <p>没有 Best / Final，推理验收未到达。</p>
+                    </div>
+                  </div>
+                  <div class="limited-finding">
+                    <div class="num">L-01</div>
+                    <div class="copy">
+                      <h3>Attempt 已取消，未发布部分产物</h3>
+                      <dl>
+                        <dt>观测</dt><dd>state=cancelled，outcome=cancelled；Adapter 记录为 0。</dd>
+                        <dt>推断</dt><dd>符合“取消后不发布部分 Adapter”的门禁。</dd>
+                        <dt>建议</dt><dd>保留证据，不把该 Attempt 送入推理试用。</dd>
+                      </dl>
+                    </div>
+                  </div>
+                  <div class="limited-finding">
+                    <div class="num">L-02</div>
+                    <div class="copy">
+                      <h3>缺失训练指标，无法判断健康度</h3>
+                      <dl>
+                        <dt>观测</dt><dd>metrics=0，显存峰值为空，没有可绘制的 Loss 曲线。</dd>
+                        <dt>推断</dt><dd>没有数据意味着“不知道”，不是“健康”。</dd>
+                        <dt>建议</dt><dd>如需要训练结论，重新运行并确保指标归档。</dd>
+                      </dl>
+                    </div>
+                  </div>
+                  <div class="limits-box">
+                    <strong>限制</strong>
+                    <ul>
+                      <li>不能从取消状态推断训练代码、数据或硬件有缺陷。</li>
+                      <li>不能把 runtime_report 的存在当作训练已开始。</li>
+                      <li>本报告不触发重试、不创建实例、不修改历史 Attempt。</li>
+                    </ul>
+                  </div>
+                </div>
+                <aside class="limited-side">
+                  <span class="mf-eyebrow">EVIDENCE COVERAGE</span>
+                  <h2>证据缺口账</h2>
+                  <p>${coverage.filter((item) => item[1]).length} / 8 类证据可用。</p>
+                  <div class="coverage-list" style="margin-top:9px">
+                    ${coverage.map(([label, isPresent, note]) => `
+                      <div class="coverage-item">
+                        <i class="${isPresent ? "" : "missing"}"></i>
+                        <div><strong>${ui.escapeHtml(label)}</strong><small>${ui.escapeHtml(note)}</small></div>
+                        <em>${isPresent ? "YES" : "NO"}</em>
+                      </div>
+                    `).join("")}
+                  </div>
+                </aside>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      function render() {
+        if (view === "loading") {
+          renderLoading();
+          return;
+        }
+        if (view === "report") {
+          if (attempt.report?.exists) renderReport();
+          else renderEmpty();
+          return;
+        }
+        if (view === "limited") {
+          renderLimited();
+          return;
+        }
+        if (view === "empty") {
+          renderEmpty();
+          return;
+        }
+        renderEntry();
+      }
+
+      function bindAskBox() {
+        const form = document.getElementById("askForm");
+        const response = document.getElementById("askResponse");
+        ui.initAskBox(form, response, {
+          "为什么 Adapter available 不能写成模型可用？": "观测：Best / Final 为 available，只能证明两个 Adapter 文件可校验、可下载。推断：没有当前 Adapter ID 关联的独立推理服务 ready 与最小请求证据。建议：先完成推理验收，再讨论“可用”。",
+          "训练健康吗？": "训练内信号可读：22 个 Train/LR 点、0 Token 溢出、runtime lock 一致、显存峰值已测。但只有 1 个 Eval 点，泛化趋势仍无法判断。",
+          "为什么没有根因？": "失败 Attempt 的 metrics、runtime_report、manifest 与日志都为空；错误码只说明失败阶段，不足以区分凭据安装、连接或实例状态。",
+        });
+      }
+
+      function rerenderFindings() {
+        const list = document.getElementById("findingList");
+        if (!list || !attempt.report) return;
+        list.innerHTML = renderFindings(attempt.report.findings);
+        const filterRow = root.querySelector(".filter-row");
+        if (filterRow) filterRow.outerHTML = renderFilters(attempt.report.findings);
+        const note = document.getElementById("filterNote");
+        if (note) note.textContent = `当前显示 ${severityLabels[filter] || "全部"} · ${severityCount(attempt.report.findings, filter)} 条`;
+      }
+
+      function refreshInspector() {
+        const item = selectedEvidenceItem();
+        const inspector = document.getElementById("report-evidence");
+        if (inspector) inspector.innerHTML = renderInspector(item);
+        root.querySelectorAll("[data-evidence]").forEach((node) => {
+          if (node.classList.contains("timeline-event")) {
+            node.classList.toggle("is-active", node.dataset.evidence === selectedEvidence);
+          }
+        });
+        root.querySelectorAll(".evidence-chip, .evidence-index-item").forEach((node) => {
+          node.setAttribute("aria-pressed", String(node.dataset.evidence === selectedEvidence));
+        });
+      }
+
+      function selectEvidence(id) {
+        if (!id) return;
+        selectedEvidence = id;
+        refreshInspector();
+      }
+
+      function showEvidence(id) {
+        const item = evidenceList().find((entry) => entry.id === id) || selectedEvidenceItem();
+        if (!item) {
+          ui.toast("当前没有可展开的证据。");
+          return;
+        }
+        evidenceDialogBody.innerHTML = `
+          <span class="mf-eyebrow">${ui.escapeHtml(item.kind)} · ${ui.escapeHtml(item.id)}</span>
+          <h3 style="margin-top:6px;font-family:var(--c-serif);font-size:22px">${ui.escapeHtml(item.title)}</h3>
+          <p style="margin-top:7px;color:var(--mf-muted);font-size:10px;line-height:1.7">${ui.escapeHtml(item.detail)}</p>
+          <div class="field-pair" style="margin-top:12px">
+            <div><span>SOURCE</span><strong>${ui.escapeHtml(item.source)}</strong></div>
+            <div><span>PATH</span><strong>${ui.escapeHtml(item.path)}</strong></div>
+            <div><span>VALUE</span><strong>${ui.escapeHtml(item.value)}</strong></div>
+            <div><span>SAMPLES</span><strong>${ui.escapeHtml(item.samples)}</strong></div>
+            <div><span>HASH</span><strong>${ui.escapeHtml(item.hash || "未提供")}</strong></div>
+          </div>
+          <div class="dialog-note"><strong>证据边界：</strong>${ui.escapeHtml(item.limitation)}</div>
+        `;
+        evidenceDialog.open(document.activeElement);
+      }
+
+      function openApply(experimentId) {
+        const experiment = attempt.report?.experiments.find((item) => item.id === experimentId);
+        if (!experiment) return;
+        currentExperiment = experiment;
+        applyDialogBody.innerHTML = `
+          <p style="color:var(--mf-muted);font-size:10px;line-height:1.7">${ui.escapeHtml(experiment.title)}</p>
+          <div class="dialog-config">
+            ${(experiment.changes || []).map(([key, before, after]) => `
+              <div><span>${ui.escapeHtml(key)}</span><strong>${ui.escapeHtml(before)} → ${ui.escapeHtml(after)}</strong></div>
+            `).join("")}
+          </div>
+          <div class="dialog-note"><strong>草稿边界：</strong>${ui.escapeHtml(experiment.hypothesis)} 应用后仍需核对数据、基座、运行时兼容性与费用守卫。</div>
+        `;
+        applyDialog.open(document.activeElement);
+      }
+
+      function startGeneration() {
+        if (generationTimer) window.clearTimeout(generationTimer);
+        generationStep = 0;
+        view = "loading";
+        render();
+
+        const advance = () => {
+          if (view !== "loading") return;
+          generationStep += 1;
+          if (generationStep < 4) {
+            const nodes = [...root.querySelectorAll("[data-loading-step]")];
+            nodes.forEach((node, index) => {
+              node.classList.toggle("is-done", index < generationStep);
+              node.classList.toggle("is-current", index === generationStep);
+              const state = node.querySelector(".step-state");
+              if (state) state.textContent = index < generationStep ? "DONE" : index === generationStep ? "READING" : "QUEUED";
+            });
+            generationTimer = window.setTimeout(advance, 480);
+            return;
+          }
+          if (attempt.report?.exists) {
+            view = "report";
+            selectedEvidence = defaultEvidence();
+          } else {
+            limitedGenerated = true;
+            view = "limited";
+          }
+          render();
+          window.scrollTo({top: 0, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"});
+        };
+        generationTimer = window.setTimeout(advance, 520);
+      }
+
+      root.addEventListener("click", async (event) => {
+        const filterButton = event.target.closest("[data-filter]");
+        const evidenceButton = event.target.closest("[data-evidence]");
+        const actionNode = event.target.closest("[data-action]");
+
+        if (filterButton) {
+          filter = filterButton.dataset.filter;
+          rerenderFindings();
+          return;
+        }
+        if (evidenceButton) {
+          selectEvidence(evidenceButton.dataset.evidence);
+          if (evidenceButton.classList.contains("timeline-event")) {
+            selectedFinding = "";
+            root.querySelectorAll(".finding-entry").forEach((node) => node.classList.remove("is-selected"));
+          }
+          return;
+        }
+        if (!actionNode) return;
+        const action = actionNode.dataset.action;
+        if (action === "open-report") {
+          view = "report";
+          selectedEvidence = defaultEvidence();
+          selectedFinding = "";
+          filter = "all";
+          render();
+          document.getElementById("viewRoot")?.focus({preventScroll: true});
+        } else if (action === "back-entry") {
+          if (generationTimer) window.clearTimeout(generationTimer);
+          view = "entry";
+          render();
+        } else if (action === "generate" || action === "regenerate") {
+          startGeneration();
+        } else if (action === "cancel-generation") {
+          if (generationTimer) window.clearTimeout(generationTimer);
+          view = "entry";
+          render();
+        } else if (action === "scroll-coverage") {
+          document.getElementById("coverageSheet")?.scrollIntoView({behavior: "smooth", block: "center"});
+        } else if (action === "copy-summary") {
+          const text = attempt.report?.exists
+            ? `${attempt.displayName}\n${attempt.report.summary}\n训练健康度：${attempt.report.health.label}\n可交付性：${attempt.report.delivery.label}`
+            : "有限复盘：没有 metrics、Adapter 或推理验收；无法判断训练健康度。";
+          const ok = await ui.copyText(text);
+          ui.toast(ok ? "结论摘要已复制。" : "复制失败，请手动选择文本。");
+        } else if (action === "copy-finding") {
+          const finding = attempt.report?.findings.find((item) => item.id === actionNode.dataset.findingId);
+          if (!finding) return;
+          const text = `${finding.id} ${finding.title}\n观测：${finding.observation}\n推断：${finding.inference}\n建议：${finding.recommendation}\n证据：${finding.evidence.join(" / ")}`;
+          const ok = await ui.copyText(text);
+          ui.toast(ok ? "论断与边界已复制。" : "复制失败，请手动选择文本。");
+        } else if (action === "copy-experiment") {
+          const experiment = attempt.report?.experiments.find((item) => item.id === actionNode.dataset.experimentId);
+          if (!experiment) return;
+          const text = `${experiment.priority} ${experiment.title}\n假设：${experiment.hypothesis}\n预期：${experiment.expectation}\n证据：${experiment.evidence.join(" / ")}`;
+          const ok = await ui.copyText(text);
+          ui.toast(ok ? "实验建议已复制。" : "复制失败，请手动选择文本。");
+        } else if (action === "apply-experiment") {
+          openApply(actionNode.dataset.experimentId);
+        } else if (action === "copy-evidence") {
+          const item = evidenceList().find((entry) => entry.id === actionNode.dataset.evidenceId);
+          if (!item) return;
+          const text = `${item.id} ${item.title}\n${item.source}\n${item.value}\n限制：${item.limitation}`;
+          const ok = await ui.copyText(text);
+          ui.toast(ok ? "证据说明已复制。" : "复制失败，请手动选择文本。");
+        } else if (action === "open-evidence") {
+          showEvidence(actionNode.dataset.evidenceId);
+        }
+      });
+
+      root.addEventListener("click", (event) => {
+        const entry = event.target.closest(".finding-entry");
+        if (!entry) return;
+        selectedFinding = entry.dataset.findingId;
+        root.querySelectorAll(".finding-entry").forEach((node) => node.classList.toggle("is-selected", node === entry));
+      });
+
+      attemptSelect.addEventListener("change", () => {
+        if (generationTimer) window.clearTimeout(generationTimer);
+        attempt = data.getAttempt(attemptSelect.value);
+        filter = "all";
+        selectedEvidence = defaultEvidence();
+        selectedFinding = "";
+        limitedGenerated = false;
+        view = attempt.report?.exists ? "entry" : "empty";
+        render();
+        window.scrollTo({top: 0, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"});
+      });
+
+      confirmApply.addEventListener("click", () => {
+        if (!currentExperiment) return;
+        applyDialog.close();
+        ui.toast("已创建原型配置草稿；未提交训练、未创建 GPU、未修改当前 Attempt。");
+      });
+
+      const requestedView = params.get("view");
+      if (requestedView === "loading") {
+        startGeneration();
+      } else {
+        render();
+      }
+    })();
+  </script>
+</body>
+</html>

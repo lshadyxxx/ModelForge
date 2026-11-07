@@ -19,6 +19,23 @@ test('image name filters are trimmed and omitted when blank', () => {
   assert.match(imageDirectoryQuery('region-a', 'zone-a', '  torch  ', 'App').path, /(?:[?&])name=torch(?:&|$)/);
 });
 
+test('custom image queries keep the exact region and zone scope', () => {
+  const query = imageDirectoryQuery(
+    'cn-bj2',
+    'cn-bj2-03',
+    'training',
+    'Custom',
+    0,
+    100,
+  );
+
+  assert.equal(query.filters.ImageType, 'Custom');
+  assert.match(query.path, /image_type=Custom/);
+  assert.match(query.path, /region=cn-bj2/);
+  assert.match(query.path, /zone=cn-bj2-03/);
+  assert.match(query.path, /name=training/);
+});
+
 test('an old region page cannot be used after switching regions', () => {
   const previous = directory({Region: 'region-a', Offset: 80, Limit: 20});
 

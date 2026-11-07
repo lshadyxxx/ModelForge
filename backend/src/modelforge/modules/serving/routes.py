@@ -7,6 +7,7 @@ from modelforge.bootstrap import remote_services
 from modelforge.modules.models import Adapters
 from pydantic import BaseModel,ConfigDict,Field
 from .use_cases import Serving,CreateTrial,Chat
+from .acceptance import AcceptanceDecision,InferenceAcceptance
 
 router=APIRouter(prefix='/api/v1/serving',tags=['serving'])
 
@@ -49,6 +50,21 @@ def bind(identifier:uuid.UUID,body:Binding,request:Request):
 
 @router.post('/trials/{identifier}/cancel-request')
 def cancel_request(identifier:uuid.UUID,request:Request):return Serving(request.app.state.resources).request_cancel(identifier)
+
+@router.get('/trials/{identifier}/acceptance')
+def acceptance_history(identifier:uuid.UUID,request:Request):
+    return InferenceAcceptance(request.app.state.resources).list(identifier)
+
+@router.post('/trials/{identifier}/acceptance',status_code=201)
+def record_acceptance(
+    identifier:uuid.UUID,
+    body:AcceptanceDecision,
+    request:Request,
+):
+    return InferenceAcceptance(request.app.state.resources).record(
+        identifier,
+        body,
+    )
 
 @router.post('/trials/{identifier}/chat')
 def chat(identifier:uuid.UUID,body:Chat,request:Request):

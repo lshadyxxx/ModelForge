@@ -67,6 +67,12 @@ class InstanceType(Projection):
     Disks: list[DiskGroup] = Field(default_factory=list)
 
 
+class ImageZoneSupport(Projection):
+    Region: str = ""
+    Zone: str
+    Status: str = ""
+
+
 class Image(Projection):
     CompShareImageId: str
     Name: str
@@ -75,8 +81,10 @@ class Image(Projection):
     Author: str = ""
     Tags: list[str] = Field(default_factory=list)
     Description: str = ""
+    Zone: str = ""
+    ImageSupportZone: list[ImageZoneSupport] = Field(default_factory=list)
 
-    @field_validator("Tags", mode="before")
+    @field_validator("Tags", "ImageSupportZone", mode="before")
     @classmethod
     def normalize_null_tags(cls, value):
         return [] if value is None else value
@@ -173,6 +181,7 @@ CONTRACTS = {
     "zones": ("DescribeCompShareSupportZone", "ZoneInfo", Zone),
     "specs": ("DescribeAvailableCompShareInstanceTypes", "AvailableInstanceTypes", InstanceType),
     "images": ("DescribeCompShareImages", "ImageSet", Image),
+    "custom_images": ("DescribeCompShareCustomImages", "ImageSet", Image),
     "models": ("DescribeModelRepositoryModels", "Models", PublicModel),
     "capacity": ("CheckCompShareResourceCapacity", "Specs", Capacity),
     "instances": ("DescribeCompShareInstance", "UHostSet", Instance),
@@ -204,6 +213,105 @@ class Catalog:
         return {"items": items, "total": total, "state": state,
             "fetched_at": datetime.now(timezone.utc).isoformat(),
             "source": "ucloud", "filters": parameters, "compatibility": "unverified"}
+
+    def custom_images(
+        self,
+        *,
+        region: str,
+        zone: str | None = None,
+        name: str | None = None,
+        offset: int = 0,
+        limit: int = 20,
+    ):
+        """Read, filter, and page account-owned images from their dedicated API."""
+        rows = []
+        provider_total = None
+        cursor = 0
+        while True:
+            response = self.provider.query(
+                "DescribeCompShareCustomImages",
+                {"Region": region, "Offset": cursor, "Limit": 100},
+            )
+            try:
+                source = response["ImageSet"]
+                total = response["TotalCount"]
+                if not isinstance(source, list) or type(total) is not int or total < 0:
+                    raise ValueError()
+                page = [Image.model_validate(row).model_dump() for row in source]
+            except (KeyError, TypeError, ValueError, ValidationError):
+                raise AppError(
+                    502,
+                    "cloud_invalid_response",
+                    "优云自制镜像目录字段无效，请稍后重试。",
+                ) from None
+            if provider_total is None:
+                provider_total = total
+            elif total != provider_total:
+                raise AppError(
+                    502,
+                    "cloud_invalid_response",
+                    "优云自制镜像目录分页不一致，请稍后重试。",
+                )
+            rows.extend(page)
+            cursor += len(page)
+            if not page or cursor >= provider_total:
+                break
+            if cursor > 10_000:
+                raise AppError(
+                    502,
+                    "cloud_invalid_response",
+                    "优云自制镜像目录超出安全分页上限。",
+                )
+
+        needle = (name or "").strip().casefold()
+
+        def matches(row):
+            if zone:
+                declared_zone = row.get("Zone") or ""
+                support_zones = {
+                    item.get("Zone")
+                    for item in row.get("ImageSupportZone", [])
+                    if item.get("Zone")
+                    and (not item.get("Region") or item.get("Region") == region)
+                }
+                if declared_zone and declared_zone != zone:
+                    return False
+                if support_zones and zone not in support_zones:
+                    return False
+                if not declared_zone and not support_zones:
+                    return False
+            if needle:
+                haystack = " ".join(
+                    [
+                        row.get("Name") or "",
+                        row.get("CompShareImageId") or "",
+                        row.get("Description") or "",
+                        row.get("Author") or "",
+                        " ".join(row.get("Tags") or []),
+                    ]
+                ).casefold()
+                if needle not in haystack:
+                    return False
+            return True
+
+        filtered = [row for row in rows if matches(row)]
+        return {
+            "items": filtered[offset:offset + limit],
+            "total": len(filtered),
+            "state": "empty" if not filtered else "ready",
+            "fetched_at": datetime.now(timezone.utc).isoformat(),
+            "source": "ucloud",
+            "filters": {
+                "Region": region,
+                **({"Zone": zone} if zone else {}),
+                **({"Name": name.strip()} if needle else {}),
+                "ImageType": "Custom",
+                "Offset": offset,
+                "Limit": limit,
+            },
+            "compatibility": "unverified",
+            "provider_total": provider_total,
+        }
 
     def validate_selection(self, spec):
         """A current exact capacity check; never creates or reserves a paid instance."""

@@ -37,6 +37,17 @@ export type ModelStatusSummary = {
 };
 export type ModelFilter = 'all' | 'modelscope' | 'directory' | 'ucloud_public' | 'pending' | 'errors' | 'verified';
 
+export type ModelImportProgress = {
+  transferredBytes: number;
+  totalBytes: number;
+  percent: number;
+  verifiedFiles: number;
+  totalFiles: number;
+  currentBytes: number;
+  currentFileSize: number | null;
+  currentPercent: number | null;
+};
+
 const errorStates = new Set(['delete_failed', 'upload_failed', 'failed', 'mismatch']);
 const transferringStates = new Set(['uploading', 'queued', 'running']);
 const pendingStates = new Set(['pending', 'awaiting_verification', 'cancelled', 'deleting']);
@@ -49,6 +60,38 @@ export function mergeVersionRow(rows: Row[], version: Version, fallbackName = ''
 
 export function modelShortId(identifier: string): string {
   return identifier.slice(0, 8).toUpperCase();
+}
+
+export function modelImportProgress(
+  version: Pick<Version, 'files' | 'total_bytes' | 'verified_bytes' | 'import'>,
+): ModelImportProgress {
+  const totalBytes = Math.max(0, Number(version.total_bytes) || 0);
+  const verifiedBytes = Math.min(totalBytes, Math.max(0, Number(version.verified_bytes) || 0));
+  const currentBytes = Math.max(0, Number(version.import?.current_bytes) || 0);
+  const currentFile = version.import?.current_path
+    ? version.files.find((file) => file.path === version.import?.current_path)
+    : undefined;
+  const currentContribution = currentFile?.state === 'verified'
+    ? 0
+    : Math.min(currentFile?.size_bytes ?? currentBytes, currentBytes);
+  const transferredBytes = Math.min(totalBytes, verifiedBytes + currentContribution);
+  const percent = totalBytes > 0 ? transferredBytes / totalBytes * 100 : 0;
+  const currentFileBytes = currentFile
+    ? Math.min(currentFile.size_bytes, currentBytes)
+    : currentContribution;
+  const currentFileSize = currentFile?.size_bytes ?? null;
+  return {
+    transferredBytes,
+    totalBytes,
+    percent,
+    verifiedFiles: version.files.filter((file) => file.state === 'verified').length,
+    totalFiles: version.files.length,
+    currentBytes: currentFileBytes,
+    currentFileSize,
+    currentPercent: currentFileSize
+      ? Math.min(100, currentFileBytes / currentFileSize * 100)
+      : null,
+  };
 }
 
 export function groupModelRows(rows: Row[]): ModelGroup[] {

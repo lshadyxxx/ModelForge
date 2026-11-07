@@ -117,7 +117,7 @@ def test_model_limits_contract_reports_configuration(monkeypatch):
     assert response.status_code == 200
     assert response.json() == {'file_limit_bytes': 17, 'total_limit_bytes': 31,
         'file_count_limit': 5, 'configuration_version': 'test-models', 'locked': False,
-        'resume_granularity': 'file'}
+        'resume_granularity': 'file', 'modelscope_resume_granularity': 'byte'}
 
 
 def test_runtime_baseline_contract_reports_locks_and_open_gaps(monkeypatch):
@@ -155,3 +155,25 @@ def test_unexpected_errors_are_sanitized():
     assert response.status_code == 500
     assert "never-leak" not in response.text
     assert response.json()["request_id"] == response.headers["X-Request-ID"]
+
+
+def test_ai_diagnosis_availability_defaults_to_disabled(monkeypatch):
+    settings = SimpleNamespace(
+        ai_enabled=False,
+        ai_model=None,
+    )
+    monkeypatch.setattr(
+        app.state,
+        "resources",
+        SimpleNamespace(settings=settings),
+        raising=False,
+    )
+    response = TestClient(app).get("/api/v1/training/diagnosis/config")
+    assert response.status_code == 200
+    assert response.json() == {
+        "enabled": False,
+        "model_configured": False,
+        "scope": "terminal_attempt_only",
+        "trigger": "manual",
+        "ai_role": "advisory_diagnosis_not_gate",
+    }

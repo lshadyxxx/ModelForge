@@ -1,0 +1,2611 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>方案 B · AI 训练简报 · ModelForge</title>
+  <link rel="stylesheet" href="shared/base.css">
+  <style>
+    :root {
+      --b-serif: Georgia, "Songti SC", "STSong", SimSun, serif;
+      --b-paper: #fffdf8;
+      --b-wash: #f2ecdf;
+      --b-rule: #d7cdbb;
+      --b-blue: #1e4ca8;
+      --b-blue-deep: #173879;
+      --b-soft: #eef3ff;
+    }
+
+    body {
+      background:
+        radial-gradient(circle at 8% -5%, rgba(255, 255, 255, 0.78), transparent 30%),
+        var(--b-wash);
+    }
+
+    .skip-link {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      z-index: 120;
+      padding: 10px 14px;
+      border-radius: 6px;
+      color: white;
+      background: var(--b-blue-deep);
+      transform: translateY(-160%);
+    }
+
+    .skip-link:focus {
+      transform: translateY(0);
+    }
+
+    .site-header {
+      position: sticky;
+      top: 0;
+      z-index: 40;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      min-height: 62px;
+      padding: 9px 32px;
+      border-bottom: 1px solid var(--b-rule);
+      background: rgba(255, 253, 248, 0.95);
+      backdrop-filter: blur(12px);
+    }
+
+    .header-left,
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      min-width: 0;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      flex: 0 0 auto;
+    }
+
+    .brand-mark {
+      display: grid;
+      place-items: center;
+      width: 31px;
+      height: 31px;
+      border-radius: 8px;
+      color: #fff;
+      background: var(--b-blue-deep);
+      font-size: 17px;
+      font-weight: 760;
+    }
+
+    .brand strong {
+      display: block;
+      font-size: 14px;
+      letter-spacing: -0.02em;
+    }
+
+    .brand small {
+      display: block;
+      margin-top: 1px;
+      color: var(--mf-muted);
+      font-size: 8px;
+      letter-spacing: 0.06em;
+    }
+
+    .header-rule {
+      width: 1px;
+      height: 24px;
+      background: var(--b-rule);
+    }
+
+    .crumbs {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      min-width: 0;
+      color: var(--mf-muted);
+      font-size: 10px;
+      white-space: nowrap;
+    }
+
+    .crumbs a {
+      color: var(--b-blue);
+      font-weight: 650;
+    }
+
+    .attempt-select {
+      max-width: 300px;
+      min-height: 34px;
+      padding: 5px 26px 5px 9px;
+      border: 1px solid var(--b-rule);
+      border-radius: 7px;
+      color: var(--mf-ink-soft);
+      background: #fff;
+      font-size: 10px;
+    }
+
+    .header-right label {
+      display: flex;
+      min-width: 0;
+      flex: 1;
+    }
+
+    .header-right .mf-button {
+      flex-shrink: 0;
+      white-space: nowrap;
+    }
+
+    main {
+      min-width: 0;
+      padding: 28px 32px 60px;
+    }
+
+    .shell {
+      width: min(1260px, 100%);
+      min-width: 0;
+      margin: 0 auto;
+    }
+
+    .entry-context {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 24px;
+      margin-bottom: 23px;
+    }
+
+    .entry-context h1 {
+      max-width: 920px;
+      margin-top: 5px;
+      font-family: var(--b-serif);
+      font-size: clamp(28px, 3vw, 44px);
+      font-weight: 600;
+      line-height: 1.16;
+      letter-spacing: -0.04em;
+      text-wrap: balance;
+    }
+
+    .entry-context p {
+      max-width: 800px;
+      margin-top: 8px;
+      color: var(--mf-muted);
+      font-size: 11px;
+      line-height: 1.7;
+    }
+
+    .entry-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px 13px;
+      margin-top: 8px;
+      color: var(--mf-muted);
+      font-size: 9px;
+    }
+
+    .entry-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      padding-top: 5px;
+    }
+
+    .briefing-nav {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      margin-bottom: 20px;
+      padding: 0;
+      border-top: 1px solid var(--b-rule);
+      border-bottom: 1px solid var(--b-rule);
+      overflow-x: auto;
+    }
+
+    .briefing-nav button {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      min-height: 43px;
+      padding: 8px 17px;
+      border: 0;
+      border-right: 1px solid var(--b-rule);
+      color: var(--mf-muted);
+      background: transparent;
+      font-size: 10px;
+      white-space: nowrap;
+    }
+
+    .briefing-nav button:hover {
+      color: var(--b-blue);
+      background: rgba(255, 255, 255, 0.45);
+    }
+
+    .briefing-nav button span {
+      color: #8f8a7c;
+      font-family: var(--mf-mono);
+      font-size: 8px;
+    }
+
+    .briefing-nav a {
+      margin-left: auto;
+      padding: 8px 13px;
+      color: var(--b-blue);
+      font-size: 10px;
+      font-weight: 650;
+      white-space: nowrap;
+    }
+
+    .entry-brief {
+      position: relative;
+      overflow: hidden;
+      display: grid;
+      grid-template-columns: minmax(0, 1.25fr) minmax(320px, 0.75fr);
+      gap: 34px;
+      padding: 38px 42px;
+      border: 1px solid var(--b-rule);
+      background: var(--b-paper);
+      box-shadow: var(--mf-shadow-soft);
+    }
+
+    .entry-brief::before {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      width: 6px;
+      background: var(--b-blue);
+      content: "";
+    }
+
+    .entry-brief::after {
+      position: absolute;
+      top: -65px;
+      right: -55px;
+      width: 280px;
+      height: 280px;
+      border: 1px solid rgba(30, 76, 168, 0.12);
+      border-radius: 50%;
+      content: "";
+    }
+
+    .brief-kicker {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      flex-wrap: wrap;
+    }
+
+    .brief-kicker .mf-eyebrow {
+      color: var(--b-blue);
+    }
+
+    .entry-brief h2 {
+      max-width: 780px;
+      margin-top: 16px;
+      font-family: var(--b-serif);
+      font-size: clamp(29px, 3.2vw, 46px);
+      font-weight: 600;
+      line-height: 1.18;
+      letter-spacing: -0.045em;
+      text-wrap: balance;
+    }
+
+    .entry-brief .dek {
+      max-width: 760px;
+      margin-top: 12px;
+      color: #52616c;
+      font-size: 12px;
+      line-height: 1.8;
+    }
+
+    .entry-brief .entry-actions {
+      justify-content: flex-start;
+      margin-top: 22px;
+      padding-top: 0;
+    }
+
+    .entry-aside {
+      position: relative;
+      z-index: 1;
+      align-self: stretch;
+      display: grid;
+      align-content: center;
+      gap: 13px;
+      padding-left: 32px;
+      border-left: 1px solid var(--b-rule);
+    }
+
+    .promise {
+      padding: 14px 0;
+      border-bottom: 1px solid var(--b-rule);
+    }
+
+    .promise:last-of-type {
+      border-bottom: 0;
+    }
+
+    .promise span {
+      display: block;
+      color: var(--mf-muted);
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .promise strong {
+      display: block;
+      margin-top: 5px;
+      font-family: var(--b-serif);
+      font-size: 19px;
+      font-weight: 600;
+      line-height: 1.35;
+      letter-spacing: -0.025em;
+    }
+
+    .promise p {
+      margin-top: 5px;
+      color: var(--mf-muted);
+      font-size: 10px;
+      line-height: 1.65;
+    }
+
+    .entry-facts {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      margin-top: 18px;
+      border-top: 1px solid var(--b-rule);
+      border-bottom: 1px solid var(--b-rule);
+      background: rgba(255, 253, 248, 0.63);
+    }
+
+    .entry-fact {
+      min-width: 0;
+      padding: 16px 18px;
+      border-right: 1px solid var(--b-rule);
+    }
+
+    .entry-fact:last-child {
+      border-right: 0;
+    }
+
+    .entry-fact span,
+    .entry-fact strong,
+    .entry-fact small {
+      display: block;
+    }
+
+    .entry-fact span {
+      color: var(--mf-muted);
+      font-size: 9px;
+    }
+
+    .entry-fact strong {
+      margin-top: 3px;
+      font-family: var(--mf-mono);
+      font-size: 19px;
+      font-weight: 600;
+    }
+
+    .entry-fact small {
+      margin-top: 2px;
+      color: var(--mf-muted);
+      font-size: 8px;
+    }
+
+    .report-cover {
+      position: relative;
+      padding: 34px 38px 30px;
+      border-top: 6px solid var(--b-blue);
+      border-right: 1px solid var(--b-rule);
+      border-bottom: 1px solid var(--b-rule);
+      border-left: 1px solid var(--b-rule);
+      background: var(--b-paper);
+      box-shadow: var(--mf-shadow-soft);
+    }
+
+    .cover-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .cover-top-left {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      flex-wrap: wrap;
+    }
+
+    .cover-date {
+      color: var(--mf-muted);
+      font-family: var(--mf-mono);
+      font-size: 9px;
+      text-align: right;
+    }
+
+    .report-cover h1 {
+      max-width: 1010px;
+      margin-top: 23px;
+      font-family: var(--b-serif);
+      font-size: clamp(37px, 4.3vw, 62px);
+      font-weight: 600;
+      line-height: 1.08;
+      letter-spacing: -0.055em;
+      text-wrap: balance;
+    }
+
+    .report-cover .dek {
+      max-width: 920px;
+      margin-top: 14px;
+      color: #4d5c67;
+      font-size: 13px;
+      line-height: 1.85;
+    }
+
+    .cover-byline {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 7px 15px;
+      margin-top: 23px;
+      padding-top: 14px;
+      border-top: 1px solid var(--b-rule);
+      color: var(--mf-muted);
+      font-size: 9px;
+    }
+
+    .cover-byline b {
+      color: var(--mf-ink-soft);
+      font-weight: 650;
+    }
+
+    .decision-strip {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      margin-top: -1px;
+      border: 1px solid var(--b-rule);
+      background: var(--b-paper);
+    }
+
+    .decision {
+      position: relative;
+      padding: 20px 24px;
+      border-right: 1px solid var(--b-rule);
+    }
+
+    .decision:last-child {
+      border-right: 0;
+    }
+
+    .decision-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .decision-top > span:first-child {
+      color: var(--mf-muted);
+      font-size: 9px;
+      font-weight: 750;
+      letter-spacing: 0.11em;
+      text-transform: uppercase;
+    }
+
+    .decision h2 {
+      margin-top: 10px;
+      font-family: var(--b-serif);
+      font-size: 24px;
+      font-weight: 600;
+      line-height: 1.24;
+      letter-spacing: -0.035em;
+    }
+
+    .decision p {
+      margin-top: 7px;
+      color: var(--mf-muted);
+      font-size: 10px;
+      line-height: 1.7;
+    }
+
+    .report-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 312px;
+      align-items: start;
+      gap: 28px;
+      margin-top: 28px;
+    }
+
+    .briefing-body {
+      min-width: 0;
+    }
+
+    .chapter {
+      padding: 28px 0 32px;
+      border-top: 1px solid var(--b-rule);
+    }
+
+    .chapter:first-child {
+      border-top: 0;
+      padding-top: 0;
+    }
+
+    .chapter-head {
+      display: grid;
+      grid-template-columns: 66px minmax(0, 1fr);
+      gap: 17px;
+      align-items: start;
+    }
+
+    .chapter-number {
+      color: #c9c0ad;
+      font-family: var(--mf-mono);
+      font-size: 40px;
+      font-weight: 500;
+      line-height: 0.95;
+      letter-spacing: -0.08em;
+    }
+
+    .chapter h2 {
+      margin-top: 2px;
+      font-family: var(--b-serif);
+      font-size: clamp(24px, 2.5vw, 34px);
+      font-weight: 600;
+      line-height: 1.22;
+      letter-spacing: -0.04em;
+      text-wrap: balance;
+    }
+
+    .chapter-dek {
+      max-width: 780px;
+      margin-top: 9px;
+      color: var(--mf-muted);
+      font-size: 11px;
+      line-height: 1.8;
+    }
+
+    .chapter-body {
+      padding-left: 83px;
+    }
+
+    .answer-lead {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 240px;
+      gap: 18px;
+      align-items: start;
+      margin-top: 20px;
+    }
+
+    .answer-lead blockquote {
+      margin: 0;
+      padding: 2px 0 2px 18px;
+      border-left: 3px solid var(--b-blue);
+      font-family: var(--b-serif);
+      font-size: 21px;
+      line-height: 1.52;
+      letter-spacing: -0.025em;
+    }
+
+    .answer-lead blockquote span {
+      display: block;
+      margin-bottom: 5px;
+      color: var(--b-blue);
+      font-family: var(--mf-sans);
+      font-size: 9px;
+      font-weight: 750;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .big-fact {
+      padding: 15px 16px;
+      border: 1px solid var(--b-rule);
+      background: #fbf8f0;
+    }
+
+    .big-fact span {
+      color: var(--mf-muted);
+      font-size: 9px;
+    }
+
+    .big-fact strong {
+      display: block;
+      margin-top: 4px;
+      font-family: var(--b-serif);
+      font-size: 27px;
+      font-weight: 600;
+      line-height: 1.2;
+    }
+
+    .big-fact small {
+      display: block;
+      margin-top: 5px;
+      color: var(--mf-muted);
+      font-size: 9px;
+      line-height: 1.5;
+    }
+
+    .fact-trio {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 0;
+      margin-top: 18px;
+      border-top: 1px solid var(--b-rule);
+      border-bottom: 1px solid var(--b-rule);
+    }
+
+    .fact-trio article {
+      min-width: 0;
+      padding: 15px 15px 14px 0;
+      border-right: 1px solid var(--b-rule);
+    }
+
+    .fact-trio article:not(:first-child) {
+      padding-left: 15px;
+    }
+
+    .fact-trio article:last-child {
+      padding-right: 0;
+      border-right: 0;
+    }
+
+    .fact-trio span {
+      color: var(--mf-muted);
+      font-size: 8px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .fact-trio strong {
+      display: block;
+      margin-top: 5px;
+      font-family: var(--mf-mono);
+      font-size: 13px;
+      font-weight: 600;
+      overflow-wrap: anywhere;
+    }
+
+    .fact-trio p {
+      margin-top: 5px;
+      color: var(--mf-muted);
+      font-size: 9px;
+      line-height: 1.6;
+    }
+
+    .inline-evidence {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      margin-top: 14px;
+    }
+
+    .story-chart {
+      margin-top: 22px;
+      padding: 19px 20px;
+      border: 1px solid var(--b-rule);
+      background: #fbf8f0;
+    }
+
+    .story-chart-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .story-chart h3 {
+      font-family: var(--b-serif);
+      font-size: 20px;
+      font-weight: 600;
+      letter-spacing: -0.025em;
+    }
+
+    .story-chart p {
+      margin-top: 5px;
+      color: var(--mf-muted);
+      font-size: 9px;
+    }
+
+    .legend {
+      display: flex;
+      gap: 11px;
+      flex-wrap: wrap;
+      color: var(--mf-muted);
+      font-size: 9px;
+    }
+
+    .legend span {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .legend i {
+      width: 13px;
+      height: 2px;
+      background: var(--b-blue);
+    }
+
+    .legend i.eval {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--mf-success);
+    }
+
+    .chart-svg {
+      display: block;
+      width: 100%;
+      height: auto;
+      margin-top: 12px;
+    }
+
+    .axis {
+      stroke: var(--b-rule);
+      stroke-width: 1;
+    }
+
+    .axis-label {
+      fill: #7d817f;
+      font-family: var(--mf-mono);
+      font-size: 8px;
+    }
+
+    .loss-line {
+      fill: none;
+      stroke: var(--b-blue);
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .eval-point {
+      fill: #fffdf8;
+      stroke: var(--mf-success);
+      stroke-width: 2;
+    }
+
+    .annotation-line {
+      stroke: #b1a27d;
+      stroke-width: 1;
+      stroke-dasharray: 3 3;
+    }
+
+    .annotation-text {
+      fill: #6f6049;
+      font-family: var(--mf-sans);
+      font-size: 9px;
+      font-weight: 600;
+    }
+
+    .chart-note {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 9px;
+      padding-top: 10px;
+      border-top: 1px solid var(--b-rule);
+    }
+
+    .chart-note div {
+      display: flex;
+      gap: 8px;
+      color: var(--mf-muted);
+      font-size: 9px;
+      line-height: 1.55;
+    }
+
+    .chart-note b {
+      color: var(--mf-ink-soft);
+    }
+
+    .finding-block {
+      margin-top: 22px;
+    }
+
+    .finding-block-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 11px;
+    }
+
+    .finding-block h3 {
+      font-family: var(--b-serif);
+      font-size: 20px;
+      font-weight: 600;
+      letter-spacing: -0.025em;
+    }
+
+    .filter-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      justify-content: flex-end;
+    }
+
+    .filter-row .mf-chip {
+      min-height: 27px;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 9px;
+    }
+
+    .finding-list {
+      border-top: 1px solid var(--b-rule);
+    }
+
+    .finding-row {
+      display: grid;
+      grid-template-columns: 8px minmax(0, 1fr) auto;
+      gap: 13px;
+      padding: 15px 0;
+      border-bottom: 1px solid var(--b-rule);
+    }
+
+    .finding-bar {
+      width: 3px;
+      height: 100%;
+      min-height: 34px;
+      border-radius: 3px;
+      background: var(--mf-warning);
+    }
+
+    .finding-row[data-severity="passed"] .finding-bar {
+      background: var(--mf-success);
+    }
+
+    .finding-row[data-severity="blocked"] .finding-bar {
+      background: var(--mf-danger);
+    }
+
+    .finding-row[data-severity="info"] .finding-bar {
+      background: var(--mf-muted-2);
+    }
+
+    .finding-row[data-severity="unknown"] .finding-bar {
+      background: repeating-linear-gradient(180deg, #9aa8b3 0 4px, transparent 4px 7px);
+    }
+
+    .finding-row h4 {
+      margin: 0;
+      font-size: 12px;
+      line-height: 1.5;
+      letter-spacing: -0.01em;
+    }
+
+    .finding-row p {
+      margin-top: 4px;
+      color: var(--mf-muted);
+      font-size: 9px;
+      line-height: 1.65;
+    }
+
+    .finding-row .row-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      align-items: center;
+      margin-top: 7px;
+    }
+
+    .finding-row .evidence-row {
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+      margin-top: 8px;
+    }
+
+    .finding-row .mf-evidence-chip {
+      min-height: 23px;
+      padding: 2px 6px;
+    }
+
+    .finding-arrow {
+      align-self: center;
+      width: 26px;
+      height: 26px;
+      border: 1px solid var(--b-rule);
+      border-radius: 50%;
+      color: var(--mf-muted);
+      background: transparent;
+    }
+
+    .finding-empty {
+      padding: 22px 0;
+      color: var(--mf-muted);
+      border-bottom: 1px solid var(--b-rule);
+      font-size: 10px;
+    }
+
+    .delivery-passport {
+      display: grid;
+      grid-template-columns: 180px minmax(0, 1fr);
+      margin-top: 20px;
+      border: 1px solid var(--b-rule);
+      background: #fbf8f0;
+    }
+
+    .passport-stamp {
+      display: grid;
+      place-items: center;
+      padding: 20px;
+      border-right: 1px solid var(--b-rule);
+      text-align: center;
+    }
+
+    .passport-seal {
+      display: grid;
+      place-items: center;
+      width: 102px;
+      height: 102px;
+      border: 2px solid var(--mf-warning);
+      border-radius: 50%;
+      color: #715712;
+      background: #fff9e8;
+      font-size: 9px;
+      font-weight: 750;
+      line-height: 1.45;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      transform: rotate(-4deg);
+    }
+
+    .passport-body {
+      padding: 19px 21px;
+    }
+
+    .passport-body h3 {
+      font-family: var(--b-serif);
+      font-size: 22px;
+      font-weight: 600;
+      line-height: 1.32;
+      letter-spacing: -0.03em;
+    }
+
+    .passport-body > p {
+      margin-top: 6px;
+      color: var(--mf-muted);
+      font-size: 10px;
+      line-height: 1.7;
+    }
+
+    .passport-rows {
+      display: grid;
+      gap: 0;
+      margin-top: 12px;
+      border-top: 1px solid var(--b-rule);
+    }
+
+    .passport-rows div {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--b-rule);
+      font-size: 9px;
+    }
+
+    .passport-rows div:last-child {
+      border-bottom: 0;
+    }
+
+    .passport-rows span {
+      color: var(--mf-muted);
+    }
+
+    .passport-rows strong {
+      font-weight: 650;
+      text-align: right;
+    }
+
+    .passport-rows .not-verified {
+      color: var(--mf-warning);
+    }
+
+    .section-lead {
+      max-width: 760px;
+      margin-top: 18px;
+      font-family: var(--b-serif);
+      font-size: 18px;
+      line-height: 1.6;
+      letter-spacing: -0.02em;
+    }
+
+    .experiment-grid {
+      display: grid;
+      gap: 10px;
+      margin-top: 18px;
+    }
+
+    .experiment {
+      display: grid;
+      grid-template-columns: 52px minmax(0, 1fr) auto;
+      gap: 15px;
+      align-items: start;
+      padding: 16px 0;
+      border-top: 1px solid var(--b-rule);
+    }
+
+    .experiment:last-child {
+      border-bottom: 1px solid var(--b-rule);
+    }
+
+    .experiment-priority {
+      padding-top: 2px;
+      color: var(--b-blue);
+      font-family: var(--mf-mono);
+      font-size: 17px;
+      font-weight: 600;
+      letter-spacing: -0.04em;
+    }
+
+    .experiment h3 {
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .experiment p {
+      margin-top: 4px;
+      color: var(--mf-muted);
+      font-size: 9px;
+      line-height: 1.65;
+    }
+
+    .experiment .expectation {
+      margin-top: 7px;
+      color: #5f5c54;
+      font-size: 9px;
+      line-height: 1.65;
+    }
+
+    .experiment-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      align-items: stretch;
+    }
+
+    .experiment-actions .mf-button {
+      min-height: 31px;
+      padding: 5px 8px;
+      font-size: 9px;
+      white-space: nowrap;
+    }
+
+    .limit-section {
+      margin-top: 25px;
+      padding: 17px 19px;
+      border: 1px dashed #bdb3a1;
+      color: var(--mf-muted);
+      background: rgba(255, 253, 248, 0.55);
+    }
+
+    .limit-section h3 {
+      color: var(--mf-ink-soft);
+      font-family: var(--b-serif);
+      font-size: 17px;
+      font-weight: 600;
+    }
+
+    .limit-section ul {
+      display: grid;
+      gap: 5px;
+      margin-top: 9px;
+      padding-left: 16px;
+      font-size: 9px;
+      line-height: 1.65;
+    }
+
+    .field-notes {
+      position: sticky;
+      top: 83px;
+      min-width: 0;
+      border-top: 4px solid var(--b-blue);
+      border-right: 1px solid var(--b-rule);
+      border-bottom: 1px solid var(--b-rule);
+      border-left: 1px solid var(--b-rule);
+      background: var(--b-paper);
+      box-shadow: var(--mf-shadow-soft);
+    }
+
+    .notes-head {
+      padding: 16px 17px 13px;
+      border-bottom: 1px solid var(--b-rule);
+    }
+
+    .notes-head h2 {
+      margin-top: 3px;
+      font-family: var(--b-serif);
+      font-size: 20px;
+      font-weight: 600;
+      letter-spacing: -0.025em;
+    }
+
+    .notes-body {
+      padding: 15px 17px;
+    }
+
+    .todo {
+      display: grid;
+      grid-template-columns: 24px minmax(0, 1fr);
+      gap: 9px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--b-rule);
+    }
+
+    .todo:last-child {
+      border-bottom: 0;
+    }
+
+    .todo-index {
+      display: grid;
+      place-items: center;
+      width: 22px;
+      height: 22px;
+      border: 1px solid var(--b-rule);
+      border-radius: 50%;
+      color: var(--b-blue);
+      font-family: var(--mf-mono);
+      font-size: 8px;
+      font-weight: 600;
+    }
+
+    .todo strong {
+      display: block;
+      font-size: 10px;
+      line-height: 1.5;
+    }
+
+    .todo p {
+      margin-top: 4px;
+      color: var(--mf-muted);
+      font-size: 8px;
+      line-height: 1.6;
+    }
+
+    .notes-actions {
+      margin-top: 11px;
+      display: grid;
+      gap: 6px;
+    }
+
+    .notes-actions .mf-button {
+      width: 100%;
+      min-height: 34px;
+      font-size: 9px;
+    }
+
+    .note-evidence {
+      margin-top: 13px;
+      padding-top: 12px;
+      border-top: 1px solid var(--b-rule);
+    }
+
+    .note-evidence h3 {
+      color: var(--mf-muted);
+      font-size: 9px;
+      font-weight: 750;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .note-evidence .inline-evidence {
+      margin-top: 8px;
+    }
+
+    .note-boundary {
+      margin-top: 12px;
+      padding: 9px 10px;
+      border-left: 2px solid var(--mf-warning);
+      color: #655b3f;
+      background: #fff9e8;
+      font-size: 8px;
+      line-height: 1.65;
+    }
+
+    .ask-form {
+      margin-top: 24px;
+      padding: 18px 20px;
+      border: 1px solid var(--b-rule);
+      background: var(--b-paper);
+    }
+
+    .ask-form form {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .ask-form input {
+      flex: 1;
+      min-width: 0;
+      min-height: 38px;
+      padding: 8px 10px;
+      border: 1px solid var(--b-rule);
+      border-radius: 6px;
+      background: #fff;
+      font-size: 10px;
+    }
+
+    .ask-response {
+      margin-top: 9px;
+      padding: 9px 10px;
+      border-left: 2px solid var(--b-blue);
+      color: var(--mf-muted);
+      background: #f5f7ff;
+      font-size: 9px;
+      line-height: 1.65;
+    }
+
+    .empty-cover {
+      position: relative;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 300px;
+      gap: 34px;
+      padding: 42px;
+      border-top: 6px solid var(--b-blue);
+      border-right: 1px solid var(--b-rule);
+      border-bottom: 1px solid var(--b-rule);
+      border-left: 1px solid var(--b-rule);
+      background: var(--b-paper);
+    }
+
+    .empty-cover .mf-eyebrow {
+      color: var(--b-blue);
+    }
+
+    .empty-cover h1 {
+      max-width: 720px;
+      margin-top: 14px;
+      font-family: var(--b-serif);
+      font-size: clamp(34px, 4vw, 55px);
+      font-weight: 600;
+      line-height: 1.1;
+      letter-spacing: -0.05em;
+      text-wrap: balance;
+    }
+
+    .empty-cover p {
+      max-width: 690px;
+      margin-top: 13px;
+      color: var(--mf-muted);
+      font-size: 11px;
+      line-height: 1.8;
+    }
+
+    .empty-cover .entry-actions {
+      margin-top: 19px;
+      padding: 0;
+      justify-content: flex-start;
+    }
+
+    .coverage-sheet {
+      align-self: start;
+      padding: 17px;
+      border: 1px solid var(--b-rule);
+      background: #fbf8f0;
+    }
+
+    .coverage-sheet h2 {
+      font-family: var(--b-serif);
+      font-size: 19px;
+      font-weight: 600;
+    }
+
+    .coverage-sheet > p {
+      margin-top: 4px;
+      color: var(--mf-muted);
+      font-size: 9px;
+    }
+
+    .coverage-list {
+      display: grid;
+      gap: 0;
+      margin-top: 11px;
+    }
+
+    .coverage-list div {
+      display: flex;
+      justify-content: space-between;
+      gap: 9px;
+      padding: 7px 0;
+      border-top: 1px solid var(--b-rule);
+      color: var(--mf-muted);
+      font-size: 9px;
+    }
+
+    .coverage-list b {
+      color: var(--mf-ink-soft);
+    }
+
+    .loading-sheet {
+      display: grid;
+      place-items: center;
+      min-height: 620px;
+      border: 1px solid var(--b-rule);
+      background: var(--b-paper);
+    }
+
+    .loading-inner {
+      width: min(590px, 100%);
+      padding: 32px;
+    }
+
+    .loader {
+      position: relative;
+      width: 54px;
+      height: 54px;
+      border: 1px solid var(--b-rule);
+      border-radius: 50%;
+    }
+
+    .loader::before {
+      position: absolute;
+      inset: 9px;
+      border: 1px solid var(--b-blue);
+      border-radius: 50%;
+      content: "";
+      animation: pulse 1.2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      50% { transform: scale(0.72); opacity: 0.45; }
+    }
+
+    .loading-inner h1 {
+      margin-top: 20px;
+      font-family: var(--b-serif);
+      font-size: 34px;
+      font-weight: 600;
+      line-height: 1.2;
+      letter-spacing: -0.04em;
+    }
+
+    .loading-inner > p {
+      margin-top: 9px;
+      color: var(--mf-muted);
+      font-size: 10px;
+      line-height: 1.7;
+    }
+
+    .loading-stages {
+      display: grid;
+      gap: 0;
+      margin-top: 20px;
+      border-top: 1px solid var(--b-rule);
+    }
+
+    .loading-stages div {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 0;
+      border-bottom: 1px solid var(--b-rule);
+      color: var(--mf-muted);
+      font-size: 9px;
+    }
+
+    .loading-stages div::before {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #b5b6b1;
+      content: "";
+    }
+
+    .loading-stages .is-current {
+      color: var(--b-blue);
+      font-weight: 650;
+    }
+
+    .loading-stages .is-current::before {
+      background: var(--b-blue);
+    }
+
+    .failure-banner {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      margin-top: 18px;
+      padding: 12px 13px;
+      border-left: 3px solid var(--mf-danger);
+      color: #71423d;
+      background: #fff6f3;
+      font-size: 10px;
+      line-height: 1.65;
+    }
+
+    .evidence-dialog-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 9px;
+      margin-top: 12px;
+    }
+
+    .evidence-dialog-grid div {
+      padding: 9px 10px;
+      border: 1px solid var(--b-rule);
+      background: #fbf8f0;
+    }
+
+    .evidence-dialog-grid span {
+      display: block;
+      color: var(--mf-muted);
+      font-size: 9px;
+    }
+
+    .evidence-dialog-grid strong {
+      display: block;
+      margin-top: 3px;
+      font-family: var(--mf-mono);
+      font-size: 10px;
+      overflow-wrap: anywhere;
+    }
+
+    .config-changes {
+      display: grid;
+      gap: 0;
+      margin-top: 13px;
+      border-top: 1px solid var(--b-rule);
+    }
+
+    .config-changes div {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--b-rule);
+      font-size: 10px;
+    }
+
+    @media (max-width: 1040px) {
+      .report-layout {
+        grid-template-columns: minmax(0, 1fr);
+      }
+
+      .field-notes {
+        position: static;
+        order: -1;
+      }
+
+      .notes-body {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 0 20px;
+      }
+
+      .notes-actions {
+        align-self: end;
+      }
+    }
+
+    @media (max-width: 820px) {
+      .site-header {
+        flex-wrap: wrap;
+        padding: 10px 16px;
+      }
+
+      .header-left,
+      .header-right {
+        width: 100%;
+        justify-content: space-between;
+      }
+
+      .header-rule,
+      .crumbs {
+        display: none;
+      }
+
+      .attempt-select {
+        flex: 1;
+        max-width: none;
+      }
+
+      main {
+        padding: 20px 16px 44px;
+      }
+
+      .entry-context {
+        display: block;
+      }
+
+      .entry-context h1 {
+        font-size: 32px;
+      }
+
+      .entry-actions {
+        margin-top: 14px;
+        justify-content: flex-start;
+      }
+
+      .entry-brief {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 23px;
+        padding: 28px 25px;
+      }
+
+      .entry-aside {
+        padding-top: 20px;
+        padding-left: 0;
+        border-top: 1px solid var(--b-rule);
+        border-left: 0;
+      }
+
+      .entry-facts {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .entry-fact:nth-child(2) {
+        border-right: 0;
+      }
+
+      .entry-fact:nth-child(-n + 2) {
+        border-bottom: 1px solid var(--b-rule);
+      }
+
+      .report-cover {
+        padding: 29px 24px 25px;
+      }
+
+      .cover-top {
+        align-items: flex-start;
+      }
+
+      .cover-date {
+        display: none;
+      }
+
+      .decision-strip {
+        grid-template-columns: 1fr;
+      }
+
+      .decision {
+        border-right: 0;
+        border-bottom: 1px solid var(--b-rule);
+      }
+
+      .decision:last-child {
+        border-bottom: 0;
+      }
+
+      .chapter-head {
+        grid-template-columns: 48px minmax(0, 1fr);
+        gap: 10px;
+      }
+
+      .chapter-number {
+        font-size: 30px;
+      }
+
+      .chapter-body {
+        padding-left: 58px;
+      }
+
+      .answer-lead,
+      .delivery-passport {
+        grid-template-columns: 1fr;
+      }
+
+      .passport-stamp {
+        border-right: 0;
+        border-bottom: 1px solid var(--b-rule);
+      }
+
+      .fact-trio {
+        grid-template-columns: 1fr;
+      }
+
+      .fact-trio article,
+      .fact-trio article:not(:first-child) {
+        padding: 12px 0;
+        border-right: 0;
+        border-bottom: 1px solid var(--b-rule);
+      }
+
+      .fact-trio article:last-child {
+        border-bottom: 0;
+      }
+
+      .notes-body {
+        display: block;
+      }
+
+      .empty-cover {
+        grid-template-columns: 1fr;
+        padding: 30px 25px;
+      }
+
+      .coverage-sheet {
+        margin-top: 4px;
+      }
+
+      .experiment {
+        grid-template-columns: 40px minmax(0, 1fr);
+      }
+
+      .experiment-actions {
+        grid-column: 2;
+        flex-direction: row;
+      }
+    }
+
+    @media (max-width: 520px) {
+      .brand small,
+      .mf-demo-stamp {
+        font-size: 8px;
+      }
+
+      .site-header {
+        padding-right: 12px;
+        padding-left: 12px;
+      }
+
+      main {
+        padding-right: 12px;
+        padding-left: 12px;
+      }
+
+      .report-cover h1,
+      .empty-cover h1 {
+        font-size: 36px;
+      }
+
+      .briefing-nav button {
+        min-height: 44px;
+        padding-right: 13px;
+        padding-left: 13px;
+      }
+
+      .chapter-head {
+        display: block;
+      }
+
+      .chapter-number {
+        margin-bottom: 8px;
+      }
+
+      .chapter-body {
+        padding-left: 0;
+      }
+
+      .chart-note {
+        grid-template-columns: 1fr;
+      }
+
+      .finding-block-head {
+        display: block;
+      }
+
+      .filter-row {
+        justify-content: flex-start;
+        margin-top: 9px;
+      }
+
+      .finding-row {
+        grid-template-columns: 6px minmax(0, 1fr);
+      }
+
+      .finding-arrow {
+        display: none;
+      }
+
+      .passport-body {
+        padding: 17px;
+      }
+
+      .ask-form form {
+        flex-direction: column;
+      }
+
+      .ask-form .mf-button {
+        width: 100%;
+      }
+
+      .evidence-dialog-grid,
+      .dialog-config {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#viewRoot">跳到简报内容</a>
+
+  <header class="site-header">
+    <div class="header-left">
+      <a class="brand" href="index.html" aria-label="返回三方案对比">
+        <span class="brand-mark" aria-hidden="true">M</span>
+        <span>
+          <strong>ModelForge</strong>
+          <small>训练工作台 · AI 简报</small>
+        </span>
+      </a>
+      <span class="header-rule" aria-hidden="true"></span>
+      <div class="crumbs">
+        <span>训练</span><span>/</span><span>Attempt</span><span>/</span><strong>AI 训练简报</strong>
+      </div>
+    </div>
+    <div class="header-right">
+      <span class="mf-demo-stamp">原型示例</span>
+      <label>
+        <span class="mf-sr-only">切换 Attempt</span>
+        <select class="attempt-select" id="attemptSelect" aria-label="切换 Attempt"></select>
+      </label>
+      <a class="mf-button quiet" href="index.html">方案对比</a>
+    </div>
+  </header>
+
+  <main id="viewRoot" tabindex="-1"></main>
+
+  <div class="mf-dialog-backdrop" id="evidenceDialog" hidden>
+    <section class="mf-dialog" role="dialog" aria-modal="true" aria-labelledby="evidenceDialogTitle" tabindex="-1">
+      <header class="mf-dialog-head">
+        <div>
+          <span class="mf-eyebrow">EVIDENCE · 原型示例</span>
+          <h2 id="evidenceDialogTitle">证据详情</h2>
+          <p>只展示接口与归档文件中已有的事实。</p>
+        </div>
+        <button class="mf-button quiet" type="button" data-dialog-close aria-label="关闭证据">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
+        </button>
+      </header>
+      <div class="mf-dialog-body" id="evidenceDialogBody"></div>
+      <footer class="mf-dialog-actions">
+        <button class="mf-button" type="button" data-dialog-close>关闭</button>
+      </footer>
+    </section>
+  </div>
+
+  <div class="mf-dialog-backdrop" id="applyDialog" hidden>
+    <section class="mf-dialog" role="dialog" aria-modal="true" aria-labelledby="applyDialogTitle" aria-describedby="applyDialogDescription" tabindex="-1">
+      <header class="mf-dialog-head">
+        <div>
+          <span class="mf-eyebrow">DRAFT ONLY · 原型示例</span>
+          <h2 id="applyDialogTitle">把建议写成新训练草稿</h2>
+          <p id="applyDialogDescription">不会修改当前 Attempt，不会提交，也不会创建收费实例。</p>
+        </div>
+        <button class="mf-button quiet" type="button" data-dialog-close aria-label="关闭对话框">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
+        </button>
+      </header>
+      <div class="mf-dialog-body" id="applyDialogBody"></div>
+      <footer class="mf-dialog-actions">
+        <button class="mf-button quiet" type="button" data-dialog-close>先不应用</button>
+        <button class="mf-button primary" type="button" id="confirmApply">创建配置草稿</button>
+      </footer>
+    </section>
+  </div>
+
+  <script src="shared/prototype-data.js"></script>
+  <script src="shared/prototype-core.js"></script>
+  <script>
+    (() => {
+      const data = window.MF_PROTOTYPE;
+      const ui = window.MFUI;
+      const root = document.getElementById("viewRoot");
+      const attemptSelect = document.getElementById("attemptSelect");
+      const evidenceDialogRoot = document.getElementById("evidenceDialog");
+      const evidenceDialogBody = document.getElementById("evidenceDialogBody");
+      const applyDialogRoot = document.getElementById("applyDialog");
+      const applyDialogBody = document.getElementById("applyDialogBody");
+      const confirmApply = document.getElementById("confirmApply");
+      const evidenceDialog = ui.initDialog(evidenceDialogRoot);
+      const applyDialog = ui.initDialog(applyDialogRoot);
+      const params = new URLSearchParams(location.search);
+      let attempt = data.getAttempt(params.get("attempt") || data.defaults.attempt);
+      let view = params.get("view") === "report" ? "report" : "entry";
+      let filter = "all";
+      let loadingTimer = 0;
+      let currentExperiment = null;
+
+      attemptSelect.innerHTML = data.attempts.map((item) => {
+        const status = item.state === "succeeded" ? "已成功" : item.state === "failed" ? "已失败" : "已取消";
+        return `<option value="${ui.escapeHtml(item.id)}">${ui.escapeHtml(item.displayName)} · ${status}</option>`;
+      }).join("");
+      attemptSelect.value = attempt.id;
+
+      function stateTone() {
+        if (attempt.state === "failed") return "danger";
+        if (attempt.state === "cancelled") return "neutral";
+        return "success";
+      }
+
+      function renderEntry() {
+        const isFailed = attempt.state === "failed";
+        const isCancelled = attempt.state === "cancelled";
+        const reportExists = attempt.report?.exists;
+        const headline = isFailed
+          ? "这次训练没有跑起来。现在能确认失败阶段，不能确认根因。"
+          : isCancelled
+            ? "这次尝试已被取消；没有一份可以负责的训练报告。"
+            : "这次训练跑完了，也产出了 Adapter；但它是否“好用”，目前还不能回答。";
+        const dek = isFailed
+          ? "安全首启阶段终止，未形成 metrics、runtime 或执行清单。简报会把已知事实与缺失证据分开，不给虚构的调参建议。"
+          : isCancelled
+            ? "已有 Attempt 快照、runtime 与 6 个执行文件；没有 metrics、Adapter 或推理验收。生成报告只能得到有限复盘。"
+            : "22 个训练点、1 个验证点、12 个证据文件和 Best / Final 2/2 可用。训练内信号可读，但独立推理验收尚未关联。";
+        root.innerHTML = `
+          <div class="shell">
+            <div class="entry-context">
+              <div>
+                <div class="mf-eyebrow">ATTEMPT #${attempt.number} / ${ui.escapeHtml(attempt.mode)} / AI 简报入口</div>
+                <h1>${ui.escapeHtml(attempt.name)}</h1>
+                <p>这是训练详情里的一层 advisory（建议性）报告，不替代运行分析、硬门禁或产物接口。</p>
+                <div class="entry-meta">
+                  <span class="mf-mono">${ui.escapeHtml(attempt.id)}</span>
+                  <span>${ui.escapeHtml(attempt.model)} · ${ui.escapeHtml(attempt.method)}</span>
+                  <span>更新于 ${ui.escapeHtml(attempt.updatedAt)}</span>
+                </div>
+              </div>
+              <div class="entry-actions">
+                <span class="mf-status ${stateTone()}">${ui.escapeHtml(attempt.stateLabel)}</span>
+                <button class="mf-button" type="button" data-action="refresh">刷新事实</button>
+                <button class="mf-button" type="button">${isFailed ? "查看重试边界" : "打开训练产物"}</button>
+              </div>
+            </div>
+
+            <nav class="briefing-nav" aria-label="Attemp 详情页签">
+              <button type="button"><span>01</span>运行总览</button>
+              <button type="button"><span>02</span>运行分析</button>
+              <button type="button" aria-current="page"><span>03</span>AI 训练简报</button>
+              <button type="button"><span>04</span>训练日志</button>
+              <button type="button"><span>05</span>训练产物</button>
+              <a href="index.html">← 三方案对比</a>
+            </nav>
+
+            <section class="entry-brief" aria-labelledby="entryBriefTitle">
+              <div>
+                <div class="brief-kicker">
+                  <span class="mf-eyebrow">AI TRAINING BRIEF · ADVISORY</span>
+                  ${reportExists
+                    ? `<span class="mf-status ${isFailed ? "danger" : "warning"}">${isFailed ? "失败复盘可阅读" : "可用性未验证"}</span>`
+                    : `<span class="mf-status neutral">报告未生成</span>`}
+                </div>
+                <h2 id="entryBriefTitle">${ui.escapeHtml(headline)}</h2>
+                <p class="dek">${ui.escapeHtml(dek)}</p>
+                <div class="entry-actions">
+                  <button class="mf-button primary" type="button" data-action="${reportExists ? "open-report" : "generate"}">
+                    ${reportExists ? "阅读训练简报" : "生成有限复盘"}
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M5 12h14M14 7l5 5-5 5"/></svg>
+                  </button>
+                  ${reportExists ? `<button class="mf-button" type="button" data-action="regenerate">重新生成</button>` : ""}
+                  <button class="mf-button quiet" type="button">查看原始证据</button>
+                </div>
+              </div>
+              <aside class="entry-aside" aria-label="简报结论摘要">
+                ${renderEntryPromises()}
+              </aside>
+            </section>
+
+            <div class="entry-facts">
+              <div class="entry-fact"><span>最新 Step</span><strong>${attempt.metrics.trainCount ? "22" : "—"}</strong><small>${attempt.metrics.trainCount ? "Epoch 1.00" : "训练未形成指标"}</small></div>
+              <div class="entry-fact"><span>Train Loss</span><strong>${attempt.metrics.lastTrain ?? "—"}</strong><small>${attempt.metrics.trainCount} 个真实采样</small></div>
+              <div class="entry-fact"><span>Eval Loss</span><strong>${attempt.metrics.bestEval ?? "—"}</strong><small>${attempt.metrics.evalCount ? "仅 1 个验证点" : "无验证采样"}</small></div>
+              <div class="entry-fact"><span>Best / Final</span><strong>${attempt.adapters.length}/2</strong><small>${attempt.adapters.length ? "available" : "未发布"}</small></div>
+            </div>
+          </div>
+        `;
+      }
+
+      function renderEntryPromises() {
+        if (attempt.state === "failed") {
+          return `
+            <div class="promise"><span>训练健康度</span><strong>无法判断</strong><p>没有指标，不代表健康。</p></div>
+            <div class="promise"><span>可交付性</span><strong>不可交付</strong><p>Adapter 未生成，产物归档未开始。</p></div>
+            <div class="promise"><span>下一步</span><strong>先补首启证据</strong><p>日志接口当前返回 0 个 chunk，不能直接假定根因。</p></div>
+          `;
+        }
+        if (attempt.state === "cancelled") {
+          return `
+            <div class="promise"><span>训练健康度</span><strong>无法判断</strong><p>0 个训练 / 验证指标。</p></div>
+            <div class="promise"><span>可交付性</span><strong>不可交付</strong><p>取消后不发布部分 Adapter。</p></div>
+            <div class="promise"><span>下一步</span><strong>重新采集</strong><p>如需结论，先完成一次指标归档完整的运行。</p></div>
+          `;
+        }
+        return `
+          <div class="promise"><span>训练健康度</span><strong>部分可判断</strong><p>训练内信号可读；泛化证据只有 1 个 Eval 点。</p></div>
+          <div class="promise"><span>可交付性</span><strong>可进入推理验收</strong><p>Best / Final 2/2；模型可用性尚未验证。</p></div>
+          <div class="promise"><span>下一步</span><strong>先验收，再调参</strong><p>没有推理结果前，不要用 Loss 推断业务效果。</p></div>
+        `;
+      }
+
+      function renderChapters() {
+        if (attempt.state === "failed") return renderFailureChapters();
+        if (attempt.state === "cancelled") return renderCancelledChapters();
+        return renderSuccessChapters();
+      }
+
+      function renderSuccessChapters() {
+        const report = attempt.report;
+        const answer = report.answers;
+        return `
+          <section class="chapter" id="chapter-1">
+            <div class="chapter-head">
+              <div class="chapter-number">01</div>
+              <div>
+                <h2>${ui.escapeHtml(answer[0].label)}</h2>
+                <p class="chapter-dek">先看训练链路是否完整，再看数字是否支持“模型变好”这样的结论。</p>
+              </div>
+            </div>
+            <div class="chapter-body">
+              <div class="answer-lead">
+                <blockquote><span>结论</span>${ui.escapeHtml(answer[0].verdict)}。<br>${ui.escapeHtml(answer[0].text)}</blockquote>
+                <div class="big-fact">
+                  <span>证据归档</span>
+                  <strong>12 / 12</strong>
+                  <small>执行清单全部回读校验；exit_code=0。</small>
+                </div>
+              </div>
+              <div class="fact-trio">
+                <article><span>运行</span><strong>exit_code 0</strong><p>进程正常退出；实例回收与产物状态分别记录。</p></article>
+                <article><span>产物</span><strong>Best + Final</strong><p>两个角色均 available；两者都指向 step 22。</p></article>
+                <article><span>边界</span><strong>非业务验收</strong><p>训练完成不等于生成质量、模型可用或用户价值。</p></article>
+              </div>
+              <div class="inline-evidence">
+                <button class="mf-evidence-chip" type="button" data-evidence="E-03">E-03 · 执行清单</button>
+                <button class="mf-evidence-chip" type="button" data-evidence="E-06">E-06 · Adapter API</button>
+              </div>
+            </div>
+          </section>
+
+          <section class="chapter" id="chapter-2">
+            <div class="chapter-head">
+              <div class="chapter-number">02</div>
+              <div>
+                <h2>${ui.escapeHtml(answer[1].label)}</h2>
+                <p class="chapter-dek">健康度只回答“训练内证据有没有异常”，不回答模型是否好用。</p>
+              </div>
+            </div>
+            <div class="chapter-body">
+              <div class="answer-lead">
+                <blockquote><span>结论</span>${ui.escapeHtml(answer[1].verdict)}。<br>${ui.escapeHtml(answer[1].text)}</blockquote>
+                <div class="big-fact">
+                  <span>验证覆盖</span>
+                  <strong>1 pt</strong>
+                  <small>只有一个 Eval 点；不能判断趋势或过拟合。</small>
+                </div>
+              </div>
+              ${renderStoryChart()}
+              <div class="finding-block">
+                <div class="finding-block-head">
+                  <h3>${ui.escapeHtml(answer[2].label)} 的关键判断</h3>
+                  ${renderFilters(report.findings)}
+                </div>
+                <div class="finding-list" id="findingList">${renderFindings(report.findings)}</div>
+              </div>
+            </div>
+          </section>
+
+          <section class="chapter" id="chapter-3">
+            <div class="chapter-head">
+              <div class="chapter-number">03</div>
+              <div>
+                <h2>可以交付什么，不能宣称什么</h2>
+                <p class="chapter-dek">Adapter available、推理服务 ready、模型可用是三件事。简报只帮你把它们分开。</p>
+              </div>
+            </div>
+            <div class="chapter-body">
+              <div class="delivery-passport">
+                <div class="passport-stamp">
+                  <div class="passport-seal">Adapter<br>verified<br>模型未验收</div>
+                </div>
+                <div class="passport-body">
+                  <h3>Adapter 可交付；模型可用性未验证。</h3>
+                  <p>Best 与 Final 均为 available，文件清单和 SHA-256 已校验。没有关联到这两个 Adapter ID 的独立推理 Trial。</p>
+                  <div class="passport-rows">
+                    <div><span>Best Adapter</span><strong>7e1f0949 · available</strong></div>
+                    <div><span>Final Adapter</span><strong>cd1d7a23 · available</strong></div>
+                    <div><span>独立推理验收</span><strong class="not-verified">未关联 · 不能写“模型可用”</strong></div>
+                  </div>
+                </div>
+              </div>
+              <div class="inline-evidence">
+                <button class="mf-evidence-chip" type="button" data-evidence="E-06">E-06 · Best / Final</button>
+                <button class="mf-evidence-chip" type="button" data-evidence="E-07">E-07 · 推理验收未关联</button>
+              </div>
+            </div>
+          </section>
+
+          <section class="chapter" id="chapter-4">
+            <div class="chapter-head">
+              <div class="chapter-number">04</div>
+              <div>
+                <h2>${ui.escapeHtml(answer[3].label)}</h2>
+                <p class="chapter-dek">先补最缺的证据，再考虑调学习率。每条实验都是假设，不是承诺。</p>
+              </div>
+            </div>
+            <div class="chapter-body">
+              <p class="section-lead">${ui.escapeHtml(answer[3].text)}</p>
+              <div class="experiment-grid">
+                ${report.experiments.map(renderExperiment).join("")}
+              </div>
+            </div>
+          </section>
+
+          <section class="limit-section" id="limits">
+            <h3>这份简报不能回答什么</h3>
+            <ul>${report.limitations.map((item) => `<li>${ui.escapeHtml(item)}</li>`).join("")}</ul>
+          </section>
+        `;
+      }
+
+      function renderFailureChapters() {
+        const report = attempt.report;
+        return `
+          <section class="chapter" id="chapter-1">
+            <div class="chapter-head">
+              <div class="chapter-number">01</div>
+              <div><h2>发生了什么？</h2><p class="chapter-dek">先把确定的失败阶段与猜测的根因分开。</p></div>
+            </div>
+            <div class="chapter-body">
+              ${renderFailureBanner()}
+              <div class="answer-lead">
+                <blockquote><span>结论</span>运行没有进入训练。错误码指向安全首启，但现有证据不足以确认根因。</blockquote>
+                <div class="big-fact"><span>终止阶段</span><strong>安全首启</strong><small>metrics、runtime_report、执行清单均未形成。</small></div>
+              </div>
+              <div class="fact-trio">
+                <article><span>错误码</span><strong>bootstrap_key_install_failed</strong><p>阶段信号，不是完整解释。</p></article>
+                <article><span>日志</span><strong>0 chunks</strong><p>当前日志接口没有可读取内容。</p></article>
+                <article><span>产物</span><strong>未生成</strong><p>artifact_state=pending，无部分 Adapter。</p></article>
+              </div>
+              <div class="inline-evidence">
+                <button class="mf-evidence-chip" type="button" data-evidence="E-F1">E-F1 · 失败事实</button>
+                <button class="mf-evidence-chip" type="button" data-evidence="E-F2">E-F2 · 缺失证据</button>
+              </div>
+            </div>
+          </section>
+          <section class="chapter" id="chapter-2">
+            <div class="chapter-head">
+              <div class="chapter-number">02</div>
+              <div><h2>训练过程健康吗？</h2><p class="chapter-dek">这不是“零异常”，而是“还没有训练数据”。</p></div>
+            </div>
+            <div class="chapter-body">
+              <div class="answer-lead">
+                <blockquote><span>结论</span>无法判断。没有 Train/Eval Loss、学习率或显存轨迹，也没有 runtime lock。</blockquote>
+                <div class="big-fact"><span>指标覆盖</span><strong>0 / 22</strong><small>不要用 0 代替缺失。</small></div>
+              </div>
+              <div class="finding-block">
+                <div class="finding-block-head"><h3>失败复盘的关键判断</h3>${renderFilters(report.findings)}</div>
+                <div class="finding-list" id="findingList">${renderFindings(report.findings)}</div>
+              </div>
+            </div>
+          </section>
+          <section class="chapter" id="chapter-3">
+            <div class="chapter-head">
+              <div class="chapter-number">03</div>
+              <div><h2>下一步怎么改？</h2><p class="chapter-dek">不要立即重复付费重试；先补齐首启失败上下文。</p></div>
+            </div>
+            <div class="chapter-body">
+              <div class="delivery-passport">
+                <div class="passport-stamp"><div class="passport-seal">NO<br>ADAPTER<br>NO TRIAL</div></div>
+                <div class="passport-body">
+                  <h3>本次 Attempt 不可交付。</h3>
+                  <p>失败记录保留，重试必须创建新的 Attempt；不能用后续成功运行覆盖这次结果。</p>
+                  <div class="passport-rows">
+                    <div><span>Adapter</span><strong>0 / 2</strong></div>
+                    <div><span>推理验收</span><strong>未到达</strong></div>
+                    <div><span>可安全执行</span><strong>补证据 → 核对 → 新 Attempt</strong></div>
+                  </div>
+                </div>
+              </div>
+              <div class="experiment-grid">${report.experiments.map(renderExperiment).join("")}</div>
+            </div>
+          </section>
+          <section class="limit-section">
+            <h3>这份复盘不能回答什么</h3>
+            <ul>${report.limitations.map((item) => `<li>${ui.escapeHtml(item)}</li>`).join("")}</ul>
+          </section>
+        `;
+      }
+
+      function renderCancelledChapters() {
+        return `
+          <section class="chapter" id="chapter-1">
+            <div class="chapter-head">
+              <div class="chapter-number">01</div>
+              <div><h2>这次尝试留下了什么？</h2></div>
+            </div>
+            <div class="chapter-body">
+              <div class="answer-lead">
+                <blockquote><span>结论</span>Attempt 已取消，不发布部分 Adapter。已有快照、runtime 与 6 个执行文件，但没有训练指标。</blockquote>
+                <div class="big-fact"><span>证据覆盖</span><strong>3 / 8</strong><small>补齐指标前，不生成训练结论。</small></div>
+              </div>
+            </div>
+          </section>
+          <section class="chapter">
+            <div class="chapter-head">
+              <div class="chapter-number">02</div>
+              <div><h2>可以说“不可交付”，不能说“训练失败根因”</h2></div>
+            </div>
+            <div class="chapter-body">
+              <div class="delivery-passport">
+                <div class="passport-stamp"><div class="passport-seal">LIMITED<br>EVIDENCE</div></div>
+                <div class="passport-body">
+                  <h3>有限复盘：只保留确定事实。</h3>
+                  <p>取消、无 Adapter、无 metrics、6 个执行文件。没有推理结果或训练质量结论。</p>
+                  <div class="passport-rows">
+                    <div><span>训练健康度</span><strong class="not-verified">无法判断</strong></div>
+                    <div><span>可交付性</span><strong>不可交付</strong></div>
+                    <div><span>建议</span><strong>重新运行并确保指标归档</strong></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        `;
+      }
+
+      function renderStoryChart() {
+        const width = 760;
+        const height = 230;
+        const padding = {left: 38, right: 22, top: 22, bottom: 30};
+        const max = Math.max(...attempt.trainLoss);
+        const min = Math.min(...attempt.trainLoss);
+        const path = ui.linePath(attempt.trainLoss, width, height, padding, min, max);
+        const xForIndex = (index) => padding.left + (index / Math.max(attempt.trainLoss.length - 1, 1)) * (width - padding.left - padding.right);
+        const yForValue = (value) => padding.top + (1 - (value - min) / Math.max(max - min, 0.000001)) * (height - padding.top - padding.bottom);
+        const evalX = xForIndex(attempt.trainLoss.length - 1);
+        const evalY = yForValue(attempt.metrics.bestEval);
+        return `
+          <div class="story-chart">
+            <div class="story-chart-head">
+              <div>
+                <h3>Loss 降得很快，但“稳定”这件事还没被验证</h3>
+                <p>蓝线是 22 个训练点；绿点只有 1 个 Eval 采样。没有外推线，也没有百分比完成度。</p>
+              </div>
+              <div class="legend"><span><i></i>Train Loss</span><span><i class="eval"></i>Eval Loss</span></div>
+            </div>
+            <svg class="chart-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="Train Loss 从 11.682 下降至 0.200，Eval Loss 在 step 22 为 0.215">
+              ${[0, 1, 2, 3, 4].map((index) => {
+                const y = padding.top + index * ((height - padding.top - padding.bottom) / 4);
+                const value = max - index * ((max - min) / 4);
+                return `<line class="axis" x1="${padding.left}" x2="${width - padding.right}" y1="${y}" y2="${y}"></line><text class="axis-label" x="0" y="${y + 3}">${value.toFixed(1)}</text>`;
+              }).join("")}
+              <path class="loss-line" d="${path}"></path>
+              <circle class="eval-point" cx="${evalX}" cy="${evalY}" r="5"></circle>
+              <line class="annotation-line" x1="${evalX - 120}" x2="${evalX}" y1="${evalY - 38}" y2="${evalY - 6}"></line>
+              <text class="annotation-text" x="${evalX - 250}" y="${evalY - 44}">唯一验证点：0.2148 · 不能判断趋势</text>
+              ${[1, 6, 12, 17, 22].map((step) => `<text class="axis-label" x="${xForIndex(step - 1) - 4}" y="${height - 8}">${step}</text>`).join("")}
+            </svg>
+            <div class="chart-note">
+              <div><span class="mf-layer">观测</span><span><b>Train Loss</b> 11.682 → 0.1998；这是优化目标，不是问答准确率。</span></div>
+              <div><span class="mf-layer inference">推断</span><span><b>Eval 仅 1 点</b>，因此不判断过拟合或泛化稳定性。</span></div>
+            </div>
+          </div>
+        `;
+      }
+
+      function renderFailureBanner() {
+        return `<div class="failure-banner"><span class="mf-status danger">已失败</span><span><strong>bootstrap_key_install_failed</strong> · 运行在首启阶段终止。日志接口当前返回 0 个 chunk；根因未确认。</span></div>`;
+      }
+
+      function renderFilters(findings) {
+        const counts = {
+          all: findings.length,
+          blocked: findings.filter((item) => item.severity === "blocked").length,
+          attention: findings.filter((item) => item.severity === "attention").length,
+          passed: findings.filter((item) => item.severity === "passed").length,
+          info: findings.filter((item) => item.severity === "info").length,
+          unknown: findings.filter((item) => item.severity === "unknown").length,
+        };
+        return `<div class="filter-row" role="group" aria-label="按严重度筛选">${[
+          ["all", "全部"],
+          ["blocked", "阻断"],
+          ["attention", "需关注"],
+          ["passed", "已通过"],
+          ["info", "提示"],
+          ["unknown", "无法判断"],
+        ].map(([key, label]) => `
+          <button type="button" class="mf-chip ${filter === key ? "is-active" : ""}" data-filter="${key}" aria-pressed="${filter === key}">${label}<span class="count">${counts[key]}</span></button>
+        `).join("")}</div>`;
+      }
+
+      function renderFindings(findings) {
+        const rows = filter === "all" ? findings : findings.filter((item) => item.severity === filter);
+        if (!rows.length) return `<p class="finding-empty">没有符合当前筛选的发现。</p>`;
+        return rows.map((item) => `
+          <article class="finding-row" data-severity="${ui.escapeHtml(item.severity)}">
+            <span class="finding-bar" aria-hidden="true"></span>
+            <div>
+              <div class="finding-id" style="color:var(--mf-muted);font:8px var(--mf-mono)">${ui.escapeHtml(item.id)} · ${ui.escapeHtml(item.category)}</div>
+              <h4>${ui.escapeHtml(item.title)}</h4>
+              <p>${ui.escapeHtml(item.observation)}</p>
+              <div class="row-meta">
+                <span class="mf-status ${item.severity === "blocked" ? "danger" : item.severity === "attention" ? "warning" : item.severity === "passed" ? "success" : item.severity === "unknown" ? "unknown" : "neutral"}">${ui.escapeHtml(item.severityLabel)}</span>
+                <span class="mf-layer ${item.layer === "推断" ? "inference" : item.layer === "建议" ? "advice" : item.layer === "限制" ? "limit" : ""}">${ui.escapeHtml(item.layer)}</span>
+              </div>
+              <div class="evidence-row">${item.evidence.map((id) => `<button class="mf-evidence-chip" type="button" data-evidence="${ui.escapeHtml(id)}">${ui.escapeHtml(id)}</button>`).join("")}</div>
+            </div>
+            <button class="finding-arrow" type="button" data-evidence="${ui.escapeHtml(item.evidence[0])}" aria-label="查看 ${ui.escapeHtml(item.id)} 的证据">→</button>
+          </article>
+        `).join("");
+      }
+
+      function renderExperiment(experiment) {
+        return `
+          <article class="experiment">
+            <div class="experiment-priority">${ui.escapeHtml(experiment.priority)}</div>
+            <div>
+              <h3>${ui.escapeHtml(experiment.title)}</h3>
+              <p>${ui.escapeHtml(experiment.hypothesis)}</p>
+              <div class="expectation"><strong>预期观察：</strong>${ui.escapeHtml(experiment.expectation)}</div>
+            </div>
+            <div class="experiment-actions">
+              <button class="mf-button" type="button" data-action="copy-experiment" data-experiment-id="${ui.escapeHtml(experiment.id)}">复制建议</button>
+              ${experiment.apply ? `<button class="mf-button primary" type="button" data-action="apply-experiment" data-experiment-id="${ui.escapeHtml(experiment.id)}">应用建议配置</button>` : ""}
+            </div>
+          </article>
+        `;
+      }
+
+      function renderNotes() {
+        if (attempt.state === "failed") {
+          return `
+            <div class="notes-head"><span class="mf-eyebrow">DESK NOTES</span><h2>这次先别急着重试</h2></div>
+            <div class="notes-body">
+              <div class="todo"><span class="todo-index">01</span><div><strong>核对首启失败上下文</strong><p>日志为 0 chunk，先查 provisioning 与供应商侧记录。</p></div></div>
+              <div class="todo"><span class="todo-index">02</span><div><strong>保留失败 Attempt</strong><p>后续运行不能覆盖本次诊断事实。</p></div></div>
+              <div class="notes-actions">
+                <button class="mf-button" type="button" data-action="copy-summary">复制复盘摘要</button>
+                <button class="mf-button quiet" type="button" data-action="refresh">查看原始状态</button>
+              </div>
+              ${renderNoteEvidence(["E-F1", "E-F2"])}
+              <p class="note-boundary">报告是 advisory；失败状态与重试隔离仍由原系统硬门禁负责。</p>
+            </div>
+          `;
+        }
+        if (attempt.state === "cancelled") {
+          return `
+            <div class="notes-head"><span class="mf-eyebrow">DESK NOTES</span><h2>没有充分证据</h2></div>
+            <div class="notes-body">
+              <div class="todo"><span class="todo-index">01</span><div><strong>保留取消事实</strong><p>不发布部分 Adapter。</p></div></div>
+              <div class="todo"><span class="todo-index">02</span><div><strong>需要训练结论时重跑</strong><p>并确认 metrics / manifest 完整归档。</p></div></div>
+              <div class="notes-actions"><button class="mf-button" type="button" data-action="refresh">重新读取证据</button></div>
+              <p class="note-boundary">当前不生成调参与业务效果建议。</p>
+            </div>
+          `;
+        }
+        return `
+          <div class="notes-head"><span class="mf-eyebrow">DESK NOTES</span><h2>如果只做一件事</h2></div>
+          <div class="notes-body">
+            <div class="todo"><span class="todo-index">01</span><div><strong>做独立推理验收</strong><p>先用 Best Adapter；记录服务 ready、最小请求与代表性问题。</p></div></div>
+            <div class="todo"><span class="todo-index">02</span><div><strong>再重复一次同配置</strong><p>建立最小方差证据，不先假定学习率需要调整。</p></div></div>
+            <div class="notes-actions">
+              <button class="mf-button primary" type="button" data-action="open-report">阅读完整简报</button>
+              <button class="mf-button" type="button" data-action="copy-summary">复制结论</button>
+            </div>
+            ${renderNoteEvidence(["E-01", "E-06", "E-07"])}
+            <p class="note-boundary">AI 报告不修改训练状态，不发布 Adapter，不自动创建 GPU。没有推理验收时，不能写“模型可用”。</p>
+          </div>
+        `;
+      }
+
+      function renderNoteEvidence(ids) {
+        return `<div class="note-evidence"><h3>关键证据</h3><div class="inline-evidence">${ids.map((id) => `<button class="mf-evidence-chip" type="button" data-evidence="${ui.escapeHtml(id)}">${ui.escapeHtml(id)}</button>`).join("")}</div></div>`;
+      }
+
+      function renderReport() {
+        if (!attempt.report?.exists) {
+          renderEmpty();
+          return;
+        }
+        const report = attempt.report;
+        root.innerHTML = `
+          <div class="shell">
+            <div class="report-cover">
+              <div class="cover-top">
+                <div class="cover-top-left">
+                  <span class="mf-eyebrow">AI TRAINING BRIEF · ADVISORY</span>
+                  <span class="mf-demo-stamp">原型示例</span>
+                  <span class="mf-status ${attempt.state === "failed" ? "danger" : "warning"}">${attempt.state === "failed" ? "失败复盘" : "可用性未验证"}</span>
+                </div>
+                <div class="cover-date">BRIEF ${ui.escapeHtml(report.version)}<br>${ui.escapeHtml(report.generatedAt)}</div>
+              </div>
+              <h1>${ui.escapeHtml(report.headline)}</h1>
+              <p class="dek">${ui.escapeHtml(report.summary)}</p>
+              <div class="cover-byline">
+                <span>Attempt <b>${ui.escapeHtml(attempt.shortId)}</b></span>
+                <span>模型 <b>${ui.escapeHtml(attempt.model)}</b></span>
+                <span>方法 <b>${ui.escapeHtml(attempt.method)}</b></span>
+                <span>GPU <b>${ui.escapeHtml(attempt.gpu)}</b></span>
+                <span>${ui.escapeHtml(report.sourceNote)}</span>
+              </div>
+            </div>
+
+            <div class="decision-strip" aria-label="双门禁结论">
+              ${renderDecision(report.health, "训练健康度", "")}
+              ${renderDecision(report.delivery, "可交付性", "delivery")}
+            </div>
+
+            <div class="report-layout">
+              <article class="briefing-body">
+                <nav class="briefing-nav" aria-label="简报章节">
+                  <a href="#chapter-1">01 做对了吗</a>
+                  <a href="#chapter-2">02 训练健康吗</a>
+                  <a href="#chapter-3">03 能交付吗</a>
+                  <a href="#chapter-4">04 下一步</a>
+                  <button type="button" data-action="back-entry" style="margin-left:auto;border-right:0;border-left:1px solid var(--b-rule)">← 返回详情</button>
+                </nav>
+                ${renderChapters()}
+                <section class="ask-form" id="askForm" aria-labelledby="askLabel">
+                  <span class="mf-eyebrow">追问 · FRONTEND ONLY</span>
+                  <form id="innerAskForm">
+                    <label class="mf-sr-only" id="askLabel" for="askInput">追问这份简报</label>
+                    <input id="askInput" placeholder="例如：为什么不能把 Adapter available 当成模型可用？">
+                    <button class="mf-button primary" type="submit">追问</button>
+                  </form>
+                  <p class="ask-response" id="askResponse" hidden></p>
+                </section>
+              </article>
+
+              <aside class="field-notes" aria-label="行动便签">
+                <div class="notes-head"><span class="mf-eyebrow">ACTION NOTES</span><h2>一页带走</h2></div>
+                <div class="notes-body">
+                  <div class="todo"><span class="todo-index">A</span><div><strong>训练健康度</strong><p>${ui.escapeHtml(report.health.title)}</p></div></div>
+                  <div class="todo"><span class="todo-index">B</span><div><strong>可交付性</strong><p>${ui.escapeHtml(report.delivery.title)}</p></div></div>
+                  <div class="todo"><span class="todo-index">C</span><div><strong>下一步</strong><p>先补独立推理验收，再考虑同配置重跑。</p></div></div>
+                  <div class="notes-actions">
+                    <button class="mf-button primary" type="button" data-action="regenerate">重新生成简报</button>
+                    <button class="mf-button" type="button" data-action="copy-summary">复制结论</button>
+                    <button class="mf-button quiet" type="button" data-action="back-entry">返回 Attempt 详情</button>
+                  </div>
+                  ${renderNoteEvidence(["E-01", "E-06", "E-07"])}
+                </div>
+              </aside>
+            </div>
+          </div>
+        `;
+        const askForm = document.getElementById("innerAskForm");
+        ui.initAskBox(
+          askForm,
+          document.getElementById("askResponse"),
+          {
+            "为什么不能把 Adapter available 当成模型可用？": "观测：Best/Final 为 available，只证明两个 Adapter 文件可校验、可下载。推断：尚无独立推理服务 ready 与最小请求证据。所以不能写“模型可用”。",
+            "训练健康吗？": "训练内信号可读：22 个 Train/LR 点、0 Token 溢出、runtime lock 一致、显存峰值已测。但只有 1 个 Eval 点，泛化趋势仍无法判断。",
+          },
+        );
+      }
+
+      function renderDecision(value, label, extra) {
+        const tone = value.tone === "blocked" ? "danger" : value.tone === "watch" ? "warning" : "unknown";
+        return `
+          <article class="decision">
+            <div class="decision-top"><span>${label === "训练健康度" ? "TRAINING HEALTH" : "DELIVERABILITY"}</span><span class="mf-status ${tone}">${ui.escapeHtml(value.label)}</span></div>
+            <h2>${ui.escapeHtml(value.title)}</h2>
+            <p>${ui.escapeHtml(value.detail)}</p>
+          </article>
+        `;
+      }
+
+      function renderEmpty() {
+        root.innerHTML = `
+          <div class="shell">
+            <div class="briefing-nav" style="border-top:0;border-bottom:0;margin:0 0 12px">
+              <button type="button" data-action="back-entry" style="border-right:0">← 返回 Attempt 详情</button>
+              <a href="index.html">三方案对比</a>
+            </div>
+            <section class="empty-cover">
+              <div>
+                <div class="brief-kicker"><span class="mf-eyebrow">AI TRAINING BRIEF / NO REPORT</span><span class="mf-demo-stamp">原型示例</span><span class="mf-status neutral">无报告</span></div>
+                <h1>没有一份可以负责的训练简报。</h1>
+                <p>${ui.escapeHtml(attempt.report.sourceNote)} 当前可以确认取消、无 Adapter 与部分执行文件，但没有 metrics 和推理验收。报告不会凭空补出“训练健康”。</p>
+                <div class="entry-actions">
+                  <button class="mf-button primary" type="button" data-action="generate">生成有限复盘</button>
+                  <button class="mf-button" type="button" data-action="back-entry">返回详情</button>
+                </div>
+              </div>
+              <aside class="coverage-sheet">
+                <h2>证据清单</h2>
+                <p>3 / 8 类可用</p>
+                <div class="coverage-list">
+                  ${(attempt.evidenceCoverage || []).map(([label, present, note]) => `
+                    <div><b>${ui.escapeHtml(label)}</b><span>${present ? "有" : "缺失"}</span></div>
+                  `).join("")}
+                </div>
+              </aside>
+            </section>
+          </div>
+        `;
+      }
+
+      function renderLoading() {
+        root.innerHTML = `
+          <div class="shell">
+            <div class="loading-sheet" role="status" aria-live="polite">
+              <div class="loading-inner">
+                <div class="loader" aria-hidden="true"></div>
+                <h1>正在把运行事实写成一份简报</h1>
+                <p>不重新训练，不申请 GPU。只读取该 Attempt 的快照、指标与归档证据，并在没有数据的地方保留“无法判断”。</p>
+                <div class="loading-stages">
+                  <div class="is-current" data-loading-stage>读取 Attempt 快照与运行状态</div>
+                  <div data-loading-stage>核对指标、Token、显存与 runtime</div>
+                  <div data-loading-stage>检查 Adapter 与独立推理验收</div>
+                  <div data-loading-stage>组织结论、证据与限制</div>
+                </div>
+                <p class="note-boundary" style="margin-top:18px">原型示例：等待过程由本地定时器模拟，不会调用任何模型。</p>
+              </div>
+            </div>
+          </div>
+        `;
+        const stages = [...root.querySelectorAll("[data-loading-stage]")];
+        stages.forEach((stage, index) => {
+          window.setTimeout(() => {
+            stages.forEach((node) => node.classList.remove("is-current"));
+            stage.classList.add("is-current");
+          }, 340 * index);
+        });
+      }
+
+      function startGeneration() {
+        if (loadingTimer) window.clearTimeout(loadingTimer);
+        renderLoading();
+        loadingTimer = window.setTimeout(() => {
+          if (attempt.report?.exists) {
+            view = "report";
+            render();
+            ui.toast("简报已重新生成；旧结论仍以同一 Attempt 的证据为边界。");
+          } else {
+            view = "report";
+            renderLimitedCancelled();
+          }
+        }, 1550);
+      }
+
+      function renderLimitedCancelled() {
+        root.innerHTML = `
+          <div class="shell">
+            <div class="report-cover">
+              <div class="cover-top">
+                <div class="cover-top-left"><span class="mf-eyebrow">LIMITED REVIEW · ADVISORY</span><span class="mf-demo-stamp">原型示例</span><span class="mf-status unknown">证据不足</span></div>
+                <div class="cover-date">LIMITED BRIEF<br>11/06 19:58</div>
+              </div>
+              <h1>这次尝试已被取消；只能复盘“没有形成训练结论”。</h1>
+              <p class="dek">已有 Attempt 快照、runtime 与 6 个执行文件，但没有 metrics、Adapter 或推理验收。有限复盘不会生成虚假的 Loss 曲线。</p>
+              <div class="cover-byline"><span>Attempt <b>${ui.escapeHtml(attempt.shortId)}</b></span><span>${ui.escapeHtml(attempt.mode)}</span><span>报告版本 <b>LIMITED-01</b></span></div>
+            </div>
+            <div class="decision-strip">
+              <article class="decision"><div class="decision-top"><span>TRAINING HEALTH</span><span class="mf-status unknown">无法判断</span></div><h2>没有训练指标，不能评价健康度。</h2><p>缺失不是零，也不是正常。</p></article>
+              <article class="decision"><div class="decision-top"><span>DELIVERABILITY</span><span class="mf-status danger">不可交付</span></div><h2>取消不发布部分 Adapter。</h2><p>没有可进入推理验收的产物。</p></article>
+            </div>
+            <div class="report-layout">
+              <article class="briefing-body">
+                ${renderCancelledChapters()}
+                <section class="limit-section"><h3>为什么没有更多结论？</h3><ul><li>metrics=0，不能画 Loss 或判断训练健康。</li><li>未生成 Adapter，不能进入推理验收。</li><li>此复盘不触发重跑或云端资源。</li></ul></section>
+              </article>
+              <aside class="field-notes">${renderNotes()}</aside>
+            </div>
+          </div>
+        `;
+      }
+
+      function render() {
+        if (view === "report") {
+          if (attempt.report?.exists) renderReport();
+          else renderEmpty();
+          return;
+        }
+        renderEntry();
+      }
+
+      function showEvidence(id) {
+        const item = attempt.report?.evidence?.find((entry) => entry.id === id)
+          || {
+            id,
+            kind: "状态",
+            title: "当前没有可展开的完整报告证据",
+            source: "原型示例",
+            value: "无报告",
+            detail: "该 Attempt 尚未形成完整报告，只能查看运行详情中的原始字段。",
+            path: "—",
+            samples: "—",
+            hash: "",
+            limitation: "这不是证据正常；而是没有可引用的报告证据。",
+          };
+        evidenceDialogBody.innerHTML = `
+          <span class="mf-eyebrow">${ui.escapeHtml(item.kind)} · ${ui.escapeHtml(item.id)}</span>
+          <h3 style="margin-top:6px;font-family:var(--b-serif);font-size:22px">${ui.escapeHtml(item.title)}</h3>
+          <p style="margin-top:7px;color:var(--mf-muted);font-size:10px;line-height:1.7">${ui.escapeHtml(item.detail)}</p>
+          <div class="evidence-dialog-grid">
+            <div><span>来源</span><strong>${ui.escapeHtml(item.source)}</strong></div>
+            <div><span>字段 / 文件</span><strong>${ui.escapeHtml(item.path)}</strong></div>
+            <div><span>样本</span><strong>${ui.escapeHtml(item.samples)}</strong></div>
+            <div><span>摘要</span><strong>${ui.escapeHtml(item.hash || "未提供")}</strong></div>
+          </div>
+          <div class="note-boundary" style="margin-top:13px"><strong>限制：</strong>${ui.escapeHtml(item.limitation)}</div>
+        `;
+        evidenceDialog.open(document.activeElement);
+      }
+
+      function openApply(experimentId) {
+        const experiment = attempt.report?.experiments.find((item) => item.id === experimentId);
+        if (!experiment) return;
+        currentExperiment = experiment;
+        applyDialogBody.innerHTML = `
+          <p style="color:var(--mf-muted);font-size:10px;line-height:1.7">${ui.escapeHtml(experiment.title)}</p>
+          <div class="config-changes">
+            ${(experiment.changes || []).map(([key, before, after]) => `
+              <div><span class="mf-mono">${ui.escapeHtml(key)}</span><strong>${ui.escapeHtml(before)} → ${ui.escapeHtml(after)}</strong></div>
+            `).join("")}
+          </div>
+          <div class="note-boundary" style="margin-top:13px">应用只生成未提交配置草稿；仍需重新核对数据、基座、运行时兼容性与费用守卫。</div>
+        `;
+        applyDialog.open(document.activeElement);
+      }
+
+      root.addEventListener("click", async (event) => {
+        const filterButton = event.target.closest("[data-filter]");
+        const evidenceButton = event.target.closest("[data-evidence]");
+        const actionButton = event.target.closest("[data-action]");
+        if (filterButton) {
+          filter = filterButton.dataset.filter;
+          const list = document.getElementById("findingList");
+          if (list) list.innerHTML = renderFindings(attempt.report.findings);
+          root.querySelectorAll("[data-filter]").forEach((button) => {
+            button.classList.toggle("is-active", button.dataset.filter === filter);
+            button.setAttribute("aria-pressed", String(button.dataset.filter === filter));
+          });
+          return;
+        }
+        if (evidenceButton) {
+          showEvidence(evidenceButton.dataset.evidence);
+          return;
+        }
+        if (!actionButton) return;
+        const action = actionButton.dataset.action;
+        if (action === "open-report") {
+          view = "report";
+          render();
+        } else if (action === "back-entry") {
+          view = "entry";
+          render();
+        } else if (action === "generate" || action === "regenerate") {
+          startGeneration();
+        } else if (action === "refresh") {
+          ui.toast("原型示例：未向后端发起刷新请求。");
+        } else if (action === "copy-summary") {
+          const text = attempt.report?.exists
+            ? `${attempt.displayName}\n${attempt.report.summary}\n健康度：${attempt.report.health.label}\n可交付性：${attempt.report.delivery.label}`
+            : "有限复盘：没有 metrics / Adapter / 推理验收；无法判断训练健康度。";
+          const ok = await ui.copyText(text);
+          ui.toast(ok ? "结论摘要已复制。" : "复制失败，请手动选择文本。");
+        } else if (action === "copy-experiment") {
+          const experiment = attempt.report?.experiments.find((item) => item.id === actionButton.dataset.experimentId);
+          if (!experiment) return;
+          const ok = await ui.copyText(`${experiment.priority} ${experiment.title}\n${experiment.hypothesis}\n预期：${experiment.expectation}`);
+          ui.toast(ok ? "实验建议已复制。" : "复制失败，请手动选择文本。");
+        } else if (action === "apply-experiment") {
+          openApply(actionButton.dataset.experimentId);
+        }
+      });
+
+      attemptSelect.addEventListener("change", () => {
+        if (loadingTimer) window.clearTimeout(loadingTimer);
+        attempt = data.getAttempt(attemptSelect.value);
+        filter = "all";
+        view = attempt.report?.exists ? "entry" : "entry";
+        render();
+        window.scrollTo({top: 0, behavior: "smooth"});
+      });
+
+      confirmApply.addEventListener("click", () => {
+        if (!currentExperiment) return;
+        applyDialog.close();
+        ui.toast("已创建原型配置草稿；未提交、未创建 GPU、未修改历史 Attempt。");
+      });
+
+      render();
+    })();
+  </script>
+</body>
+</html>

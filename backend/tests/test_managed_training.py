@@ -189,7 +189,6 @@ def managed_env(monkeypatch):
     resources.pool.wait()
     resources.settings.ucloud_public_key = SecretStr("fixture-public")
     resources.settings.ucloud_private_key = SecretStr("fixture-private")
-    resources.settings.ucloud_write_enabled = True
     resources.settings.ucloud_project_id = None
     with resources.pool.connection() as connection:
         connection.execute(

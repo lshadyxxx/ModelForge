@@ -7,6 +7,7 @@ import threading
 from modelforge.bootstrap import Resources, execution_workers
 from modelforge.errors import configure_errors
 from modelforge.modules.models import ModelImports
+from modelforge.modules.diagnosis import DiagnosisWorker
 from modelforge.settings import get_settings
 
 logger = logging.getLogger(__name__)
@@ -36,6 +37,20 @@ def execution_loop(resources, stop):
         stop.wait(2)
 
 
+def diagnosis_loop(resources, stop):
+    diagnosis = DiagnosisWorker(resources)
+    poll_seconds = max(0.5, float(resources.settings.ai_worker_poll_seconds))
+    while not stop.is_set():
+        try:
+            active = diagnosis.run_once()
+        except Exception:
+            logger.warning(
+                'Diagnosis dependency unavailable; durable job remains recoverable'
+            )
+            active = False
+        stop.wait(0.1 if active else poll_seconds)
+
+
 @asynccontextmanager
 async def lifespan(app):
     import asyncio
@@ -45,13 +60,21 @@ async def lifespan(app):
     thread.start()
     execution_thread = threading.Thread(target=execution_loop, args=(resources, stop), name="execution-worker")
     execution_thread.start()
+    diagnosis_thread = threading.Thread(
+        target=diagnosis_loop,
+        args=(resources, stop),
+        name="diagnosis-worker",
+    )
+    diagnosis_thread.start()
     app.state.import_thread = thread
+    app.state.diagnosis_thread = diagnosis_thread
     try:
         yield
     finally:
         stop.set()
         await asyncio.to_thread(thread.join)
         await asyncio.to_thread(execution_thread.join)
+        await asyncio.to_thread(diagnosis_thread.join)
         resources.close()
 
 app = FastAPI(title="ModelForge Worker probe", docs_url=None, redoc_url=None, lifespan=lifespan)

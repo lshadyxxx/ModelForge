@@ -269,6 +269,109 @@ def test_download_follows_approved_cdn_and_verifies_real_bytes():
     assert seen == ['modelscope.cn', 'cdn-lfs-cn-1.modelscope.cn']
 
 
+def test_download_resumes_from_persisted_prefix_with_valid_range():
+    prefix = DATA[:5]
+    seen = []
+    def serve(request):
+        seen.append(request.url.host)
+        if request.url.host == 'modelscope.cn':
+            return httpx.Response(302, headers={
+                'Location': 'https://cdn-lfs-cn-1.modelscope.cn/weight?Signature=secret'})
+        assert request.headers['range'] == f'bytes={len(prefix)}-'
+        return httpx.Response(
+            206, content=DATA[len(prefix):],
+            headers={
+                'Content-Range': f'bytes {len(prefix)}-{len(DATA) - 1}/{len(DATA)}',
+                'Content-Length': str(len(DATA) - len(prefix)),
+                'Accept-Ranges': 'bytes',
+            })
+    output, progress = io.BytesIO(prefix), []
+    output.seek(len(prefix))
+    client(serve).download(
+        'Qwen/Qwen3-0.6B', COMMIT,
+        {'path': 'config.json', 'size_bytes': len(DATA), 'sha256': hashlib.sha256(DATA).hexdigest()},
+        output, progress.append, resume_from=len(prefix))
+    assert output.getvalue() == DATA
+    assert progress[0] == len(prefix)
+    assert progress[-1] == len(DATA)
+    assert seen == ['modelscope.cn', 'cdn-lfs-cn-1.modelscope.cn']
+
+
+def test_download_restarts_cleanly_when_server_ignores_range():
+    prefix = b'wrong'
+    seen_range = []
+    def serve(request):
+        if request.url.host == 'modelscope.cn':
+            return httpx.Response(302, headers={
+                'Location': 'https://cdn-lfs-cn-1.modelscope.cn/weight?Signature=secret'})
+        seen_range.append(request.headers.get('range'))
+        return httpx.Response(200, content=DATA)
+    output = io.BytesIO(prefix)
+    output.seek(len(prefix))
+    client(serve).download(
+        'Qwen/Qwen3-0.6B', COMMIT,
+        {'path': 'config.json', 'size_bytes': len(DATA), 'sha256': hashlib.sha256(DATA).hexdigest()},
+        output, lambda _: None, resume_from=len(prefix))
+    assert seen_range == [f'bytes={len(prefix)}-']
+    assert output.getvalue() == DATA
+
+
+@pytest.mark.parametrize('content_range', [
+    None,
+    'bytes 99-100/123',
+    'bytes 5-999/123',
+    f'bytes 5-{len(DATA) - 1}/{len(DATA) + 1}',
+    'items 5-10/123',
+])
+def test_invalid_resume_content_range_is_rejected(content_range):
+    prefix = DATA[:5]
+    def serve(request):
+        if request.url.host == 'modelscope.cn':
+            return httpx.Response(302, headers={
+                'Location': 'https://cdn-lfs-cn-1.modelscope.cn/weight?Signature=secret'})
+        headers = {} if content_range is None else {'Content-Range': content_range}
+        return httpx.Response(206, content=DATA[len(prefix):], headers=headers)
+    output = io.BytesIO(prefix)
+    output.seek(len(prefix))
+    with pytest.raises(AppError) as caught:
+        client(serve).download(
+            'Qwen/Qwen3-0.6B', COMMIT,
+            {'path': 'config.json', 'size_bytes': len(DATA), 'sha256': hashlib.sha256(DATA).hexdigest()},
+            output, lambda _: None, resume_from=len(prefix))
+    assert caught.value.code == 'model_source_unavailable'
+
+
+def test_complete_persisted_file_is_verified_without_http():
+    output = io.BytesIO(DATA)
+    output.seek(len(DATA))
+    progress = []
+    client(lambda request: pytest.fail('Complete partial file requested HTTP')).download(
+        'Qwen/Qwen3-0.6B', COMMIT,
+        {'path': 'config.json', 'size_bytes': len(DATA), 'sha256': hashlib.sha256(DATA).hexdigest()},
+        output, progress.append, resume_from=len(DATA))
+    assert output.getvalue() == DATA
+    assert progress == [len(DATA)]
+
+
+def test_resumed_prefix_progress_is_cumulative(monkeypatch):
+    from modelforge.modules.models import modelscope as modelscope_module
+    class ChunkedBytesIO(io.BytesIO):
+        def read(self, size=-1):
+            return super().read(min(size, 4))
+    prefix = DATA[:12]
+    output = ChunkedBytesIO(prefix)
+    output.seek(len(prefix))
+    progress = []
+    monkeypatch.setattr(modelscope_module, 'PREFIX_CHECKPOINT_BYTES', 4)
+    client(lambda request: httpx.Response(
+        206, content=DATA[len(prefix):],
+        headers={'Content-Range': f'bytes {len(prefix)}-{len(DATA) - 1}/{len(DATA)}'})).download(
+        'Qwen/Qwen3-0.6B', COMMIT,
+        {'path': 'config.json', 'size_bytes': len(DATA), 'sha256': hashlib.sha256(DATA).hexdigest()},
+        output, progress.append, resume_from=len(prefix))
+    assert progress == [4, 8, 12, len(DATA)]
+
+
 @pytest.mark.parametrize('target', ['http://modelscope.cn/file', 'https://127.0.0.1/secret',
     'https://other.modelscope.cn/file', 'https://modelscope.cn:444/file', 'https://user:password@modelscope.cn/file'])
 def test_unapproved_redirect_is_rejected_without_requesting_target(target):

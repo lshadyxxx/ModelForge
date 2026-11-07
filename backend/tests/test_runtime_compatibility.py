@@ -123,6 +123,8 @@ def test_b_profile_requires_its_own_custom_image_and_runtime_source():
     assert identity["training_image_id"] == "compshareImage-1xc89j1np56m"
     assert identity["training_image_type"] == "Custom"
     assert identity["training_runtime_source"] == "prebuilt"
+    assert identity["selection_mode"] == "verified"
+    assert identity["warnings"] == []
 
     with pytest.raises(AppError) as caught:
         training_compatibility(MODEL, CONFIG, TRAIN_INSTANCE, image_profile=profile)
@@ -157,40 +159,65 @@ def test_training_accepts_only_the_measured_complete_combination():
 
 
 def test_training_blocks_unknown_architecture_before_hardware_checks():
-    model = {**MODEL, "format_summary": {"model_type": "llama"}}
+    model = {**MODEL, "format_summary": {"model_type": "bert"}}
     with pytest.raises(AppError) as caught:
         training_compatibility(model, CONFIG, TRAIN_INSTANCE)
     assert caught.value.code == "runtime_model_unsupported"
     assert caught.value.details["mismatches"][0]["field"] == "model.architecture"
 
 
-def test_training_blocks_changed_content_even_for_same_architecture():
+def test_training_allows_unmeasured_content_with_advisory():
     model = {**MODEL, "manifest_sha256": "0" * 64}
-    with pytest.raises(AppError) as caught:
-        training_compatibility(model, CONFIG, TRAIN_INSTANCE)
-    assert caught.value.code == "runtime_model_version_unsupported"
-    assert caught.value.details["mismatches"][0]["field"] == "model.fingerprint"
+    identity = training_compatibility(model, CONFIG, TRAIN_INSTANCE)
+    assert identity["selection_mode"] == "custom"
+    assert identity["warnings"][0]["code"] == "runtime_model_version_unverified"
 
 
-def test_training_blocks_unmeasured_parameters_and_hardware():
-    with pytest.raises(AppError) as caught:
-        training_compatibility(
-            MODEL, TrainingConfig(template="qwen3_nothink", cutoff_len=1024), TRAIN_INSTANCE
-        )
-    assert caught.value.code == "runtime_parameters_unsupported"
+def test_training_allows_custom_parameters_and_hardware_with_warnings():
+    identity = training_compatibility(
+        MODEL, TrainingConfig(template="qwen3_nothink", cutoff_len=1024), TRAIN_INSTANCE
+    )
+    assert identity["selection_mode"] == "custom"
+    assert {warning["code"] for warning in identity["warnings"]} == {
+        "runtime_parameters_unverified",
+    }
     changed = TRAIN_INSTANCE.model_copy(update={"gpu_type": "A100"})
-    with pytest.raises(AppError) as caught:
-        training_compatibility(MODEL, CONFIG, changed)
-    assert caught.value.code == "runtime_hardware_unsupported"
+    identity = training_compatibility(MODEL, CONFIG, changed)
+    assert identity["selection_mode"] == "custom"
+    assert identity["warnings"][0]["code"] == "runtime_hardware_unverified"
     changed = TRAIN_INSTANCE.model_copy(update={"cpu_platform": "Auto"})
-    with pytest.raises(AppError) as caught:
-        training_compatibility(MODEL, CONFIG, changed)
-    assert caught.value.code == "runtime_hardware_unsupported"
-    assert caught.value.details["mismatches"] == [{
+    identity = training_compatibility(MODEL, CONFIG, changed)
+    assert identity["warnings"][0]["mismatches"] == [{
         "field": "instance.cpu_platform",
         "expected": "Amd/Auto",
         "actual": "Auto",
     }]
+
+
+def test_training_maps_other_supported_architectures_to_their_template():
+    model = {
+        **MODEL,
+        "manifest_sha256": "c" * 64,
+        "format_summary": {"model_type": "llama"},
+    }
+    identity = training_compatibility(
+        model,
+        TrainingConfig(template="llama3"),
+        TRAIN_INSTANCE,
+    )
+    assert identity["selection_mode"] == "custom"
+    assert {warning["code"] for warning in identity["warnings"]} == {
+        "runtime_model_version_unverified",
+        "runtime_parameters_unverified",
+    }
+
+
+def test_training_blocks_template_that_does_not_match_architecture():
+    model = {**MODEL, "format_summary": {"model_type": "llama"}}
+    with pytest.raises(AppError) as caught:
+        training_compatibility(model, CONFIG, TRAIN_INSTANCE)
+    assert caught.value.code == "runtime_parameters_unsupported"
+    assert caught.value.details["mismatches"][0]["field"] == "config.template"
 
 
 def test_inference_requires_same_base_preset_and_hardware():

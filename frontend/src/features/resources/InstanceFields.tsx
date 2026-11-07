@@ -16,7 +16,7 @@ export type InstanceSpec = {
   boot_disk_type: string;
 };
 
-type Zone = {Region: string; Zone: string; Describe: string};
+type Zone = {Region: string; Zone: string; Describe: string; IsPod: boolean};
 type Spec = {
   Name: string;
   MachineSizes: {
@@ -45,10 +45,14 @@ export function InstanceFields({
   value,
   onChange,
   disabled = false,
+  imageLock = null,
+  managed = false,
 }: {
   value: InstanceSpec;
   onChange: (value: InstanceSpec) => void;
   disabled?: boolean;
+  imageLock?: {id: string; label: string} | null;
+  managed?: boolean;
 }) {
   const [zones, setZones] = useState<Zone[]>([]);
   const [specs, setSpecs] = useState<Spec[]>([]);
@@ -103,6 +107,12 @@ export function InstanceFields({
   }, [value.region, value.zone]);
 
   useEffect(() => {
+    if (imageLock) {
+      setImages([]);
+      setTotal(0);
+      setImagesLoading(false);
+      return;
+    }
     if (!value.region || !value.zone) {
       setImages([]);
       setTotal(0);
@@ -126,7 +136,7 @@ export function InstanceFields({
       if (!controller.signal.aborted) setImagesLoading(false);
     });
     return () => controller.abort();
-  }, [value.region, value.zone, imageType, imageName, offset]);
+  }, [imageLock?.id, value.region, value.zone, imageType, imageName, offset]);
 
   const spec = specs.find((item) => item.Name === value.gpu_type);
   const sizes = (spec?.MachineSizes ?? [])
@@ -138,10 +148,13 @@ export function InstanceFields({
         platforms: collection.MinimalCpuPlatform,
       }))
     )));
-  const regions = [...new Set(zones.map((zone) => zone.Region))];
-  const zoneOptions = zones
-    .filter((zone) => zone.Region === value.region)
-    .map((zone) => ({value: zone.Zone, label: `${zone.Describe} · ${zone.Zone}`}));
+  const scopeOptions = zones.map((zone) => ({
+    value: `${zone.Region}|${zone.Zone}`,
+    label: `${zone.Describe} · ${zone.IsPod ? '容器' : '云主机'} · ${zone.Zone}`,
+  }));
+  const selectedScope = value.region && value.zone
+    ? `${value.region}|${value.zone}`
+    : '';
   const sizeOptions = sizes.map((size) => ({
     value: `${size.cpu}:${size.memory_mb}`,
     label: `${size.cpu} 核 / ${size.memory_mb / 1024} GiB`,
@@ -158,35 +171,29 @@ export function InstanceFields({
     <legend>单 GPU 实例要求</legend>
     {error && <p role="alert" className="error-message">{error}</p>}
     <div className="form-grid">
-      <label>地域
+      <label>部署位置
         <SelectMenu
-          value={value.region}
-          options={regions.map((region) => ({value: region, label: region}))}
-          onChange={(region) => {
+          value={selectedScope}
+          options={scopeOptions}
+          onChange={(scope) => {
+            const [region, zone] = scope.split('|');
+            if (!region || !zone) return;
             setOffset(0);
-            onChange({...emptyInstance, region});
+            onChange({
+              ...(imageLock ? value : emptyInstance),
+              region,
+              zone,
+              gpu_type: '',
+              cpu: 0,
+              memory_mb: 0,
+              image_id: imageLock?.id ?? '',
+            });
           }}
-          placeholder={zonesLoading ? '正在读取地域' : '选择地域'}
-          emptyText="没有可用地域"
-          searchPlaceholder="搜索地域"
+          placeholder={zonesLoading ? '正在读取部署位置' : '选择地域与可用区'}
+          emptyText="没有可用部署位置"
+          searchPlaceholder="搜索地域、可用区或类型"
           disabled={disabled || zonesLoading || !zones.length}
-          ariaLabel="地域"
-          required
-        />
-      </label>
-      <label>可用区
-        <SelectMenu
-          value={value.zone}
-          options={zoneOptions}
-          onChange={(zone) => {
-            setOffset(0);
-            onChange({...emptyInstance, region: value.region, zone});
-          }}
-          placeholder={value.region ? '选择可用区' : '请先选择地域'}
-          emptyText="当前地域没有可用区"
-          searchPlaceholder="搜索可用区"
-          disabled={disabled || !value.region}
-          ariaLabel="可用区"
+          ariaLabel="部署位置"
           required
         />
       </label>
@@ -239,49 +246,58 @@ export function InstanceFields({
           ariaLabel="CPU 平台"
         />
       </label>
-      <label>镜像目录
-        <SelectMenu
-          value={imageType}
-          options={[
-            {value: 'System', label: '系统镜像'},
-            {value: 'App', label: '应用镜像'},
-          ]}
-          onChange={(nextImageType) => {
-            setImageType(nextImageType);
-            setOffset(0);
-            onChange({...value, image_id: ''});
-          }}
-          placeholder="选择镜像目录"
-          searchable={false}
-          disabled={disabled}
-          ariaLabel="镜像目录"
-        />
-      </label>
-      <label>筛选镜像
-        <input
-          value={imageName}
-          onChange={(event) => {
-            setImageName(event.target.value);
-            setOffset(0);
-            onChange({...value, image_id: ''});
-          }}
-          placeholder={value.zone ? '按镜像名称筛选' : '请先选择可用区'}
-          disabled={disabled || !value.zone}
-        />
-      </label>
-      <label>运行镜像
-        <SelectMenu
-          value={value.image_id}
-          options={imageOptions}
-          onChange={(imageId) => onChange({...value, image_id: imageId})}
-          placeholder={!value.zone ? '请先选择可用区' : imagesLoading ? '正在读取运行镜像' : '选择运行镜像'}
-          searchPlaceholder="搜索运行镜像"
-          emptyText="当前筛选没有匹配镜像"
-          disabled={disabled || !value.zone || imagesLoading}
-          ariaLabel="运行镜像"
-          required
-        />
-      </label>
+      {imageLock ? <label className="span-two">训练镜像
+        <div className="training-locked-image">
+          <strong>{imageLock.label}</strong>
+          <code>{imageLock.id}</code>
+        </div>
+        <small>由训练镜像 profile 固定；资源配置只改变实例规格，不改变训练运行时。</small>
+      </label> : <>
+        <label>镜像目录
+          <SelectMenu
+            value={imageType}
+            options={[
+              {value: 'System', label: '系统镜像'},
+              {value: 'App', label: '应用镜像'},
+              {value: 'Custom', label: '自定义镜像'},
+            ]}
+            onChange={(nextImageType) => {
+              setImageType(nextImageType);
+              setOffset(0);
+              onChange({...value, image_id: ''});
+            }}
+            placeholder="选择镜像目录"
+            searchable={false}
+            disabled={disabled}
+            ariaLabel="镜像目录"
+          />
+        </label>
+        <label>筛选镜像
+          <input
+            value={imageName}
+            onChange={(event) => {
+              setImageName(event.target.value);
+              setOffset(0);
+              onChange({...value, image_id: ''});
+            }}
+            placeholder={value.zone ? '按镜像名称筛选' : '请先选择可用区'}
+            disabled={disabled || !value.zone}
+          />
+        </label>
+        <label>运行镜像
+          <SelectMenu
+            value={value.image_id}
+            options={imageOptions}
+            onChange={(imageId) => onChange({...value, image_id: imageId})}
+            placeholder={!value.zone ? '请先选择可用区' : imagesLoading ? '正在读取运行镜像' : '选择运行镜像'}
+            searchPlaceholder="搜索运行镜像"
+            emptyText="当前筛选没有匹配镜像"
+            disabled={disabled || !value.zone || imagesLoading}
+            ariaLabel="运行镜像"
+            required
+          />
+        </label>
+      </>}
       <label>系统盘（GB）
         <input
           required
@@ -322,7 +338,7 @@ export function InstanceFields({
         />
       </label>
     </div>
-    <div className="workflow-actions">
+    {!imageLock && <div className="workflow-actions">
       <button
         type="button"
         className="secondary"
@@ -338,7 +354,9 @@ export function InstanceFields({
         disabled={imagesLoading || !images.length || offset + images.length >= total}
         onClick={() => setOffset(offset + 100)}
       >下一页镜像</button>
-    </div>
-    <p className="muted">提交后保存这组要求；平台不会自动购买。镜像需预装兼容的训练或推理运行时，执行时记录实际版本与校验。</p>
+    </div>}
+    <p className="muted">{managed
+      ? '平台会按这组规格重新核对库存与报价，创建单台收费实例，并在训练结束、失败或取消后自动回收。'
+      : '提交后保存这组要求；平台不会自动购买。镜像需预装兼容的训练或推理运行时，执行时记录实际版本与校验。'}</p>
   </fieldset>;
 }

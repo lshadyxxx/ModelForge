@@ -9,8 +9,9 @@ import {
 } from '../../resources';
 import {
   getRuntimeBaseline,
-  modelCompatibilityReason,
+  trainingModelGuidance,
   trainingPresetFromBaseline,
+  trainingTemplateForModel,
   type RuntimeBaseline,
 } from '../../runtime';
 import {
@@ -137,8 +138,15 @@ function validateInstance(instance: InstanceSpec): Errors {
 function validateConfig(config: TrainingConfig): Errors {
   const errors: Errors = {};
   if (!Number.isFinite(config.seed) || config.seed < 0 || config.seed > 2147483647) errors.seed = '随机种子必须在 0 到 2147483647 之间。';
-  if (!Number.isFinite(config.epochs) || config.epochs < 1) errors.epochs = '训练轮数必须大于等于 1。';
-  if (!Number.isFinite(config.learning_rate) || config.learning_rate <= 0) errors.learning_rate = '学习率必须大于 0。';
+  if (!Number.isFinite(config.epochs) || config.epochs < 1 || config.epochs > 100) errors.epochs = '训练轮数必须在 1 到 100 之间。';
+  if (!Number.isFinite(config.learning_rate) || config.learning_rate < 1e-7 || config.learning_rate > 0.01) errors.learning_rate = '学习率必须在 1e-7 到 0.01 之间。';
+  if (!Number.isFinite(config.cutoff_len) || config.cutoff_len < 128 || config.cutoff_len > 32768) errors.cutoff_len = '最大 Token 必须在 128 到 32768 之间。';
+  if (!Number.isFinite(config.batch_size) || config.batch_size < 1 || config.batch_size > 8) errors.batch_size = '批大小必须在 1 到 8 之间。';
+  if (!Number.isFinite(config.gradient_accumulation) || config.gradient_accumulation < 1 || config.gradient_accumulation > 128) errors.gradient_accumulation = '梯度累积必须在 1 到 128 之间。';
+  if (![4, 8, 16, 32, 64].includes(config.lora_rank)) errors.lora_rank = 'LoRA Rank 必须是 4、8、16、32 或 64。';
+  if (!Number.isFinite(config.lora_alpha) || config.lora_alpha < 1 || config.lora_alpha > 256) errors.lora_alpha = 'LoRA Alpha 必须在 1 到 256 之间。';
+  if (!Number.isFinite(config.lora_dropout) || config.lora_dropout < 0 || config.lora_dropout > 0.5) errors.lora_dropout = 'LoRA Dropout 必须在 0 到 0.5 之间。';
+  if (!Number.isFinite(config.warmup_ratio) || config.warmup_ratio < 0 || config.warmup_ratio > 0.3) errors.warmup_ratio = '预热比例必须在 0 到 0.3 之间。';
   return errors;
 }
 
@@ -164,6 +172,8 @@ export function CreateTrainingWizard({
   const [writeLoading, setWriteLoading] = useState(true);
   const [config, setConfig] = useState<TrainingConfig>(initialConfig);
   const [instance, setInstance] = useState<InstanceSpec>(emptyInstance);
+  const [managedInstance, setManagedInstance] = useState<InstanceSpec>(emptyInstance);
+  const [managedResourceMode, setManagedResourceMode] = useState<'recommended' | 'custom'>('recommended');
   const [datasets, setDatasets] = useState<TrainingAsset[]>([]);
   const [models, setModels] = useState<TrainingAsset[]>([]);
   const [runtime, setRuntime] = useState<RuntimeBaseline | null>(null);
@@ -286,20 +296,36 @@ export function CreateTrainingWizard({
   const selectedModel = models.find((row) => row.version_id === model);
   const availableProfiles = availableTrainingProfiles(profileCatalog);
   const selectedProfile = trainingImageProfileById(profileCatalog, profileId);
-  const managedInstance = managedInstanceFrom(runtime, selectedProfile);
-  const modelReason = selectedModel && runtime ? modelCompatibilityReason(selectedModel, runtime) : '';
+  const selectedModelGuidance = selectedModel && runtime
+    ? trainingModelGuidance(selectedModel, runtime)
+    : {blocking: '', warning: ''};
+
+  useEffect(() => {
+    const recommended = managedInstanceFrom(runtime, selectedProfile);
+    if (!recommended.region) {
+      setManagedInstance(emptyInstance);
+      return;
+    }
+    setManagedInstance((current) => (
+      managedResourceMode === 'custom' && current.region
+        ? {...current, image_id: recommended.image_id}
+        : recommended
+    ));
+  }, [managedResourceMode, runtime, selectedProfile?.id, selectedProfile?.image_id]);
   const datasetOptions = datasets.map((row) => ({
     value: row.version_id,
     label: `${row.name} · v${row.version_number}`,
     description: row.manifest_sha256 ? `内容 ${shortId(row.manifest_sha256, 12)}` : undefined,
   }));
   const modelOptions = models.map((row) => {
-    const reason = runtime ? modelCompatibilityReason(row, runtime) : '';
+    const guidance = runtime ? trainingModelGuidance(row, runtime) : {blocking: '', warning: ''};
     return {
       value: row.version_id,
       label: `${row.name} · v${row.version_number}`,
-      description: reason || `${row.format_summary?.model_type || '架构未标注'} · 指纹 ${shortId(row.manifest_sha256, 12)}`,
-      disabled: Boolean(reason),
+      description: guidance.blocking
+        || guidance.warning
+        || `${row.format_summary?.model_type || '架构未标注'} · 指纹 ${shortId(row.manifest_sha256, 12)}`,
+      disabled: Boolean(guidance.blocking),
     };
   });
   const stepErrorMap: Errors = step === 1
@@ -307,7 +333,7 @@ export function CreateTrainingWizard({
         ...(name.trim() ? {} : {name: '请填写任务名称，再继续下一步。'}),
         ...(dataset ? {} : {dataset: '请选择已发布的数据版本。'}),
         ...(model ? {} : {model: '请选择已验证的基础模型。'}),
-        ...(model && modelReason ? {model: modelReason} : {}),
+        ...(model && selectedModelGuidance.blocking ? {model: selectedModelGuidance.blocking} : {}),
       }
     : step === 2
       ? executionMode === 'managed'
@@ -324,6 +350,7 @@ export function CreateTrainingWizard({
             ...(selectedProfile && !imageProfileStatus(selectedProfile).selectable
               ? {execution_mode: '所选训练镜像尚未发布，不能提交。'}
               : {}),
+            ...(managedResourceMode === 'custom' ? validateInstance(managedInstance) : {}),
           }
         : validateInstance(instance)
       : step === 3
@@ -335,6 +362,13 @@ export function CreateTrainingWizard({
   useEffect(() => {
     if (showErrors && allErrors.length) summaryRef.current?.focus();
   }, [allErrors.length, showErrors, step]);
+
+  function selectBaseModel(versionId: string) {
+    setModel(versionId);
+    const nextModel = models.find((row) => row.version_id === versionId);
+    const template = nextModel ? trainingTemplateForModel(nextModel) : null;
+    if (template) setConfig((current) => ({...current, template}));
+  }
 
   function goNext() {
     if (assetsError || !runtime) {
@@ -462,7 +496,7 @@ export function CreateTrainingWizard({
                 {...fieldProps(errors, 'model')}
                 value={model}
                 options={modelOptions}
-                onChange={setModel}
+                onChange={selectBaseModel}
                 placeholder="选择基础模型版本"
                 searchPlaceholder="搜索基础模型"
                 emptyText="没有可用的基础模型版本"
@@ -473,6 +507,10 @@ export function CreateTrainingWizard({
               {selectedModel && <small>{selectedModel.format_summary?.model_type || '架构未标注'} · 指纹 {shortId(selectedModel.manifest_sha256, 12)}</small>}
             </label>
           </div>
+          {selectedModel && selectedModelGuidance.warning && <div className="training-config-note">
+            <TrainingIcon name="info" size={16}/>
+            <p>{selectedModelGuidance.warning}</p>
+          </div>}
           <div className="training-baseline-card">
             <TrainingIcon name="lock" size={18}/>
             <div><strong>{assetsLoading ? '正在读取兼容基线' : runtime ? `${runtime.model.display_name} 训练基线` : '训练基线不可用'}</strong>
@@ -485,7 +523,7 @@ export function CreateTrainingWizard({
           <div className="training-step-heading"><span>02</span><div><h2>选择执行方式</h2><p>托管模式由平台完成实例、安全首启、费用守卫、训练和回收；手动模式只关联你自行创建的实例。</p></div></div>
           {(writeLoading || writeEnabled === false) && <div className={'training-write-gate' + (writeEnabled === false ? ' blocked' : '')} role="status">
             <TrainingIcon name={writeLoading ? 'clock' : 'lock'} size={17}/>
-            <div><strong>{writeLoading ? '正在核对云写入权限' : '平台托管当前不可用'}</strong><p>{writeLoading ? '托管创建按钮会在确认后端 write_enabled 后启用。' : `${writeReason} 已保留手动实例路径。`}</p></div>
+            <div><strong>{writeLoading ? '正在核对云写入权限' : '优云凭据不可用'}</strong><p>{writeLoading ? '正在确认后端写入能力。' : `${writeReason} 已保留手动实例路径。`}</p></div>
           </div>}
           <div className="training-execution-choices" role="radiogroup" aria-label="训练执行方式">
             {(['managed', 'manual'] as TrainingExecutionMode[]).map((mode) => {
@@ -562,12 +600,41 @@ export function CreateTrainingWizard({
               </div>}
             </section>
 
-            <div className="training-managed-spec" aria-label="托管实例冻结规格">
-              <article><span>GPU</span><strong>{managedInstance.gpu_type || '—'}</strong><small>单卡 · 24 GB 显存</small></article>
-              <article><span>CPU / 内存</span><strong>{managedInstance.cpu || '—'} 核</strong><small>{managedInstance.memory_mb ? `${managedInstance.memory_mb / 1024} GiB` : '—'}</small></article>
-              <article><span>地域 / 可用区</span><strong>{managedInstance.region || '—'}</strong><small>{managedInstance.zone || '—'}</small></article>
-              <article><span>系统盘</span><strong>{managedInstance.boot_disk_gb || '—'} GB</strong><small>{managedInstance.boot_disk_type || '—'}</small></article>
-            </div>
+            <section className="training-managed-resources" aria-labelledby="training-managed-resources-heading">
+              <header>
+                <div>
+                  <span className="training-kicker">MANAGED COMPUTE</span>
+                  <h3 id="training-managed-resources-heading">托管资源配置</h3>
+                  <p>默认使用实测组合；需要其他规格时切到自定义，平台仍负责创建、费用守卫和回收。</p>
+                </div>
+                <div className="training-resource-mode" role="group" aria-label="托管资源配置模式">
+                  <button type="button" className={managedResourceMode === 'recommended' ? 'active' : ''} onClick={() => setManagedResourceMode('recommended')}>推荐规格</button>
+                  <button type="button" className={managedResourceMode === 'custom' ? 'active' : ''} onClick={() => setManagedResourceMode('custom')}>自定义规格</button>
+                </div>
+              </header>
+              {managedResourceMode === 'recommended'
+                ? <div className="training-managed-spec">
+                    <article><span>GPU</span><strong>{managedInstance.gpu_type || '—'}</strong><small>单卡 GPU</small></article>
+                    <article><span>CPU / 内存</span><strong>{managedInstance.cpu || '—'} 核</strong><small>{managedInstance.memory_mb ? `${managedInstance.memory_mb / 1024} GiB` : '—'}</small></article>
+                    <article><span>地域 / 可用区</span><strong>{managedInstance.region || '—'}</strong><small>{managedInstance.zone || '—'}</small></article>
+                    <article><span>系统盘</span><strong>{managedInstance.boot_disk_gb || '—'} GB</strong><small>{managedInstance.boot_disk_type || '—'}</small></article>
+                  </div>
+                : <>
+                    <InstanceFields
+                      value={managedInstance}
+                      onChange={setManagedInstance}
+                      disabled={assetsLoading || busy}
+                      imageLock={selectedProfile ? {
+                        id: selectedProfile.image_id ?? '',
+                        label: selectedProfile.label,
+                      } : null}
+                      managed
+                    />
+                    {Object.values(showErrors ? validateInstance(managedInstance) : {}).map((message) => (
+                      <p className="training-field-error" key={message}>{message}</p>
+                    ))}
+                  </>}
+            </section>
             <div className="training-cost-guard">
               <TrainingIcon name="shield" size={19}/>
               <div>
@@ -589,32 +656,34 @@ export function CreateTrainingWizard({
           </>}
         </div>}
         {step === 3 && <div className="training-step-panel">
-          <div className="training-step-heading"><span>03</span><div><h2>训练参数</h2><p>首版只开放真实跑通的参数 preset。锁定字段来自兼容基线，随机种子可调整。</p></div></div>
+          <div className="training-step-heading"><span>03</span><div><h2>训练参数</h2><p>默认载入实测推荐值；可调整 Epoch、学习率、上下文、批量与 LoRA 参数，提交时冻结为不可变快照。</p></div>
+            {runtime && <button type="button" className="secondary" onClick={() => setConfig((current) => trainingPresetFromBaseline(current, runtime))}>恢复推荐参数</button>}
+          </div>
           {!runtime ? <div className="training-inline-empty">运行基线不可用，无法配置训练参数。</div> : <div className="training-parameter-groups">
             <fieldset>
               <legend>训练与调度</legend>
               <div className="training-parameter-grid">
-                <label><span>训练轮数 <i>锁定</i></span><input disabled type="number" value={config.epochs} readOnly/><small>Epochs</small></label>
-                <label><span>学习率 <i>锁定</i></span><input disabled type="number" value={config.learning_rate} readOnly/><small>Learning Rate</small></label>
-                <label><span>最大 Token <i>锁定</i></span><input disabled type="number" value={config.cutoff_len} readOnly/><small>Cutoff Length</small></label>
-                <label><span>批大小 <i>锁定</i></span><input disabled type="number" value={config.batch_size} readOnly/><small>Batch Size</small></label>
-                <label><span>梯度累积 <i>锁定</i></span><input disabled type="number" value={config.gradient_accumulation} readOnly/><small>Gradient Accumulation</small></label>
-                <label><span>学习率调度 <i>锁定</i></span><input disabled value={config.scheduler} readOnly/><small>Scheduler</small></label>
-                <label><span>预热比例 <i>锁定</i></span><input disabled type="number" value={config.warmup_ratio} readOnly/><small>Warmup Ratio</small></label>
+                <label id="training-field-epochs"><span>训练轮数 <i>推荐 1</i></span><input type="number" min={1} max={100} step={1} value={config.epochs} onChange={(event) => setConfig({...config, epochs: Number(event.target.value)})}/><FieldError errors={errors} name="epochs"/><small>Epochs</small></label>
+                <label id="training-field-learning_rate"><span>学习率 <i>推荐 0.0002</i></span><input type="number" min={0.0000001} max={0.01} step={0.0000001} value={config.learning_rate} onChange={(event) => setConfig({...config, learning_rate: Number(event.target.value)})}/><FieldError errors={errors} name="learning_rate"/><small>Learning Rate</small></label>
+                <label id="training-field-cutoff_len"><span>最大 Token <i>推荐 512</i></span><input type="number" min={128} max={32768} step={128} value={config.cutoff_len} onChange={(event) => setConfig({...config, cutoff_len: Number(event.target.value)})}/><FieldError errors={errors} name="cutoff_len"/><small>Cutoff Length</small></label>
+                <label id="training-field-batch_size"><span>批大小 <i>推荐 1</i></span><input type="number" min={1} max={8} step={1} value={config.batch_size} onChange={(event) => setConfig({...config, batch_size: Number(event.target.value)})}/><FieldError errors={errors} name="batch_size"/><small>Batch Size</small></label>
+                <label id="training-field-gradient_accumulation"><span>梯度累积 <i>推荐 1</i></span><input type="number" min={1} max={128} step={1} value={config.gradient_accumulation} onChange={(event) => setConfig({...config, gradient_accumulation: Number(event.target.value)})}/><FieldError errors={errors} name="gradient_accumulation"/><small>Gradient Accumulation</small></label>
+                <label><span>学习率调度 <i>推荐 Cosine</i></span><SelectMenu value={config.scheduler} options={[{value: 'cosine', label: 'Cosine'}, {value: 'linear', label: 'Linear'}]} onChange={(scheduler) => setConfig({...config, scheduler})} ariaLabel="学习率调度" searchable={false}/><small>Scheduler</small></label>
+                <label id="training-field-warmup_ratio"><span>预热比例 <i>推荐 0</i></span><input type="number" min={0} max={0.3} step={0.01} value={config.warmup_ratio} onChange={(event) => setConfig({...config, warmup_ratio: Number(event.target.value)})}/><FieldError errors={errors} name="warmup_ratio"/><small>Warmup Ratio</small></label>
               </div>
             </fieldset>
             <fieldset>
               <legend>LoRA 与可复现性</legend>
               <div className="training-parameter-grid">
-                <label><span>LoRA Rank <i>锁定</i></span><input disabled type="number" value={config.lora_rank} readOnly/><small>Adapter Rank</small></label>
-                <label><span>LoRA Alpha <i>锁定</i></span><input disabled type="number" value={config.lora_alpha} readOnly/><small>Adapter Alpha</small></label>
-                <label><span>LoRA Dropout <i>锁定</i></span><input disabled type="number" value={config.lora_dropout} readOnly/><small>Regularization</small></label>
-                <label><span>模型模板 <i>锁定</i></span><input disabled value={config.template} readOnly/><small>Chat Template</small></label>
+                <label id="training-field-lora_rank"><span>LoRA Rank <i>推荐 8</i></span><SelectMenu value={String(config.lora_rank)} options={[4, 8, 16, 32, 64].map((rank) => ({value: String(rank), label: String(rank)}))} onChange={(rank) => setConfig({...config, lora_rank: Number(rank)})} ariaLabel="LoRA Rank" searchable={false}/><FieldError errors={errors} name="lora_rank"/><small>Adapter Rank</small></label>
+                <label id="training-field-lora_alpha"><span>LoRA Alpha <i>推荐 16</i></span><input type="number" min={1} max={256} step={1} value={config.lora_alpha} onChange={(event) => setConfig({...config, lora_alpha: Number(event.target.value)})}/><FieldError errors={errors} name="lora_alpha"/><small>Adapter Alpha</small></label>
+                <label id="training-field-lora_dropout"><span>LoRA Dropout <i>推荐 0</i></span><input type="number" min={0} max={0.5} step={0.01} value={config.lora_dropout} onChange={(event) => setConfig({...config, lora_dropout: Number(event.target.value)})}/><FieldError errors={errors} name="lora_dropout"/><small>Regularization</small></label>
+                <label><span>模型模板 <i>按架构匹配</i></span><input disabled value={config.template} readOnly/><small>Chat Template</small></label>
                 <label id="training-field-seed"><span>随机种子 <b>可编辑</b></span><input {...fieldProps(errors, 'seed')} type="number" min={0} max={2147483647} step={1} value={config.seed} onChange={(event) => setConfig({...config, seed: Number(event.target.value)})}/><FieldError errors={errors} name="seed"/><small>Seed</small></label>
               </div>
             </fieldset>
           </div>}
-          <div className="training-config-note"><TrainingIcon name="info" size={16}/><p>固定训练 / 验证拆分会被复用；执行前仍会使用真实 tokenizer 检查每条样本是否超过最大 Token。</p></div>
+          <div className="training-config-note"><TrainingIcon name="info" size={16}/><p>训练 / 验证拆分保持固定；执行前仍会使用真实 tokenizer 检查每条样本。离开推荐值不会阻止提交，但会计入快照并标记为自定义兼容状态。</p></div>
         </div>}
         {step === 4 && <div className="training-step-panel">
           <div className="training-step-heading"><span>04</span><div><h2>确认冻结输入</h2><p>提交后，以下身份和参数会写入不可变 Attempt 快照。重试会创建新的 Attempt。</p></div></div>

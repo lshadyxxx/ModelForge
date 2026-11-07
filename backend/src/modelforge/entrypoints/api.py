@@ -21,6 +21,7 @@ from modelforge.modules.resources import (
     router as resources_router,
 )
 from modelforge.modules.training import router as training_router
+from modelforge.modules.diagnosis import router as diagnosis_router
 from modelforge.modules.serving import router as serving_router
 from modelforge.modules.overview import router as overview_router
 from modelforge.runtimes import router as runtime_router
@@ -46,6 +47,7 @@ app.include_router(models_router)
 app.include_router(resources_router)
 app.include_router(compute_router)
 app.include_router(training_router)
+app.include_router(diagnosis_router)
 app.include_router(serving_router)
 app.include_router(overview_router)
 app.include_router(runtime_router)

@@ -4,6 +4,23 @@ ModelForge（模锻）是一个独立规划中的模型训练与推理平台，�
 
 当前状态（2026-11-05）：核心 MVP 已在一个受支持组合上完成平台托管训练的真实闭环，同时保留原有手动实例路径。A′ 路线使用基础镜像、安全首启和冷安装 runtime，真实完成了 Qwen3-0.6B、单卡 RTX 4090 的 SFT/LoRA：Attempt `6b330374-7fff-4ac2-9104-4f3909045e0b` 运行 22 step，最终 `eval_loss=0.214783`；12 个执行证据文件经 MinIO 读回 SHA-256 全部一致，Best/Final Adapter 均为 `available` 并通过下载包级校验；实例 `<redacted-instance-id>` 已停止、删除并二次精确查询为空，租约 `092392a1-6626-4561-95b4-0fed21476b0f` 在删除确认后释放。A′ 训练主页、详情页和产物页已在 1440/390 宽度完成真实 API 截图核对，无横向溢出或浏览器运行时错误。B「预构建 Training Base」镜像 `compshareImage-1xc89j1np56m`（`Custom` / `Available`）随后通过第二次正式 managed Attempt `fbc8a03d-27e3-4ef2-8253-c23ac8a599ac` 完成 22 step SFT/LoRA、Best/Final Adapter、12/12 MinIO 读回、实例删除和租约释放；第一次 Attempt 的瞬态公钥首启失败已单列并完成有限重试修复。整体结论仍为 `PASS_WITH_LIMITATIONS`：scheduler 到期实际自动关机未单独等待验证，供应商 `ResetCompShareInstancePassword` 在当前基础镜像路径返回 `cloud_api_error`，实际安全结果由“锁定系统密码并验证旧密码认证失败”实现，不能表述为供应商 reset 成功；B 根密码快照硬化、多实例首启矩阵和实际账单仍未验证。验收后 `MF_UCLOUD_WRITE_ENABLED` 已恢复为 `false`，当前计算环境写入为 `read_only`。基线 `qwen3-0.6b-rtx4090-cn-bj2-partial-20261102-r1` 的容量边界和更广模型/GPU/镜像兼容矩阵仍未完成，因此基线继续保持 `partial`。详见[托管训练真实验收记录](docs/implementation/training-oneclick-p1-20261105.md)、[B 完整验收记录](<internal-evidence>)、[数据集审阅工作室记录](docs/implementation/datasets-review-studio-2026-11-03.md)、[模型验证工作室记录](docs/implementation/model-validation-studio-2026-11-03.md)、[Adapter 导出记录](docs/implementation/adapter-export-2026-11-03.md)、[运行时兼容记录](docs/implementation/runtime-compatibility-2026-11-02.md)及[运行说明](docs/RUNNING.md)。
 
+> 当前写入状态：上段“read_only”是验收时的历史快照，已被本节取代。本地二次开关已移除；有优云凭据时 `/configuration` 返回 `read_write`，无凭据时保持只读。
+
+## 2026-11-05 写入策略更新
+
+本地产品已移除 `MF_UCLOUD_WRITE_ENABLED` 二次开关。只要后端配置了优云凭据，
+计算环境和平台托管训练即返回 `read_write` 并允许发起真实云操作；未配置凭据时
+保持 `read_only`，不会发送云端写命令。费用预算、单 GPU 租约、实例回收和删除
+确认仍然有效。
+
+## 2026-11-06 训练配置策略
+
+平台托管不再是单一参数预设。推荐基线仍作为默认值，但训练页可切换自定义实例规格，
+并编辑训练轮数、学习率、上下文、批量、梯度累积和 LoRA 参数；其他已映射模型架构会
+自动匹配训练模板。非实测模型、超参或硬件会冻结为 `selection_mode=custom` 并附带告警，
+训练产物必须重新完成推理兼容验收。未知架构、模型模板不匹配、未发布训练镜像和费用
+超限仍会阻止提交。
+
 ## 产品目标
 
 - 管理训练数据集及其校验、版本和发布状态。

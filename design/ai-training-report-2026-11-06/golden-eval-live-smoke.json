@@ -1,0 +1,140 @@
+{
+  "suite": "training-diagnosis-golden-v1",
+  "mode": "live_model",
+  "case_count": 4,
+  "run_count": 4,
+  "passed": 4,
+  "failed": 0,
+  "gate_fidelity": 1.0,
+  "validator_clean_rate": 1.0,
+  "first_pass_clean_rate": 0.75,
+  "repair_attempts": 1,
+  "repair_succeeded": 1,
+  "repair_success_rate": 1.0,
+  "forbidden_claim_rate": 0.0,
+  "validator_negative_checks": {
+    "total": 9,
+    "passed": 9,
+    "failed": 0,
+    "rejection_rate": 1.0
+  },
+  "usage_totals": {
+    "reported_cases": 4,
+    "model_calls": 5,
+    "prompt_tokens": 28697,
+    "completion_tokens": 48512,
+    "total_tokens": 77209,
+    "latency_ms": 234879
+  },
+  "elapsed_ms": 234915,
+  "results": [
+    {
+      "case_id": "G01",
+      "gate_actual": {
+        "health": "partial",
+        "delivery": "artifact_deliverable_model_unverified"
+      },
+      "gate_match": true,
+      "first_pass_clean": true,
+      "repair_attempted": false,
+      "validator_issue_codes": [],
+      "forbidden_hits": [],
+      "error": null,
+      "latency_ms": 69659,
+      "usage": {
+        "model_calls": 1,
+        "reported_calls": 1,
+        "unreported_calls": 0,
+        "prompt_tokens": 4826,
+        "completion_tokens": 13985,
+        "total_tokens": 18811,
+        "latency_ms": 69653,
+        "cost_estimate": null,
+        "cost_note": "provider_price_not_configured"
+      },
+      "passed": true
+    },
+    {
+      "case_id": "G04",
+      "gate_actual": {
+        "health": "unknown",
+        "delivery": "not_deliverable"
+      },
+      "gate_match": true,
+      "first_pass_clean": true,
+      "repair_attempted": false,
+      "validator_issue_codes": [],
+      "forbidden_hits": [],
+      "error": null,
+      "latency_ms": 31150,
+      "usage": {
+        "model_calls": 1,
+        "reported_calls": 1,
+        "unreported_calls": 0,
+        "prompt_tokens": 4459,
+        "completion_tokens": 6207,
+        "total_tokens": 10666,
+        "latency_ms": 31146,
+        "cost_estimate": null,
+        "cost_note": "provider_price_not_configured"
+      },
+      "passed": true
+    },
+    {
+      "case_id": "G08",
+      "gate_actual": {
+        "health": "partial",
+        "delivery": "ready_for_release_review"
+      },
+      "gate_match": true,
+      "first_pass_clean": false,
+      "first_pass_validator_issue_codes": [
+        "forbidden_claim"
+      ],
+      "repair_attempted": true,
+      "repair_succeeded": true,
+      "validator_issue_codes": [],
+      "forbidden_hits": [],
+      "error": null,
+      "latency_ms": 78162,
+      "usage": {
+        "model_calls": 2,
+        "reported_calls": 2,
+        "unreported_calls": 0,
+        "prompt_tokens": 14558,
+        "completion_tokens": 17197,
+        "total_tokens": 31755,
+        "latency_ms": 78152,
+        "cost_estimate": null,
+        "cost_note": "provider_price_not_configured"
+      },
+      "passed": true
+    },
+    {
+      "case_id": "G09",
+      "gate_actual": {
+        "health": "partial",
+        "delivery": "artifact_deliverable_model_unverified"
+      },
+      "gate_match": true,
+      "first_pass_clean": true,
+      "repair_attempted": false,
+      "validator_issue_codes": [],
+      "forbidden_hits": [],
+      "error": null,
+      "latency_ms": 55932,
+      "usage": {
+        "model_calls": 1,
+        "reported_calls": 1,
+        "unreported_calls": 0,
+        "prompt_tokens": 4854,
+        "completion_tokens": 11123,
+        "total_tokens": 15977,
+        "latency_ms": 55928,
+        "cost_estimate": null,
+        "cost_note": "provider_price_not_configured"
+      },
+      "passed": true
+    }
+  ]
+}

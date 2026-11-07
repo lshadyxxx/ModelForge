@@ -2,6 +2,8 @@
 
 当前开放工作台、数据集、模型管理、计算环境、训练和独立试用入口。数据集/模型页面调用实际 API；优云凭据由后端环境注入，未配置时显示明确提示，不提供演示目录。2026-11-05 的平台托管训练已完成 A′ 与 B 两条路线的真实闭环：A′ 在基础镜像 `compshareImage-1fc8fjody17l` 上完成冷安装 runtime、22 step SFT/LoRA、12 个证据文件 MinIO 校验、Best/Final Adapter 发布、实例删除和租约释放；B 预构建镜像 `compshareImage-1xc89j1np56m` 随后以第二次正式 managed Attempt `fbc8a03d-27e3-4ef2-8253-c23ac8a599ac` 完成 22 step SFT/LoRA、Best/Final Adapter、12/12 MinIO 读回、实例删除和租约释放。第一次 B Attempt 的瞬态公钥首启失败已保留为失败证据，并通过有限重试修复。结果与限制见[托管训练真实验收记录](implementation/training-oneclick-p1-20261105.md)和[B 完整验收记录](../<internal-evidence>)。原手动实例、独立 vLLM Adapter、多轮 SSE、取消、Worker 重启、断流恢复、十五分钟空闲回收和页面手动结束路径仍保留。托管 A′ 与 B 的单次闭环为 `PASS_WITH_LIMITATIONS`，不是生产 SLA：scheduler 到期实际关机、B 快照根密码硬化、多实例/多区域稳定性和真实账单查询仍未验证；供应商密码 reset 在当前基础镜像路径返回 `cloud_api_error`，当前安全结果来自实例内密码锁定与旧密码认证失败验证。验收后后端写入开关已恢复为 `MF_UCLOUD_WRITE_ENABLED=false`，所有实例和活动租约查询为空。版本化兼容基线已绑定模型/Adapter 指纹、完整训练与推理实例规格和数值容量，训练 GPU 峰值也已实测归档；容量边界实测和完整兼容矩阵仍开放，因此基线保持 `partial`，见[运行时兼容记录](implementation/runtime-compatibility-2026-11-02.md)。真实存储与基础设施结果见[基础骨架验收](implementation/full-compose-2026-10-29.md)，历史增量见[连续记录](implementation/progress-2026-10-31.md)和[优云目录](implementation/ucloud-catalog-2026-10-31.md)。
 
+> 当前写入状态：上段“`MF_UCLOUD_WRITE_ENABLED=false`”是验收时的历史快照，现已失效。本地二次开关已移除；有优云凭据时 `/configuration` 返回 `read_write`，无凭据时保持只读。
+
 ## 启停
 
 需要 Docker Desktop（Linux containers）、Compose v2+ 和 PowerShell 5.1+ / 7。首次构建需要获取 Docker 基础镜像、PyPI、npm 和 Go modules。网络受限时见下方构建说明。从项目根目录运行：
@@ -16,6 +18,11 @@
 Windows PowerShell 5.1 可使用 `powershell -File scripts/start.ps1`；PowerShell 7 也可使用 `pwsh -File`。
 
 首次启动从 `.env.example` 生成被 Git 忽略的 `.env` 和随机本地凭据；不覆盖已有配置。端口可用 `MF_WEB_PORT` / `MF_API_PORT` 调整。只有 Web/API 发布回环端口，PostgreSQL、MinIO、Worker 不发布宿主端口；浏览器只通过同源 `/api` 访问。
+
+后端容器默认使用 `MF_DNS_PRIMARY=223.5.5.5` 和
+`MF_DNS_SECONDARY=119.29.29.29` 解析优云、ModelScope 等外部服务。该配置只作用于
+Compose 后端容器，不修改 Windows 或浏览器代理；如当前网络要求使用内网 DNS，可在
+`.env` 中覆盖这两个值后重建 `api` / `worker`。
 
 `migrate` 等待依赖健康，执行 Alembic migration 和幂等 bucket 初始化，成功后才启动 API/Worker；应用进程本身不运行迁移。
 
@@ -168,7 +175,9 @@ API 与 Worker 必须运行同版源码，先执行迁移任务；Hugging Face �
 
 将 JSON POST 到 `/api/v1/models/modelscope-imports` 后，API 固化清单，Worker 逐文件执行。revision 当前必须是完整 commit，空值或 `master` 被拒绝；达到上游 3000 项清单边界明确拒绝，不静默导入部分文件。
 
-GET `/api/v1/model-versions/{id}` 查看 `import.state`、当前文件字节和已校验文件总量。POST `/cancel` 请求取消，POST `/retry-import` 恢复失败/取消的同一快照。Worker 重启可重新领取未完成导入；下载文件重新从头传输，已验证文件经 MinIO 回读后复用。
+GET `/api/v1/model-versions/{id}` 查看 `import.state`、当前文件字节和已校验文件总量。POST `/cancel` 请求取消，POST `/retry-import` 恢复失败/取消的同一快照。Worker 重启可重新领取未完成导入；已验证文件经 MinIO 回读后复用，未完成文件从持久分片的实际长度继续请求 `Range`，并在上传前重新核对整文件 SHA-256。
+
+Compose 将 `/tmp/modelforge-models` 绑定到 Git 忽略的 `./.runtime/model-imports/`，因此应用容器重建不会删除未完成分片。删除 ModelScope 模型版本时会同步清理该版本的本地分片目录；取消后仍保留分片以便在同一固定 commit 上重试。
 
 DELETE 仍受活动导入及引用保护；取消后 Worker 确认停止才可删除。若有失效执行器的写入尚未结束，DELETE 返回 `202` 和 `storage_cleanup=pending`；GET `/api/v1/model-versions/{id}/storage-cleanup` 独立跟踪清理。版本 GET 404 不代表文件清理完成。已结束写入的清理由 Worker 重试；进程永久消失且未确认的 writing 账本保持 pending，不能仅以 PostgreSQL 会话断开判定写入结束。
 
@@ -213,9 +222,9 @@ backend/.venv/Scripts/python.exe scripts/acceptance-modelscope.py --version-id <
 
 进入“计算环境”，先刷新地域/可用区，再查 GPU 规格、平台镜像及公共模型；库存查询必须选定可用区、单卡型号、镜像、CPU 自动平台、计费模式和规格目录支持的系统盘。库存只反映查询时刻，不保留资源。目录可见不代表训练/推理已兼容。
 
-接口前缀 `/api/v1/resources/ucloud`：`GET /configuration` 返回配置布尔值、默认地域和当前 `read_only`/`read_write` 模式；`GET /zones`、`/specs`、`/images`、`/models`、`/instances`、`/monitor` 以及 `POST /capacity` 均为只读查询。镜像按单一类型分页：API 和页面默认 `System`，可选 `App`，不提供跨类型混合分页；供应商会对每类分别应用 offset/limit。实例支持 offset/limit，公共模型按名称/标签筛选；实例响应移除密码、登录命令等敏感字段。
+接口前缀 `/api/v1/resources/ucloud`：`GET /configuration` 返回配置布尔值、默认地域和当前 `read_only`/`read_write` 模式；`GET /zones`、`/specs`、`/images`、`/models`、`/instances`、`/monitor` 以及 `POST /capacity` 均为只读查询。镜像按单一类型分页：API 和页面默认 `System`，可选 `App` 和 `Custom`；`Custom` 使用 `DescribeCompShareCustomImages`，并按地域、可用区、名称和目录分页过滤。实例支持 offset/limit，公共模型按名称/标签筛选；实例响应移除密码、登录命令等敏感字段。
 
-计算环境写入使用 `/api/v1/resources/compute/environments` 的创建、启动、停止、删除和对账接口；只有后端 `MF_UCLOUD_WRITE_ENABLED=true` 时才允许，否则返回 `403 compute_write_disabled` 且不会发送云端写命令。托管训练创建也受同一写开关和单 GPU 租约保护。2026-11-05 验收结束后已恢复为 `false`，因此当前页面和 API 都是 `read_only`；重新执行真实窗口时必须显式打开并在结束后关闭。只读目录、健康检查或库存查询不能替代写开关和费用/清理门禁。
+计算环境写入使用 `/api/v1/resources/compute/environments` 的创建、启动、停止、删除和对账接口；2026-11-05 起本地产品不再提供 `MF_UCLOUD_WRITE_ENABLED` 二次开关，只要后端配置了优云凭据，`/configuration` 就返回 `read_write` 且允许写入；未配置凭据时返回 `read_only` 和 `cloud_not_configured`，不会发送云端写命令。托管训练仍受单 GPU 租约、费用预算、实例回收和删除确认保护。只读目录、健康检查或库存查询不能替代这些执行事实。
 
 `cloud_not_configured`、`cloud_credentials_rejected`、`cloud_credentials_expired`、`cloud_permission_denied`、`cloud_unavailable`、`cloud_timeout`、`cloud_rate_limited`、`cloud_invalid_response`、`cloud_out_of_stock`、`cloud_incompatible` 分别说明配置、鉴权、权限、连接、协议或库存问题。供应商未说明原因时返回 `cloud_api_error`，不推测凭据过期；供应商原始错误正文不返回浏览器。成功响应包含 fetched_at、filters、total、state 和 compatibility=unverified。无后台静默重试，用户可显式刷新。
 
@@ -224,6 +233,8 @@ backend/.venv/Scripts/python.exe scripts/acceptance-modelscope.py --version-id <
 ## 平台托管训练（A′ / B）
 
 训练创建向导提供两条互斥路径：平台托管和手动实例。托管 Attempt 创建后模式不可切换，平台负责创建实例、设置费用守卫、安全首启、runtime preflight、上传固定输入、启动远程 job、收集指标、回传产物、删除实例并在确认后释放租约。API 的历史默认值仍为 `manual`，页面新建训练默认选择 `managed`；手动路径保留用于回退和受控运维。
+
+平台托管采用“推荐基线 + 自定义配置”策略：默认载入已实测的模型、超参和实例规格；用户可切换到自定义规格，并通过真实目录选择部署位置、GPU、CPU/内存、系统盘和计费方式，也可编辑 Epoch、学习率、Token 长度、批量、梯度累积和 LoRA 参数。未知模型架构或模型与模板不匹配仍会拒绝；其他已映射架构、非实测模型指纹和自定义超参/硬件会写入 `selection_mode=custom` 与结构化 warnings，训练结果不能自动视为已完成推理兼容验收。训练镜像仍由已发布 profile 固定，费用守卫、库存/报价复核、runtime preflight、租约和实例回收继续生效。
 
 当前 A′ 完整真实验收组合为：
 

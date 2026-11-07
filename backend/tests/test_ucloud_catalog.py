@@ -166,6 +166,27 @@ def test_configuration_exposes_no_credentials_and_missing_is_not_empty(monkeypat
     assert "public_key" not in response.text
 
 
+def test_configuration_with_credentials_is_always_write_enabled(monkeypatch):
+    r = resources(
+        lambda q: pytest.fail("No query expected"),
+        Settings(
+            ucloud_public_key="public-test-only",
+            ucloud_private_key="private-test-only",
+            ucloud_region="cn-bj2",
+        ),
+    )
+    monkeypatch.setattr(app.state, "resources", r, raising=False)
+    assert TestClient(app).get(
+        "/api/v1/resources/ucloud/configuration"
+    ).json() == {
+        "configured": True,
+        "default_region": "cn-bj2",
+        "mode": "read_write",
+        "write_enabled": True,
+        "reason": None,
+    }
+
+
 def test_credentials_cannot_be_redirected_to_another_endpoint():
     with pytest.raises(ValueError):
         settings(ucloud_api_url="http://api.compshare.cn")
@@ -421,3 +442,77 @@ def test_image_http_default_uses_one_provider_type_for_global_pagination(monkeyp
     assert response.status_code == 200
     assert len(response.json()["items"]) == 1
     assert response.json()["filters"]["ImageType"] == "System"
+
+
+def test_custom_image_http_uses_dedicated_action_and_filters_locally(monkeypatch):
+    seen = []
+    rows = [
+        {
+            "CompShareImageId": "custom-training",
+            "Name": "modelforge-training-base",
+            "ImageType": "Custom",
+            "Status": "Available",
+            "Author": "",
+            "Tags": [],
+            "Description": "Prebuilt runtime",
+            "Zone": "cn-bj2-03",
+            "ImageSupportZone": [
+                {"Region": "cn-bj2", "Zone": "cn-bj2-03", "Status": ""}
+            ],
+        },
+        {
+            "CompShareImageId": "custom-other-zone",
+            "Name": "modelforge-training-base-copy",
+            "ImageType": "Custom",
+            "Status": "Available",
+            "Author": "",
+            "Tags": [],
+            "Zone": "cn-sh2-02",
+            "ImageSupportZone": [
+                {"Region": "cn-sh2", "Zone": "cn-sh2-02", "Status": ""}
+            ],
+        },
+    ]
+
+    def handler(request):
+        payload = {
+            key: values[0]
+            for key, values in parse_qs(request.content.decode()).items()
+        }
+        seen.append(payload)
+        offset = int(payload.get("Offset", 0))
+        limit = int(payload.get("Limit", 100))
+        return result(
+            "DescribeCompShareCustomImages",
+            ImageSet=rows[offset:offset + limit],
+            TotalCount=len(rows),
+        )
+
+    monkeypatch.setattr(
+        app.state,
+        "resources",
+        resources(handler),
+        raising=False,
+    )
+    response = TestClient(app).get(
+        "/api/v1/resources/ucloud/images"
+        "?region=cn-bj2&zone=cn-bj2-03&name=training"
+        "&image_type=Custom&offset=0&limit=10"
+    )
+    assert response.status_code == 200
+    assert response.json()["total"] == 1
+    assert [item["CompShareImageId"] for item in response.json()["items"]] == [
+        "custom-training"
+    ]
+    assert response.json()["filters"] == {
+        "Region": "cn-bj2",
+        "Zone": "cn-bj2-03",
+        "Name": "training",
+        "ImageType": "Custom",
+        "Offset": 0,
+        "Limit": 10,
+    }
+    assert seen[0]["Action"] == "DescribeCompShareCustomImages"
+    assert seen[0]["Region"] == "cn-bj2"
+    assert "Zone" not in seen[0]
+    assert "Name" not in seen[0]

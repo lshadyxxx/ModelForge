@@ -12,6 +12,9 @@ from modelforge.errors import AppError
 from .manifest import ModelFile, safe_path
 
 
+PREFIX_CHECKPOINT_BYTES = 64 * 1024**2
+
+
 class ModelScope:
     def __init__(self, client: httpx.Client):
         self.client = client
@@ -213,26 +216,80 @@ class ModelScope:
         return (url.scheme == 'https' and url.host in {'modelscope.cn', 'cdn-lfs-cn-1.modelscope.cn'}
                 and url.port in {None, 443} and not url.userinfo and not url.fragment)
 
-    def download(self, repository, revision, file, output, checkpoint):
-        """Checkpoint receives actual current-file bytes and can interrupt every chunk."""
+    @staticmethod
+    def _content_range(value, expected_start, expected_total):
+        match = re.fullmatch(r'bytes (\d+)-(\d+)/(\d+)', value.strip() if value else '')
+        if match is None:
+            raise AppError(502, 'model_source_unavailable',
+                           'ModelScope resume response has no valid Content-Range')
+        start, end, total = map(int, match.groups())
+        if start != expected_start or end < start or end >= total or total != expected_total:
+            raise AppError(502, 'model_source_unavailable',
+                           'ModelScope resume response does not match the fixed manifest')
+        return end - start + 1
+
+    def download(self, repository, revision, file, output, checkpoint, *, resume_from=0):
+        """Resume a persisted prefix and checkpoint actual current-file bytes."""
         self.validate_source(repository, revision)
         safe_path(file['path'])
+        if not isinstance(resume_from, int) or not 0 <= resume_from <= file['size_bytes']:
+            raise AppError(409, 'model_checksum_mismatch', 'Persisted download prefix is invalid')
+        output.seek(0)
+        digest = hashlib.sha256()
+        remaining = resume_from
+        last_checkpoint = 0
+        while remaining:
+            chunk = output.read(min(1024 * 1024, remaining))
+            if not chunk:
+                raise AppError(409, 'model_checksum_mismatch', 'Persisted download prefix is incomplete')
+            digest.update(chunk)
+            remaining -= len(chunk)
+            processed = resume_from - remaining
+            if remaining == 0 or processed - last_checkpoint >= PREFIX_CHECKPOINT_BYTES:
+                checkpoint(processed)
+                last_checkpoint = processed
+        output.seek(resume_from)
+        output.truncate(resume_from)
+        size = resume_from
+        if size == file['size_bytes']:
+            if digest.hexdigest() != file['sha256']:
+                raise AppError(409, 'model_checksum_mismatch', 'Persisted partial file differs from the fixed manifest')
+            return
+        if size == 0:
+            checkpoint(0)
         url = self._url(repository, revision, file['path'])
         try:
             for _ in range(6):
                 if not self._approved(url):
                     raise AppError(502, 'model_source_redirect_rejected', 'Repository redirect target is not approved')
-                checkpoint(0)
+                headers = {'Accept-Encoding': 'identity'}
+                if size:
+                    headers['Range'] = f'bytes={size}-'
                 with self.client.stream('GET', url, follow_redirects=False,
-                                        headers={'Accept-Encoding': 'identity'}) as response:
+                                        headers=headers) as response:
                     if response.status_code in {301, 302, 303, 307, 308}:
                         location = response.headers.get('location')
                         if not location:
                             raise AppError(502, 'model_source_redirect_rejected', 'Repository redirect has no target')
                         url = url.join(location)
                         continue
-                    self._status(response)
-                    size, digest = 0, hashlib.sha256()
+                    if size and response.status_code == 206:
+                        expected = self._content_range(
+                            response.headers.get('content-range'), size, file['size_bytes'])
+                        declared = response.headers.get('content-length')
+                        if declared is not None and int(declared) != expected:
+                            raise AppError(502, 'model_source_unavailable',
+                                           'ModelScope resume response length does not match Content-Range')
+                    else:
+                        self._status(response)
+                        if size:
+                            # A provider that ignores Range must restart cleanly rather than
+                            # append a second full body to the persisted prefix.
+                            output.seek(0)
+                            output.truncate(0)
+                            size = 0
+                            digest = hashlib.sha256()
+                            checkpoint(0)
                     for chunk in response.iter_bytes():
                         size += len(chunk)
                         if size > file['size_bytes']:

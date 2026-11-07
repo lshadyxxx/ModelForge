@@ -223,7 +223,14 @@ const unresolvedStates = [
   'cleanup_pending',
 ];
 const terminalStates = new Set(['succeeded', 'failed', 'cancelled']);
-const allowedTabs = new Set<TrainingTab>(['overview', 'analysis', 'logs', 'artifacts', 'config']);
+const allowedTabs = new Set<TrainingTab>([
+  'overview',
+  'analysis',
+  'diagnosis',
+  'logs',
+  'artifacts',
+  'config',
+]);
 
 export function trainingState(value: string): TrainingStateDescriptor {
   return stateDictionary[value] ?? {
@@ -275,7 +282,8 @@ export function availableTrainingProfiles(catalog: TrainingImageCatalog | null) 
 }
 
 export function defaultTrainingImageProfile(catalog: TrainingImageCatalog | null) {
-  return availableTrainingProfiles(catalog)[0] ?? null;
+  const profiles = availableTrainingProfiles(catalog);
+  return profiles.find((profile) => profile.runtime_source === 'prebuilt') ?? profiles[0] ?? null;
 }
 
 export function trainingImageProfileById(

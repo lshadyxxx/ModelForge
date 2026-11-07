@@ -1,4 +1,6 @@
 from functools import lru_cache
+from typing import Literal
+
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from psycopg.conninfo import make_conninfo
@@ -34,13 +36,43 @@ class Settings(BaseSettings):
     model_limits_locked: bool = False
     model_temporary_directory: str = '/tmp/modelforge-models'
 
+    # Diagnosis is advisory and remains disabled until an operator opts in.
+    # Fake generators are injected by tests and never selected from this flag.
+    ai_enabled: bool = False
+    ai_model: str | None = None
+    ai_base_url: str | None = None
+    ai_api_key: SecretStr | None = None
+    ai_timeout_seconds: int = Field(default=25, ge=5, le=120)
+    ai_structured_output_method: Literal[
+        'json_schema', 'function_calling', 'json_mode'
+    ] = 'json_schema'
+    ai_checkpoint_dsn: SecretStr | None = None
+    ai_checkpoint_schema: str = 'langgraph_checkpoint'
+    ai_checkpoint_ttl_hours: int = Field(default=24, ge=1, le=720)
+    ai_worker_poll_seconds: float = Field(default=2.0, ge=.5, le=60)
+    ai_max_attempts: int = Field(default=3, ge=1, le=10)
+    ai_lease_seconds: int = Field(default=90, ge=30, le=600)
+
+    @field_validator('ai_model', 'ai_base_url', mode='before')
+    @classmethod
+    def blank_ai_text(cls, value):
+        if isinstance(value, str):
+            return value.strip() or None
+        return value
+
+    @field_validator('ai_api_key', 'ai_checkpoint_dsn', mode='before')
+    @classmethod
+    def blank_ai_secret(cls, value):
+        if isinstance(value, str):
+            return value.strip() or None
+        return value
+
     ucloud_public_key: SecretStr | None = None
     ucloud_private_key: SecretStr | None = None
     ucloud_region: str | None = None
     ucloud_project_id: str | None = None
     ucloud_api_url: str = "https://api.compshare.cn"
     ucloud_timeout: float = Field(default=20, gt=0, le=60, allow_inf_nan=False)
-    ucloud_write_enabled: bool = False
     ucloud_training_window_minutes: int = Field(default=75, ge=5, le=360)
     ucloud_training_budget_cny: float = Field(default=5.0, gt=0, allow_inf_nan=False)
     ucloud_training_max_hourly_cny: float = Field(default=3.0, gt=0, allow_inf_nan=False)

@@ -1040,36 +1040,176 @@
 
 .model-import-progress {
   margin-bottom: 12px;
-  padding: 12px;
+  padding: 15px;
   border: 1px solid #e6d0a4;
-  border-radius: 6px;
+  border-radius: 8px;
   background: var(--model-amber-soft);
 }
 
-.model-import-progress > div,
-.model-import-progress > p {
+.model-import-progress-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
 }
 
-.model-import-progress > p {
-  margin: 7px 0 0;
-  color: var(--model-muted-strong);
-  font-size: 11px;
-  overflow-wrap: anywhere;
+.model-import-progress-head > div {
+  display: grid;
+  gap: 2px;
 }
 
-.model-import-progress p:last-child {
-  display: block;
+.model-import-progress-head > div > span {
+  color: #8f6a27;
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .06em;
+}
+
+.model-import-progress-head strong {
+  color: var(--model-ink);
+  font-size: 14px;
+}
+
+.model-import-progress-value {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
   color: #725322;
+  font-size: 11px;
+}
+
+.model-import-progress-value strong {
+  color: #6f4d16;
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.model-import-progress-meter {
+  height: 8px;
+  margin-top: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #f0dfbe;
+  box-shadow: inset 0 1px 2px rgb(87 58 7 / 12%);
+}
+
+.model-import-progress-meter > span {
+  position: relative;
+  display: block;
+  height: 100%;
+  overflow: hidden;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #b86d00 0%, #e19b24 100%);
+  box-shadow: 0 0 0 1px rgb(147 87 0 / 8%);
+  transition: width .45s ease;
+}
+
+.model-import-progress-meter > span::after {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 15%, rgb(255 255 255 / 38%) 48%, transparent 82%);
+  content: "";
+  transform: translateX(-100%);
+  animation: model-import-shimmer 1.8s ease-in-out infinite;
+}
+
+.model-import-progress-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 14px 0 0;
+}
+
+.model-import-progress-stats > div {
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid rgb(162 113 31 / 18%);
+  border-radius: 6px;
+  background: rgb(255 255 255 / 42%);
+}
+
+.model-import-progress-stats dt {
+  color: #84672f;
+  font-size: 10px;
+}
+
+.model-import-progress-stats dd {
+  margin: 3px 0 0;
+  color: #4f3c1b;
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.model-import-progress-stats dd span {
+  color: #8a744b;
+  font-weight: 400;
+}
+
+.model-import-progress-current {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+  color: var(--model-muted-strong);
+  font-size: 11px;
+}
+
+.model-import-progress-current code {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.model-import-progress-current span {
+  flex: none;
+  color: #725322;
+  font-family: "Cascadia Code", Consolas, monospace;
+}
+
+.model-import-progress-note {
+  margin: 10px 0 0;
+  color: #725322;
+  font-size: 11px;
   line-height: 1.55;
 }
 
-.model-import-progress code,
-.model-import-progress span {
-  font-size: 11px;
+@keyframes model-import-shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .model-import-progress-meter > span {
+    transition: none;
+  }
+
+  .model-import-progress-meter > span::after {
+    animation: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .model-import-progress-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .model-import-progress-current {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .model-import-progress-current code {
+    width: 100%;
+  }
 }
 
 .model-inline-error {

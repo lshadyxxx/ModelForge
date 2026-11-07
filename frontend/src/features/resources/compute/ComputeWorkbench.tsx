@@ -778,8 +778,8 @@ export function ComputeWorkbench() {
             {configurationLoading
               ? '正在读取后端能力'
               : configuration?.writeEnabled
-                ? '实例写入已由后端显式开放'
-                : '当前为真实数据只读模式'}
+                ? '实例写入已开启'
+                : '优云凭据未配置'}
           </strong>
           {' · '}
           {configurationError

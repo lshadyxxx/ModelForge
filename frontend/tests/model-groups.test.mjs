@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {filterModelGroups,groupModelRows,summarizeModelGroup} from '../src/features/models/api.ts';
+import {filterModelGroups,groupModelRows,modelImportProgress,summarizeModelGroup} from '../src/features/models/api.ts';
 
 const row=(id,model_id,version_number,state,compatibility_state='unverified',source_kind='modelscope')=>({
   id,model_id,name:'Qwen test',version_number,state,compatibility_state,source_kind,
@@ -42,4 +42,32 @@ test('filters inspect every version in a model family',()=>{
   assert.equal(filterModelGroups(groups,'','errors')[0].id,'family-2');
   assert.equal(filterModelGroups(groups,'','pending')[0].id,'family-1');
   assert.equal(filterModelGroups(groups,'','verified')[0].id,'family-1');
+});
+
+test('model import progress combines verified bytes and the active file without double counting',()=>{
+  const files=[
+    {path:'config.json',size_bytes:100,sha256:'a',state:'verified'},
+    {path:'model-00001.safetensors',size_bytes:300,sha256:'b',state:'pending'},
+  ];
+  const progress=modelImportProgress({
+    files,
+    total_bytes:400,
+    verified_bytes:100,
+    import:{state:'running',current_path:'model-00001.safetensors',current_bytes:150},
+  });
+
+  assert.equal(progress.transferredBytes,250);
+  assert.equal(progress.percent,62.5);
+  assert.equal(progress.verifiedFiles,1);
+  assert.equal(progress.currentBytes,150);
+  assert.equal(progress.currentPercent,50);
+
+  const settled=modelImportProgress({
+    files:[files[0],{...files[1],state:'verified'}],
+    total_bytes:400,
+    verified_bytes:400,
+    import:{state:'running',current_path:'model-00001.safetensors',current_bytes:300},
+  });
+  assert.equal(settled.transferredBytes,400);
+  assert.equal(settled.percent,100);
 });

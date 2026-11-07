@@ -283,6 +283,40 @@ test('training image availability never falls back to an unpublished route', () 
   assert.equal(imageProfileStatus({...catalog.profiles[0], status: 'blocked'}).selectable, false);
 });
 
+test('available prebuilt training image is preferred for one-click training', () => {
+  const profile = (overrides) => ({
+    provider_profile: overrides.id,
+    label: overrides.id,
+    description: '',
+    image_group_id: null,
+    image_type: 'Custom',
+    status: 'available',
+    evidence: 'test',
+    ...overrides,
+  });
+  const catalog = {
+    schema: 1,
+    id: 'catalog',
+    sha256: 'x',
+    baseline_id: 'b',
+    baseline_sha256: 'y',
+    profiles: [
+      profile({
+        id: 'base-image-a-prime',
+        image_id: 'img-system',
+        runtime_source: 'cold_install',
+      }),
+      profile({
+        id: 'training-base-b',
+        image_id: 'img-custom',
+        runtime_source: 'prebuilt',
+      }),
+    ],
+  };
+
+  assert.equal(defaultTrainingImageProfile(catalog).id, 'training-base-b');
+});
+
 test('managed payload sends a profile while manual payload remains profile-free', () => {
   const base = {
     name: 'Qwen3 小样本训练',

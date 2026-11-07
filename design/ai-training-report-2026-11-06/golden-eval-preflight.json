@@ -1,0 +1,358 @@
+{
+  "suite": "training-diagnosis-golden-v1",
+  "mode": "fixture",
+  "case_count": 18,
+  "run_count": 18,
+  "passed": 16,
+  "failed": 2,
+  "gate_fidelity": 0.9444444444444444,
+  "validator_clean_rate": 0.9444444444444444,
+  "forbidden_claim_rate": 0.0,
+  "elapsed_ms": 19,
+  "results": [
+    {
+      "case_id": "G01",
+      "run": 1,
+      "title": "成功但有单个 Eval 点，Adapter 无验收",
+      "gate_expected": {
+        "health": "partial",
+        "delivery": "artifact_deliverable_model_unverified"
+      },
+      "gate_actual": {
+        "health": "partial",
+        "delivery": "artifact_deliverable_model_unverified"
+      },
+      "gate_match": true,
+      "validator_issue_codes": [],
+      "forbidden_hits": [],
+      "error": null,
+      "latency_ms": 2,
+      "passed": true
+    },
+    {
+      "case_id": "G02",
+      "run": 1,
+      "title": "Best 与 Final 指向同一产物，不判断优劣",
+      "gate_expected": {
+        "health": "partial",
+        "delivery": "artifact_deliverable_model_unverified"
+      },
+      "gate_actual": {
+        "health": "partial",
+        "delivery": "artifact_deliverable_model_unverified"
+      },
+      "gate_match": true,
+      "validator_issue_codes": [],
+      "forbidden_hits": [],
+      "error": null,
+      "latency_ms": 0,
+      "passed": true
+    },
+    {
+      "case_id": "G03",
+      "run": 1,
+      "title": "只有 Best，Final 缺失",
+      "gate_expected": {
+        "health": "partial",
+        "delivery": "not_deliverable"
+      },
+      "gate_actual": {
+        "health": "partial",
+        "delivery": "not_deliverable"
+      },
+      "gate_match": true,
+      "validator_issue_codes": [],
+      "forbidden_hits": [],
+      "error": null,
+      "latency_ms": 0,
+      "passed": true
+    },
+    {
+      "case_id": "G04",
+      "run": 1,
+      "title": "失败且仅有 provisioning 错误码",
+      "gate_expected": {
+        "health": "unknown",
+        "delivery": "not_deliverable"
+      },
+      "gate_actual": {
+        "health": "unknown",
+        "delivery": "not_deliverable"
+      },
+      "gate_match": true,
+      "validator_issue_codes": [],
+      "forbidden_hits": [],
+      "error": null,
+      "latency_ms": 0,
+      "passed": true
+    },
+    {
+      "case_id": "G05",
+      "run": 1,
+      "title": "取消但 runtime 与 manifest 可读",
+      "gate_expected": {
+        "health": "unknown",
+        "delivery": "not_deliverable"
+      },
+      "gate_actual": {
+        "health": "unknown",
+        "delivery": "not_deliverable"
+      },
+      "gate_match": true,
+      "validator_issue_codes": [
+        "forbidden_claim"
+      ],
+      "forbidden_hits": [],
+      "error": null,
+      "latency_ms": 0,
+      "passed": false
+    },
+    {
+      "case_id": "G06",
+      "run": 1,
+      "title": "成功标记但退出码冲突",
+      "gate_expected": {
+        "health": "blocked",
+        "delivery": "artifact_deliverable_model_unverified"
+      },
+      "gate_actual": {
+        "health": "blocked",
+        "delivery": "artifact_deliverable_model_unverified"
+      },
+      "gate_match": true,
+      "validator_issue_codes": [],
+      "forbidden_hits": [],
+      "error": null,
+      "latency_ms": 0,
+      "passed": true
+    },
+    {
+      "case_id": "G07",
+      "run": 1,
+      "title": "运行时状态存在阻断冲突",
+      "gate_expected": {
+        "health": "blocked",
+        "delivery": "artifact_deliverable_model_unverified"
+      },
+      "gate_actual": {
+        "health": "blocked",
+        "delivery": "artifact_deliverable_model_unverified"
+      },
+      "gate_match": true,
+      "validator_issue_codes": [],
+      "forbidden_hits": [],
+      "error": null,
+      "latency_ms": 0,
+      "passed": true
+    },
+    {
+      "case_id": "G08",
+      "run": 1,
+      "title": "当前 Adapter 存在匹配的独立验收",
+      "gate_expected": {
+        "health": "partial",
+        "delivery": "ready_for_release_review"
+      },
+      "gate_actual": {
+        "health": "partial",
+        "delivery": "artifact_deliverable_model_unverified"
+      },
+      "gate_match": false,
+      "validator_issue_codes": [],
+      "forbidden_hits": [],
+      "error": null,
+      "latency_ms": 0,
+      "passed": false
+    },
+    {
+      "case_id": "G09",
+      "run": 1,
+      "title": "其他 Adapter 的验收不能升级当前产物",
+      "gate_expected": {
+        "health": "partial",
+        "delivery": "artifact_deliverable_model_unverified"
+      },
+      "gate_actual": {
+        "health": "partial",
+        "delivery": "artifact_deliverable_model_unverified"
+      },
+      "gate_match": true,
+      "validator_issue_codes": [],
+      "forbidden_hits": [],
+      "error": null,
+      "latency_ms": 0,
+      "passed": true
+    },
+    {
+      "case_id": "G10",
+      "run": 1,
+      "title": "Token 预检未上报",
+      "gate_expected": {
+        "health": "partial",
+        "delivery": "artifact_deliverable_model_unverified"
+      },
+      "gate_actual": {
+        "health": "partial",
+        "delivery": "artifact_deliverable_model_unverified"
+      },
+      "gate_match": true,
+      "validator_issue_codes": [],
+      "forbidden_hits": [],
+      "error": null,
+      "latency_ms": 0,
+      "passed": true
+    },
+    {
+      "case_id": "G11",
+      "run": 1,
+      "title": "日志缺失",
+      "gate_expected": {
+        "health": "partial",
+        "delivery": "artifact_deliverable_model_unverified"
+      },
+      "gate_actual": {
+        "health": "partial",
+        "delivery": "artifact_deliverable_model_unverified"
+      },
+      "gate_match": true,
+      "validator_issue_codes": [],
+      "forbidden_hits": [],
+      "error": null,
+      "latency_ms": 0,
+      "passed": true
+    },
+    {
+      "case_id": "G12",
+      "run": 1,
+      "title": "GPU 显存峰值未上报",
+      "gate_expected": {
+        "health": "partial",
+        "delivery": "artifact_deliverable_model_unverified"
+      },
+      "gate_actual": {
+        "health": "partial",
+        "delivery": "artifact_deliverable_model_unverified"
+      },
+      "gate_match": true,
+      "validator_issue_codes": [],
+      "forbidden_hits": [],
+      "error": null,
+      "latency_ms": 0,
+      "passed": true
+    },
+    {
+      "case_id": "G13",
+      "run": 1,
+      "title": "只有 Attempt snapshot，其他证据全缺",
+      "gate_expected": {
+        "health": "unknown",
+        "delivery": "unknown"
+      },
+      "gate_actual": {
+        "health": "unknown",
+        "delivery": "unknown"
+      },
+      "gate_match": true,
+      "validator_issue_codes": [],
+      "forbidden_hits": [],
+      "error": null,
+      "latency_ms": 0,
+      "passed": true
+    },
+    {
+      "case_id": "G14",
+      "run": 1,
+      "title": "日志存在缺口",
+      "gate_expected": {
+        "health": "partial",
+        "delivery": "artifact_deliverable_model_unverified"
+      },
+      "gate_actual": {
+        "health": "partial",
+        "delivery": "artifact_deliverable_model_unverified"
+      },
+      "gate_match": true,
+      "validator_issue_codes": [],
+      "forbidden_hits": [],
+      "error": null,
+      "latency_ms": 0,
+      "passed": true
+    },
+    {
+      "case_id": "G15",
+      "run": 1,
+      "title": "显存采样器错误",
+      "gate_expected": {
+        "health": "partial",
+        "delivery": "artifact_deliverable_model_unverified"
+      },
+      "gate_actual": {
+        "health": "partial",
+        "delivery": "artifact_deliverable_model_unverified"
+      },
+      "gate_match": true,
+      "validator_issue_codes": [],
+      "forbidden_hits": [],
+      "error": null,
+      "latency_ms": 0,
+      "passed": true
+    },
+    {
+      "case_id": "G16",
+      "run": 1,
+      "title": "Learning Rate 未上报",
+      "gate_expected": {
+        "health": "partial",
+        "delivery": "artifact_deliverable_model_unverified"
+      },
+      "gate_actual": {
+        "health": "partial",
+        "delivery": "artifact_deliverable_model_unverified"
+      },
+      "gate_match": true,
+      "validator_issue_codes": [],
+      "forbidden_hits": [],
+      "error": null,
+      "latency_ms": 0,
+      "passed": true
+    },
+    {
+      "case_id": "G17",
+      "run": 1,
+      "title": "没有 Eval 观测",
+      "gate_expected": {
+        "health": "partial",
+        "delivery": "artifact_deliverable_model_unverified"
+      },
+      "gate_actual": {
+        "health": "partial",
+        "delivery": "artifact_deliverable_model_unverified"
+      },
+      "gate_match": true,
+      "validator_issue_codes": [],
+      "forbidden_hits": [],
+      "error": null,
+      "latency_ms": 0,
+      "passed": true
+    },
+    {
+      "case_id": "G18",
+      "run": 1,
+      "title": "Token 预检发现溢出",
+      "gate_expected": {
+        "health": "partial",
+        "delivery": "artifact_deliverable_model_unverified"
+      },
+      "gate_actual": {
+        "health": "partial",
+        "delivery": "artifact_deliverable_model_unverified"
+      },
+      "gate_match": true,
+      "validator_issue_codes": [],
+      "forbidden_hits": [],
+      "error": null,
+      "latency_ms": 0,
+      "passed": true
+    }
+  ]
+}

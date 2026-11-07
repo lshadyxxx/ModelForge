@@ -3,7 +3,9 @@ import test from 'node:test';
 import {
   adapterCompatibilityReason,
   modelCompatibilityReason,
+  trainingModelGuidance,
   trainingPresetFromBaseline,
+  trainingTemplateForModel,
 } from '../src/features/runtime/compatibility.ts';
 
 const baseline = {
@@ -103,4 +105,32 @@ test('baseline preset replaces mutable training defaults', () => {
   assert.equal(result.epochs, 1);
   assert.equal(result.cutoff_len, 512);
   assert.equal(result.seed, 42);
+});
+
+test('training guidance allows a mapped architecture with an explicit warning', () => {
+  const llama = {
+    manifest_sha256: 'c'.repeat(64),
+    format_summary: {model_type: 'llama'},
+  };
+  assert.equal(trainingTemplateForModel(llama), 'llama3');
+  assert.deepEqual(trainingModelGuidance(llama, baseline), {
+    blocking: '',
+    warning: '可进入训练；该模型尚未列入实测基线，使用 llama3 模板，产物需要重新完成推理验收。',
+  });
+});
+
+test('training guidance blocks architectures outside the runtime mapping', () => {
+  const result = trainingModelGuidance({
+    manifest_sha256: 'c'.repeat(64),
+    format_summary: {model_type: 'bert'},
+  }, baseline);
+  assert.match(result.blocking, /没有 bert 架构/);
+  assert.equal(result.warning, '');
+});
+
+test('verified training model remains warning-free', () => {
+  assert.deepEqual(trainingModelGuidance({
+    manifest_sha256: 'b'.repeat(64),
+    format_summary: {model_type: 'qwen3'},
+  }, baseline), {blocking: '', warning: ''});
 });

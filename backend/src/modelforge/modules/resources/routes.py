@@ -46,17 +46,13 @@ def params(**values):
 def configuration(request: Request):
     s = request.app.state.resources.settings
     configured = bool(s.ucloud_public_key and s.ucloud_private_key)
-    write_enabled = configured and s.ucloud_write_enabled
+    write_enabled = configured
     return {
         "configured": configured,
         "default_region": s.ucloud_region,
         "mode": "read_write" if write_enabled else "read_only",
         "write_enabled": write_enabled,
-        "reason": None if write_enabled else (
-            "未配置优云凭据；计算环境写入保持关闭。"
-            if not configured
-            else "后端功能开关 MF_UCLOUD_WRITE_ENABLED 未开启，计算环境写入保持关闭。"
-        ),
+        "reason": None if write_enabled else "未配置优云凭据；计算环境写入保持关闭。",
     }
 
 
@@ -74,9 +70,19 @@ def specs(request: Request, region: Text, zone: OptionalText = None,
 
 @router.get("/images")
 def images(request: Request, region: Text, zone: OptionalText = None,
-           name: OptionalText = None, image_type: Literal["System", "App"] = "System",
+           name: OptionalText = None,
+           image_type: Literal["System", "App", "Custom"] = "System",
            offset: int = Query(0, ge=0), limit: int = Query(20, ge=1, le=100)):
-    return Catalog(request.app.state.resources).read("images", params(Region=region,
+    catalog = Catalog(request.app.state.resources)
+    if image_type == "Custom":
+        return catalog.custom_images(
+            region=region,
+            zone=zone,
+            name=name,
+            offset=offset,
+            limit=limit,
+        )
+    return catalog.read("images", params(Region=region,
         Zone=zone, Name=name, ImageType=image_type, Offset=offset, Limit=limit))
 
 
@@ -161,11 +167,12 @@ def compute_service(request: Request) -> ComputeEnvironments:
 
 
 def require_compute_write(request: Request):
-    if not request.app.state.resources.settings.ucloud_write_enabled:
+    settings = request.app.state.resources.settings
+    if not settings.ucloud_public_key or not settings.ucloud_private_key:
         raise AppError(
-            403,
-            "compute_write_disabled",
-            "后端功能开关 MF_UCLOUD_WRITE_ENABLED 未开启，未发送云端写命令。",
+            503,
+            "cloud_not_configured",
+            "尚未配置优云凭据，未发送云端写命令。",
         )
 
 
