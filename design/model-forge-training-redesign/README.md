@@ -101,7 +101,7 @@ python -m http.server 4312 --bind 127.0.0.1 --directory design/model-forge-train
 
 - [三方向同屏对比图](./review/compare/three-directions-overview.png)
 - [预览门户整页](./review/portal/preview-portal-1440.png)
-- [自动渲染与交互验收记录](./review/render-report.json)
+- [自动渲染验收截图](./review/b2/overview-1440.png)
 
 ## 实际验证
 

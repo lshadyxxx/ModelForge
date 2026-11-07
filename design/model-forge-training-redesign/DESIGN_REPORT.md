@@ -834,7 +834,7 @@ type ArtifactPair = {
 - `audit-ui.mjs`：A / B / C 的实际文字节点最小 11px，段落/列表低于 12px 的数量均为 0；390px 下 B 账本 `scrollWidth === clientWidth`。
 - `impeccable detect`：三个原型、预览门户和对比页最终返回 0 findings。
 
-原始记录：[render-report.json](./review/render-report.json)
+原始渲染报告包含本机运行路径，不随开源仓库发布；页面截图仍保留在 `review/`。
 
 ### 目视检查
 
@@ -885,8 +885,7 @@ design/model-forge-training-redesign/
     ├── b/
     ├── c/
     ├── compare/
-    ├── portal/
-    └── render-report.json
+    └── portal/
 ```
 
 ---
