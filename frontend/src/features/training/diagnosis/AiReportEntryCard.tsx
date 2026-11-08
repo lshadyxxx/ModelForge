@@ -2,6 +2,7 @@ import {isTerminalAttempt} from '../training-model';
 import type {TrainingAttempt, TrainingTab} from '../types';
 import {TrainingIcon} from '../components/TrainingIcon';
 import {useDiagnosisView} from './DiagnosisContext';
+import {comparisonEntryLine, shortId} from './diagnosis-model';
 
 export function AiReportEntryCard({
   attempt,
@@ -14,6 +15,7 @@ export function AiReportEntryCard({
   const report = diagnosis.latest?.report;
   const running = diagnosis.job && ['queued', 'running'].includes(diagnosis.job.state);
   const failed = diagnosis.job?.state === 'failed';
+  const comparisonLine = comparisonEntryLine(report?.comparison);
 
   return <section className="training-detail-panel diagnosis-entry-card">
     <header>
@@ -31,12 +33,26 @@ export function AiReportEntryCard({
         <span>AI advisory</span>
         <span>{report.findings.length} 条发现</span>
       </div>
+      {comparisonLine && <div className="diagnosis-entry-comparison">
+        <span>{comparisonLine}</span>
+        {report.comparison && report.comparison.comparability_status !== 'no_baseline' &&
+          <small>
+            模型效果：{report.comparison.model_effect.status === 'unverified'
+              ? '未验证'
+              : report.comparison.model_effect.status}
+            {report.baseline_attempt_id
+              ? ` · 基线 ${shortId(report.baseline_attempt_id)}`
+              : ''}
+          </small>}
+      </div>}
       <button type="button" className="secondary" onClick={() => onOpenTab('diagnosis')}>
         查看完整诊断 <TrainingIcon name="arrow" size={14}/>
       </button>
     </> : running ? <>
       <div className="diagnosis-entry-running"><span className="training-spinner"/><span>AI 报告生成中</span></div>
-      <p>可在诊断页查看进度；原始运行分析仍可正常使用。</p>
+      <p>{diagnosis.job?.comparison_mode === 'none'
+        ? '正在生成单运行诊断；原始运行分析仍可正常使用。'
+        : '正在对比历史训练并生成可审计报告；原始运行分析仍可正常使用。'}</p>
       <button type="button" className="secondary" onClick={() => onOpenTab('diagnosis')}>查看生成进度</button>
     </> : <>
       <p>{failed

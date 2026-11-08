@@ -1,4 +1,4 @@
-import {useMemo, useState} from 'react';
+import {useEffect, useMemo, useState} from 'react';
 import {
   formatDateTime,
   isTerminalAttempt,
@@ -13,6 +13,8 @@ import {TrainingIcon} from '../components/TrainingIcon';
 import {reportSummaryForClipboard} from './diagnosis-model';
 import {EvidenceInspector} from './EvidenceInspector';
 import {FindingLedger} from './FindingLedger';
+import {BaselineSelector} from './BaselineSelector';
+import {ComparisonPanel} from './ComparisonPanel';
 import {
   DiagnosisEmptyState,
   DiagnosisFailedState,
@@ -195,6 +197,12 @@ export function AiDiagnosisTab({attempt}: {attempt: TrainingAttempt}) {
     ? diagnosis.job.usage
     : null;
   const summary = useMemo(() => report ? reportSummaryForClipboard(report) : '', [report]);
+  const succeeded = attempt.state === 'succeeded';
+
+  useEffect(() => {
+    if (!succeeded || !diagnosis.config?.enabled) return;
+    void diagnosis.loadCandidates();
+  }, [diagnosis.config?.enabled, diagnosis.loadCandidates, succeeded]);
 
   const copySummary = async () => {
     if (!summary) return;
@@ -224,10 +232,18 @@ export function AiDiagnosisTab({attempt}: {attempt: TrainingAttempt}) {
         {report && diagnosis.config?.enabled && <button
           type="button"
           className="secondary"
-          onClick={() => void diagnosis.regenerate()}
+          onClick={() => void (
+            diagnosis.baselineChanged
+              ? diagnosis.generate()
+              : diagnosis.regenerate()
+          )}
           disabled={diagnosis.submitting || generating}
         >
-          <TrainingIcon name="refresh" size={14}/>{diagnosis.submitting || generating ? '生成中…' : '重新生成'}
+          <TrainingIcon name="refresh" size={14}/>{diagnosis.submitting || generating
+            ? '生成中…'
+            : diagnosis.baselineChanged
+              ? '用新基线重新生成'
+              : '重新生成'}
         </button>}
         <button type="button" className="quiet" onClick={() => void diagnosis.reload()} disabled={diagnosis.loading}>
           <TrainingIcon name="refresh" size={14}/>刷新
@@ -235,6 +251,22 @@ export function AiDiagnosisTab({attempt}: {attempt: TrainingAttempt}) {
       </div>
     </header>
     {copyError && <div className="diagnosis-inline-error" role="alert">{copyError}</div>}
+
+    {succeeded && diagnosis.config && <BaselineSelector
+      choice={diagnosis.baselineChoice}
+      candidates={diagnosis.comparisonCandidates}
+      loading={diagnosis.candidatesLoading}
+      error={diagnosis.candidatesError}
+      disabled={!diagnosis.config.enabled || generating || diagnosis.submitting}
+      onChange={diagnosis.setBaselineChoice}
+      onRetry={() => void diagnosis.loadCandidates()}
+    />}
+    {!succeeded && terminal && <DiagnosisInlineNotice tone="neutral" title="失败复盘不做训练效果对比">
+      本次 Attempt 未成功结束。报告只整理失败证据与可恢复动作，不比较历史训练信号。
+    </DiagnosisInlineNotice>}
+    {report && diagnosis.baselineChanged && <DiagnosisInlineNotice tone="info" title="基线选择尚未应用">
+      当前仍展示旧报告冻结的基线。点击“用新基线重新生成”会创建新版本，不覆盖旧报告。
+    </DiagnosisInlineNotice>}
 
     {diagnosis.error && <DiagnosisInlineNotice tone="danger" title="AI 诊断读取失败">
       {diagnosis.error}。原始运行分析、日志和产物不受影响。
@@ -290,6 +322,16 @@ export function AiDiagnosisTab({attempt}: {attempt: TrainingAttempt}) {
         </div>
       </section>
 
+      {report.comparison
+        ? <ComparisonPanel comparison={report.comparison} pack={evidencePack}/>
+        : <DiagnosisInlineNotice tone="neutral" title="历史版本报告">
+          这份报告生成于历史对比上线前，只包含单运行诊断；重新生成后会使用当前比较契约。
+        </DiagnosisInlineNotice>}
+
+      <div className="diagnosis-current-run-label">
+        <span>CURRENT RUN</span>
+        <small>以下结论只描述本次 Attempt，不被历史对比覆盖。</small>
+      </div>
       <GateSummary report={report}/>
       {evidencePack && <MetricEvidenceStrip pack={evidencePack}/>}
 

@@ -1,6 +1,8 @@
 import {api, json} from '../../../shared/http';
 import type {
   DiagnosisConfig,
+  DiagnosisComparisonCandidates,
+  DiagnosisComparisonChoice,
   DiagnosisDraft,
   DiagnosisJob,
   DiagnosisLatest,
@@ -22,8 +24,36 @@ export function listDiagnosisReports(attemptId: string, signal?: AbortSignal) {
   return api<DiagnosisLatest[]>(attemptPath(attemptId), {signal});
 }
 
-export function createDiagnosis(attemptId: string, signal?: AbortSignal) {
-  return api<DiagnosisJob>(attemptPath(attemptId), {...json('POST'), signal});
+function comparisonBody(choice: DiagnosisComparisonChoice) {
+  if (choice.mode === 'explicit') {
+    return {
+      comparison_mode: 'explicit',
+      baseline_attempt_id: choice.attemptId,
+    };
+  }
+  return {comparison_mode: choice.mode};
+}
+
+export function createDiagnosis(
+  attemptId: string,
+  comparison: DiagnosisComparisonChoice = {mode: 'auto'},
+  signal?: AbortSignal,
+) {
+  return api<DiagnosisJob>(
+    attemptPath(attemptId),
+    {...json('POST', comparisonBody(comparison)), signal},
+  );
+}
+
+export function getDiagnosisComparisonCandidates(
+  attemptId: string,
+  signal?: AbortSignal,
+) {
+  return api<DiagnosisComparisonCandidates>(
+    '/training/attempts/' + encodeURIComponent(attemptId)
+      + '/diagnosis-comparison-candidates?limit=20',
+    {signal},
+  );
 }
 
 export function regenerateDiagnosis(jobId: string, signal?: AbortSignal) {

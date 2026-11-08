@@ -251,6 +251,162 @@ export type DiagnosisCoverage = {
   evidence_ids: string[];
 };
 
+export type DiagnosisComparisonMode = 'none' | 'auto' | 'explicit';
+
+export type DiagnosisComparabilityStatus =
+  | 'strict'
+  | 'conditional'
+  | 'not_comparable'
+  | 'no_baseline';
+
+export type DiagnosisTrainingSignal =
+  | 'improved'
+  | 'worsened'
+  | 'mixed'
+  | 'flat'
+  | 'inconclusive';
+
+export type DiagnosisDeliverySignal =
+  | 'improved'
+  | 'worsened'
+  | 'same'
+  | 'inconclusive';
+
+export type DiagnosisComparisonConfidence =
+  | 'high'
+  | 'medium'
+  | 'low'
+  | 'none';
+
+export type DiagnosisModelEffect = {
+  status:
+    | 'verified_better'
+    | 'verified_worse'
+    | 'verified_same'
+    | 'inconclusive'
+    | 'unverified';
+  reason:
+    | 'no_comparable_downstream_evaluation'
+    | 'evaluation_missing_on_one_side'
+    | 'evaluation_spec_mismatch'
+    | 'score_comparison_available';
+  subject_evaluation_id?: string | null;
+  baseline_evaluation_id?: string | null;
+  note: string;
+};
+
+export type DiagnosisComparisonGroup = {
+  base_fingerprint: string;
+  dataset_sha256: string;
+  dataset_split_sha256: string;
+};
+
+export type DiagnosisBaselineSelection = {
+  mode: DiagnosisComparisonMode;
+  requested_attempt_id?: string | null;
+  resolved_attempt_id?: string | null;
+  selection_rule:
+    | 'none'
+    | 'latest_previous_success'
+    | 'explicit'
+    | 'not_available';
+  reason_code?: string | null;
+};
+
+export type DiagnosisParameterChange = {
+  field:
+    | 'epochs'
+    | 'learning_rate'
+    | 'cutoff_len'
+    | 'batch_size'
+    | 'gradient_accumulation'
+    | 'lora_rank'
+    | 'lora_alpha'
+    | 'lora_dropout'
+    | 'scheduler'
+    | 'warmup_ratio'
+    | 'template'
+    | 'seed';
+  baseline_value: unknown;
+  subject_value: unknown;
+  classification:
+    | 'optimization'
+    | 'budget'
+    | 'input_processing'
+    | 'stochasticity';
+};
+
+export type DiagnosisConfounder = {
+  code: string;
+  field?: string | null;
+  baseline_value?: unknown;
+  subject_value?: unknown;
+  text: string;
+  blocking: boolean;
+};
+
+export type DiagnosisMetricDelta = {
+  name:
+    | 'best_eval_loss'
+    | 'final_eval_loss'
+    | 'latest_eval_loss'
+    | 'lowest_eval_loss'
+    | 'final_train_loss'
+    | 'token_overflow_count';
+  subject_value?: number | null;
+  baseline_value?: number | null;
+  absolute_delta?: number | null;
+  relative_delta?: number | null;
+  better_direction: 'lower' | 'higher' | 'neutral';
+  evidence_ids: string[];
+};
+
+export type DiagnosisComparisonResult = {
+  schema_version: 'comparison-result-v1';
+  policy_version: string;
+  group: DiagnosisComparisonGroup;
+  selection: DiagnosisBaselineSelection;
+  comparability_status: DiagnosisComparabilityStatus;
+  confidence: DiagnosisComparisonConfidence;
+  training_signal: DiagnosisTrainingSignal;
+  delivery_signal: DiagnosisDeliverySignal;
+  model_effect: DiagnosisModelEffect;
+  primary_adapter_role?: 'best' | 'final' | null;
+  metric_deltas: DiagnosisMetricDelta[];
+  parameter_changes: DiagnosisParameterChange[];
+  confounders: DiagnosisConfounder[];
+  regressions: Array<{code: string; text?: string; [key: string]: unknown}>;
+  reason_codes: string[];
+  evidence_ids: string[];
+  comparison_digest?: string | null;
+};
+
+export type DiagnosisBaselineEvidence = {
+  attempt_id: string;
+  snapshot_sha256: string;
+  attempt_state: 'succeeded';
+  facts: Record<string, unknown>;
+  coverage: DiagnosisCoverage[];
+  evidence: DiagnosisEvidenceRef[];
+  gate: {
+    policy_version: string;
+    health_status: string;
+    delivery_status: string;
+    health_reasons: Array<{code: string; text: string; evidence_ids: string[]}>;
+    delivery_reasons: Array<{code: string; text: string; evidence_ids: string[]}>;
+    coverage: DiagnosisCoverage[];
+    evidence_ids: string[];
+    gate_digest?: string | null;
+  };
+  source_revision: DiagnosisEvidencePack['source_revision'];
+  canonical_digest?: string | null;
+};
+
+export type DiagnosisComparisonEvidence = {
+  comparison_result: DiagnosisComparisonResult;
+  baseline?: DiagnosisBaselineEvidence | null;
+};
+
 export type DiagnosisEvidencePack = {
   schema_version: string;
   attempt_id: string;
@@ -273,6 +429,7 @@ export type DiagnosisEvidencePack = {
     description: string;
     blocking: boolean;
   }>;
+  comparison?: DiagnosisComparisonEvidence | null;
   canonical_digest: string;
 };
 
@@ -295,7 +452,8 @@ export type DiagnosisFinding = {
     | 'memory'
     | 'artifact'
     | 'failure'
-    | 'coverage';
+    | 'coverage'
+    | 'comparison';
   severity: 'blocked' | 'attention' | 'passed' | 'info';
   epistemic_status: 'observed' | 'inferred' | 'unknown';
   title: string;
@@ -361,6 +519,8 @@ export type DiagnosisReport = {
   report_digest: string;
   generated_at: string;
   published_at: string;
+  baseline_attempt_id?: string | null;
+  comparison?: DiagnosisComparisonResult | null;
 };
 
 export type DiagnosisJob = {
@@ -373,6 +533,9 @@ export type DiagnosisJob = {
   finished_at?: string | null;
   latest_report_id?: string | null;
   report_version?: number | null;
+  comparison_mode?: DiagnosisComparisonMode;
+  baseline_attempt_id?: string | null;
+  comparison_policy_version?: string | null;
   usage?: {
     schema: string;
     model_calls: number;
@@ -396,6 +559,38 @@ export type DiagnosisLatest = {
   evidence_digest?: string | null;
   created_at?: string | null;
 };
+
+export type DiagnosisComparisonCandidate = {
+  attempt_id: string;
+  task_id: string;
+  task_name: string;
+  attempt_number: number;
+  state: 'succeeded';
+  created_at: string;
+  snapshot_sha256: string;
+  base_fingerprint: string;
+  dataset_sha256: string;
+  dataset_split_sha256: string;
+  best_eval_loss?: number | null;
+  final_eval_loss?: number | null;
+  eval_point_count: number;
+  available_adapter_roles: Array<'best' | 'final'>;
+  comparability_preview: DiagnosisComparabilityStatus;
+  changed_parameter_count: number;
+  confounder_preview_codes: string[];
+};
+
+export type DiagnosisComparisonCandidates = {
+  subject_attempt_id: string;
+  group: DiagnosisComparisonGroup;
+  suggested_baseline_attempt_id?: string | null;
+  candidates: DiagnosisComparisonCandidate[];
+};
+
+export type DiagnosisComparisonChoice =
+  | {mode: 'auto'}
+  | {mode: 'none'}
+  | {mode: 'explicit'; attemptId: string};
 
 export type DiagnosisConfig = {
   enabled: boolean;

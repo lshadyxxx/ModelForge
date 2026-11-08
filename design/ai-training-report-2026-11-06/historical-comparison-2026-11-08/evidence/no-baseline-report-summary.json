@@ -1,0 +1,19 @@
+{
+  "subject_attempt_id": "208ea415-3f2d-4725-bb1e-02c4a82da41f",
+  "job_id": "7a423474-5a74-46aa-bb6d-40c7e0d73103",
+  "report_id": "3fd8c4de-8495-4752-8b42-fbed82e0108f",
+  "report_mode": "limited",
+  "health": "unknown",
+  "delivery": "not_deliverable",
+  "comparability": "no_baseline",
+  "confidence": "none",
+  "training_signal": "inconclusive",
+  "delivery_signal": "inconclusive",
+  "model_effect": "unverified",
+  "usage": {
+    "model_calls": 2,
+    "total_tokens": 34000,
+    "latency_ms": 67983,
+    "cost_estimate": null
+  }
+}

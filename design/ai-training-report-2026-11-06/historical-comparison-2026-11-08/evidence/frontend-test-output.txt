@@ -1,0 +1,5 @@
+Command:
+npm test
+
+Result:
+100 tests, 100 passed, 0 failed, 0 skipped

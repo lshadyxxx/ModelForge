@@ -9,7 +9,9 @@ from typing import Any, Iterable
 from .contracts import (
     CandidateReport,
     Claim,
+    ComparisonResult,
     EvidencePack,
+    EvidencePackV2,
     GateResult,
     ValidationIssue,
 )
@@ -153,17 +155,208 @@ def _forbidden_phrases(
     return issues
 
 
+def _comparison_evidence_ids(pack: EvidencePack | EvidencePackV2) -> set[str]:
+    if not isinstance(pack, EvidencePackV2) or pack.comparison is None:
+        return set()
+    baseline = pack.comparison.baseline
+    return (
+        {item.id for item in baseline.evidence}
+        if baseline is not None else set()
+    )
+
+
+def _comparison_issues(
+    report: CandidateReport,
+    pack: EvidencePack | EvidencePackV2,
+    comparison: ComparisonResult | None,
+    *,
+    baseline_gate: GateResult | None,
+) -> list[ValidationIssue]:
+    if comparison is None and isinstance(pack, EvidencePackV2):
+        comparison = (
+            pack.comparison.comparison_result
+            if pack.comparison is not None else None
+        )
+    subject_ids = {item.id for item in pack.evidence}
+    baseline_ids = _comparison_evidence_ids(pack)
+    all_ids = subject_ids | baseline_ids
+    claims = list(_iter_claims(report))
+    issues: list[ValidationIssue] = []
+    comparative = re.compile(
+        r'(?:较基线|相比上次|比上次|历史对比|优于基线|差于基线|相对基线)'
+    )
+    no_baseline = comparison is None or (
+        comparison.comparability_status == 'no_baseline'
+        or comparison.selection.mode == 'none'
+    )
+    if no_baseline:
+        for finding in report.findings:
+            if finding.category == 'comparison':
+                issues.append(ValidationIssue(
+                    code='comparison_without_baseline',
+                    message='没有可比基线时不能生成历史对比发现。',
+                    path=f'findings.{finding.id}',
+                ))
+        for claim in claims:
+            if (
+                comparative.search(claim.text)
+                or any(
+                    identifier.startswith(('E-BASE-', 'E-COMPARE-'))
+                    for identifier in claim.evidence_ids
+                )
+            ) and not _negated(claim.text, 0):
+                issues.append(ValidationIssue(
+                    code='comparison_without_baseline',
+                    message='没有可比基线时不能生成历史对比断言。',
+                    path=f'claims.{claim.id}',
+                ))
+        return issues
+
+    for identifier in comparison.evidence_ids:
+        if identifier not in all_ids:
+            issues.append(ValidationIssue(
+                code='unknown_evidence_id',
+                message=f'ComparisonResult 引用了不存在的证据 {identifier}。',
+                path='comparison.evidence_ids',
+            ))
+
+    for claim in claims:
+        comparison_related = bool(
+            comparative.search(claim.text)
+            or any(
+                identifier.startswith(('E-BASE-', 'E-COMPARE-'))
+                for identifier in claim.evidence_ids
+            )
+        )
+        if comparison_related and not any(
+            identifier in subject_ids for identifier in claim.evidence_ids
+        ):
+            issues.append(ValidationIssue(
+                code='comparison_evidence_missing',
+                message='历史比较陈述必须引用当前运行证据。',
+                path=f'claims.{claim.id}.evidence_ids',
+            ))
+        if comparison_related and not any(
+            identifier in baseline_ids for identifier in claim.evidence_ids
+        ):
+            issues.append(ValidationIssue(
+                code='comparison_evidence_missing',
+                message='历史比较陈述必须引用 E-BASE-* 基线证据。',
+                path=f'claims.{claim.id}.evidence_ids',
+            ))
+
+    text = '\n'.join(
+        [report.summary]
+        + [claim.text for claim in claims]
+        + [item.text for item in report.limitations]
+    )
+    training_signal = comparison.training_signal
+    status_patterns = (
+        (
+            r'(?:较基线|相比上次|比上次).{0,16}(?:改善|更好|更优|提升)',
+            training_signal == 'improved',
+            '训练信号不是 improved，不能写较基线改善。',
+        ),
+        (
+            r'(?:较基线|相比上次|比上次).{0,16}(?:恶化|更差|退化|变差)',
+            training_signal in {'worsened', 'mixed'},
+            '训练信号不是 worsened/mixed，不能写较基线恶化。',
+        ),
+        (
+            r'训练信号.{0,8}(?:改善|提升)',
+            training_signal == 'improved',
+            '正文改写了确定性训练信号。',
+        ),
+        (
+            r'训练信号.{0,8}(?:恶化|变差)',
+            training_signal in {'worsened', 'mixed'},
+            '正文改写了确定性训练信号。',
+        ),
+    )
+    for pattern, allowed, message in status_patterns:
+        for match in re.finditer(pattern, text):
+            if allowed or _negated(text, match.start(), match.end()):
+                continue
+            issues.append(ValidationIssue(
+                code='comparison_status_mismatch',
+                message=message,
+                path='report',
+            ))
+            break
+
+    if comparison.model_effect.status == 'unverified':
+        overclaim = re.compile(
+            r'(?:模型效果|新模型|微调|能力).{0,12}'
+            r'(?:更好|更优|改善|提升|成功|可以上线|达到可用)'
+            r'|(?:可以上线|生产可用|微调成功)'
+        )
+        for match in overclaim.finditer(text):
+            if _negated(text, match.start(), match.end()):
+                continue
+            issues.append(ValidationIssue(
+                code='model_effect_overclaim',
+                message='model_effect=unverified 时不得宣称模型效果或可用性。',
+                path='report',
+            ))
+            break
+
+    if comparison.confidence == 'low':
+        for match in re.finditer(r'(?:稳定改善|明确提升|显著改善)', text):
+            if not _negated(text, match.start(), match.end()):
+                issues.append(ValidationIssue(
+                    code='comparison_confidence_overclaim',
+                    message='低置信度比较不能写成稳定或明确的提升。',
+                    path='report',
+                ))
+                break
+
+    if any(
+        item.code == 'multiple_parameters_changed'
+        for item in comparison.confounders
+    ):
+        attribution = re.compile(
+            r'(?:(?:learning_rate|lora_rank|epochs|参数).{0,18}'
+            r'(?:导致|带来|造成|归因)|归因于.{0,18}(?:参数|learning_rate|lora_rank|epochs))'
+        )
+        for match in attribution.finditer(text):
+            if not _negated(text, match.start(), match.end()):
+                issues.append(ValidationIssue(
+                    code='single_parameter_attribution',
+                    message='多个参数共同变化时不能单参数归因。',
+                    path='report',
+                ))
+                break
+    return issues
+
+
 class ReportValidator:
     """Fail closed on unsupported, unsafe or Gate-conflicting output."""
 
     def validate(
         self,
         candidate: CandidateReport,
-        pack: EvidencePack,
+        pack: EvidencePack | EvidencePackV2,
         gate: GateResult,
+        *,
+        comparison: ComparisonResult | None = None,
+        baseline_gate: GateResult | None = None,
     ) -> list[ValidationIssue]:
         issues: list[ValidationIssue] = []
-        evidence_ids = {item.id for item in pack.evidence}
+        if comparison is None and isinstance(pack, EvidencePackV2):
+            comparison = (
+                pack.comparison.comparison_result
+                if pack.comparison is not None else None
+            )
+        if baseline_gate is None and isinstance(pack, EvidencePackV2):
+            baseline = (
+                pack.comparison.baseline
+                if pack.comparison is not None else None
+            )
+            baseline_gate = baseline.gate if baseline is not None else None
+        evidence_ids = (
+            {item.id for item in pack.evidence}
+            | _comparison_evidence_ids(pack)
+        )
         claims = list(_iter_claims(candidate))
         claim_ids: set[str] = set()
         for claim in claims:
@@ -259,6 +452,14 @@ class ReportValidator:
 
         allowed_numbers = _numeric_literals(pack.facts)
         allowed_numbers.update(_numeric_literals(gate.model_dump(mode='json')))
+        if comparison is not None:
+            allowed_numbers.update(
+                _numeric_literals(comparison.model_dump(mode='json'))
+            )
+        if baseline_gate is not None:
+            allowed_numbers.update(
+                _numeric_literals(baseline_gate.model_dump(mode='json'))
+            )
         allowed_numbers.update({'0', '1', '2', '3'})
         for claim in claims + [
             item for item in report_limitation_claims(candidate)
@@ -295,6 +496,12 @@ class ReportValidator:
                 message=message,
                 path='report',
             ))
+        issues.extend(_comparison_issues(
+            candidate,
+            pack,
+            comparison,
+            baseline_gate=baseline_gate,
+        ))
         return issues
 
 

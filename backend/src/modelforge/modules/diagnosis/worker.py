@@ -151,6 +151,8 @@ class DiagnosisWorker:
                         attempt_id=job['attempt_id'],
                         owner=self.owner,
                         fencing_token=job['fencing_token'],
+                        comparison_mode=job.get('comparison_mode', 'none'),
+                        baseline_attempt_id=job.get('baseline_attempt_id'),
                     )
                     graph.invoke(
                         initial_state(job['id'], job['attempt_id']),

@@ -1,10 +1,10 @@
 # ModelForge AI 训练诊断
 ## 实施规划索引
 
-状态：M0-M4 与真实模型单例契约已落地；黄金集、人评与生产验收待执行  
+状态：单运行诊断与历史对比本地实现已落地；黄金集、人评与生产验收待执行
 日期：2026-11-07（初版：2026-11-06）  
 范围：单次训练终态 Attempt 的 AI 智能诊断报告与失败复盘  
-当前状态：本地纵向切片完成；DeepSeek 单例契约、成功/失败报告发布通过；
+当前状态：本地纵向切片与历史对比完成；DeepSeek 单例契约、成功/失败报告发布通过；
 未提交、未推送、未部署
 
 ## 1. 本轮规划产出
@@ -49,6 +49,26 @@ Git、未部署、未调用云 GPU。准确证据见
 | [AI_EVALUATION_ACCEPTANCE.md](AI_EVALUATION_ACCEPTANCE.md) | 黄金集、自动断言、人工 Rubric、指标阈值和发布门禁 | 验收规范 |
 | [SECURITY_OPERATIONS_RUNBOOK.md](SECURITY_OPERATIONS_RUNBOOK.md) | Prompt Injection、密钥、checkpoint、监控、故障恢复和回滚 | 安全与运维 |
 | [IMPLEMENTATION_BACKLOG.md](IMPLEMENTATION_BACKLOG.md) | 可排序的实施 ticket、依赖、建议文件边界和完成条件 | 任务种子 |
+
+### 3.1 历史训练对比规划包（2026-11-08）
+
+状态：**本地实现完成，真实页面验收通过；未提交、未推送、未部署。**
+
+| 文档 | 解决的问题 |
+|---|---|
+| [historical-comparison-2026-11-08/README.md](historical-comparison-2026-11-08/README.md) | 产品结论、范围、冻结决策和阅读入口 |
+| [historical-comparison-2026-11-08/ARCHITECTURE.md](historical-comparison-2026-11-08/ARCHITECTURE.md) | 当前/历史双证据、ComparisonEngine、LangGraph v2 与存储边界 |
+| [historical-comparison-2026-11-08/DATA_CONTRACT.md](historical-comparison-2026-11-08/DATA_CONTRACT.md) | EvidencePack v2、Report v2、迁移 0021、候选 API 与错误码 |
+| [historical-comparison-2026-11-08/COMPARISON_POLICY_AND_AI_EVAL.md](historical-comparison-2026-11-08/COMPARISON_POLICY_AND_AI_EVAL.md) | Hard Key、参数 diff、训练信号、置信度、Prompt/Validator 与黄金集 |
+| [historical-comparison-2026-11-08/UI_UX_SPEC.md](historical-comparison-2026-11-08/UI_UX_SPEC.md) | 基线选择、对比卡、状态、移动端与证据交互 |
+| [historical-comparison-2026-11-08/EXECUTION_PLAN.md](historical-comparison-2026-11-08/EXECUTION_PLAN.md) | HC-01 至 HC-09、依赖、文件白名单和交接提示词 |
+| [historical-comparison-2026-11-08/TEST_ACCEPTANCE.md](historical-comparison-2026-11-08/TEST_ACCEPTANCE.md) | 后端/前端/数据库/浏览器/AI 黄金集验收 |
+
+该规划不改变已落地的单 Attempt 诊断架构。历史对比只比较训练信号和交付信号；没有同评测集
+可比较分数时，`model_effect` 固定为 `unverified`。
+
+准确证据入口：
+[historical-comparison-2026-11-08/IMPLEMENTATION_STATUS_2026-11-08.md](historical-comparison-2026-11-08/IMPLEMENTATION_STATUS_2026-11-08.md)。
 
 文档冲突时的优先级：
 
@@ -123,8 +143,8 @@ AI 报告只能帮助解释事实，不能证明训练模型有业务价值。
 
 ## 9. 当前结论
 
-系统处于 **Local slice and real-model single-case acceptance complete,
-production evidence pending**：
+系统处于 **Local slice, historical comparison, and real-model single-case
+acceptance complete; production evidence pending**：
 
 - 已在本地工作区安装/接线 LangGraph、`langchain-openai` 和 `PostgresSaver`；
 - 已创建三张诊断业务表和独立 checkpoint schema；
@@ -132,6 +152,8 @@ production evidence pending**：
 - A v2 页签、入口卡、状态、证据展开、建议草稿和失败复盘已实现；
 - 真实模型单例契约、成功/失败报告发布和不可变 trigger 已通过；
 - 当前 Adapter 独立推理验收、黄金集、人评、生产配置和生产部署未执行；
+- 历史对比已完成本地实现、1440/390 页面验收和成功/失败真实报告生成；
+- 当前 Alembic head 为 `0021_diagnosis_comparison`；
 - 未提交 Git、未推送、未部署、未调用云 GPU。
 
 准确状态与测试证据见 [IMPLEMENTATION_STATUS_2026-11-06.md](IMPLEMENTATION_STATUS_2026-11-06.md)。

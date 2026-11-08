@@ -7,20 +7,30 @@ from typing import Any, TypedDict
 
 from modelforge.errors import AppError
 
+from .comparison import ComparisonEngine
+from .comparison_repository import ComparisonRepository
 from .context import build_context
 from .contracts import (
-    AdvisoryReport,
+    AdvisoryReportV2,
+    BaselineEvidenceProjection,
+    BaselineSelection,
     CandidateReport,
+    ComparisonResult,
+    EvidencePack,
+    EvidencePackV2,
     GateAxis,
     GateResult,
     ValidationIssue,
+    digest,
+    parse_evidence_pack,
 )
+from .evidence import with_comparison
 from .gates import GateEngine
 from .generator import GENERATOR_VERSION
 from .prompts import PROMPT_VERSION
 
 
-GRAPH_VERSION = 'training-diagnosis-graph-v1'
+GRAPH_VERSION = 'training-diagnosis-graph-v2'
 
 _HEALTH_LABELS = {
     'healthy': '训练健康',
@@ -40,8 +50,17 @@ _DELIVERY_LABELS = {
 class DiagnosisState(TypedDict, total=False):
     job_id: str
     attempt_id: str
+    comparison_mode: str
+    baseline_attempt_id: str | None
+    subject_pack: dict[str, Any]
+    baseline_projection: dict[str, Any] | None
+    selection: dict[str, Any]
+    subject_gate: dict[str, Any]
+    baseline_gate: dict[str, Any] | None
+    comparison: dict[str, Any] | None
+    evidence_frozen: bool
     evidence_digest: str
-    gate_snapshot: dict[str, Any]
+    baseline_evidence_digest: str | None
     candidate_report: dict[str, Any]
     validation_issues: list[dict[str, Any]]
     repair_count: int
@@ -76,6 +95,15 @@ def _generator_usage(generator) -> dict[str, Any] | None:
     return usage if isinstance(usage, dict) else None
 
 
+def _load_frozen_evidence(repository, job_id: uuid.UUID):
+    try:
+        return repository.load_evidence(job_id), True
+    except AppError as error:
+        if error.code != 'diagnosis_evidence_not_found':
+            raise
+        return None, False
+
+
 def build_diagnosis_graph(
     *,
     repository,
@@ -87,44 +115,192 @@ def build_diagnosis_graph(
     attempt_id: uuid.UUID,
     owner: str,
     fencing_token: int,
+    comparison_mode: str = 'none',
+    baseline_attempt_id: uuid.UUID | None = None,
 ):
     from langgraph.graph import END, START, StateGraph
 
     gate_engine = GateEngine()
+    comparison_engine = ComparisonEngine()
 
-    def collect(state: DiagnosisState) -> DiagnosisState:
-        try:
-            pack = repository.load_evidence(job_id)
-        except AppError as error:
-            if error.code != 'diagnosis_evidence_not_found':
-                raise
+    def collect_subject(state: DiagnosisState) -> DiagnosisState:
+        pack, frozen = _load_frozen_evidence(repository, job_id)
+        if pack is None:
             pack = collector.collect(attempt_id)
-            pack = repository.freeze_evidence(job_id, pack)
         if pack.attempt_id != attempt_id:
             raise AppError(
                 409,
                 'diagnosis_evidence_attempt_mismatch',
                 'Frozen evidence belongs to a different Attempt',
             )
+        baseline_projection = None
+        selection = BaselineSelection(mode='none', selection_rule='none')
+        comparison = None
+        if isinstance(pack, EvidencePackV2) and pack.comparison is not None:
+            comparison = pack.comparison.comparison_result
+            baseline_projection = pack.comparison.baseline
+            selection = comparison.selection
         return {
             'job_id': str(job_id),
             'attempt_id': str(attempt_id),
+            'comparison_mode': comparison_mode,
+            'baseline_attempt_id': (
+                str(baseline_attempt_id)
+                if baseline_attempt_id is not None else None
+            ),
+            'subject_pack': pack.model_dump(mode='json'),
+            'baseline_projection': (
+                baseline_projection.model_dump(mode='json')
+                if baseline_projection is not None else None
+            ),
+            'selection': selection.model_dump(mode='json'),
+            'comparison': (
+                comparison.model_dump(mode='json')
+                if comparison is not None else None
+            ),
+            'evidence_frozen': frozen,
             'evidence_digest': pack.canonical_digest or '',
+            'baseline_evidence_digest': (
+                baseline_projection.canonical_digest
+                if baseline_projection is not None else None
+            ),
             'repair_count': state.get('repair_count', 0),
         }
 
-    def gate(state: DiagnosisState) -> DiagnosisState:
-        pack = repository.load_evidence(job_id)
+    def collect_baseline(state: DiagnosisState) -> DiagnosisState:
+        if state.get('evidence_frozen'):
+            return {}
+        if comparison_mode == 'none':
+            return {
+                'baseline_projection': None,
+                'selection': BaselineSelection(
+                    mode='none',
+                    selection_rule='none',
+                ).model_dump(mode='json'),
+            }
+        if baseline_attempt_id is None:
+            return {
+                'baseline_projection': None,
+                'selection': BaselineSelection(
+                    mode=comparison_mode,
+                    selection_rule='not_available',
+                    reason_code=(
+                        'subject_not_succeeded_for_comparison'
+                        if comparison_mode == 'auto'
+                        else 'no_prior_successful_run_with_metrics'
+                    ),
+                ).model_dump(mode='json'),
+            }
+        try:
+            ComparisonRepository(collector.resources).assert_resolved_baseline(
+                attempt_id,
+                baseline_attempt_id,
+            )
+            baseline = collector.collect_baseline(baseline_attempt_id)
+        except AppError as error:
+            raise AppError(
+                409,
+                'comparison_evidence_changed',
+                '比较基线在任务排队后发生变化，已阻止生成。',
+            ) from error
+        selection = BaselineSelection(
+            mode=comparison_mode,
+            requested_attempt_id=(
+                baseline_attempt_id
+                if comparison_mode == 'explicit' else None
+            ),
+            resolved_attempt_id=baseline_attempt_id,
+            selection_rule=(
+                'explicit'
+                if comparison_mode == 'explicit'
+                else 'latest_previous_success'
+            ),
+        )
+        return {
+            'baseline_projection': baseline.model_dump(mode='json'),
+            'selection': selection.model_dump(mode='json'),
+            'baseline_evidence_digest': baseline.canonical_digest,
+        }
+
+    def gate_subject(state: DiagnosisState) -> DiagnosisState:
+        pack = parse_evidence_pack(state['subject_pack'])
         result = gate_engine.evaluate(pack)
         repository.set_gate(job_id, owner, fencing_token, result)
         return {
-            'gate_snapshot': result.model_dump(mode='json'),
+            'subject_gate': result.model_dump(mode='json'),
+        }
+
+    def gate_baseline(state: DiagnosisState) -> DiagnosisState:
+        baseline = state.get('baseline_projection')
+        if baseline is None:
+            return {'baseline_gate': None}
+        projection = BaselineEvidenceProjection.model_validate(baseline)
+        return {
+            'baseline_gate': projection.gate.model_dump(mode='json'),
+        }
+
+    def compare(state: DiagnosisState) -> DiagnosisState:
+        if state.get('comparison'):
+            return {}
+        pack = parse_evidence_pack(state['subject_pack'])
+        subject_gate = GateResult.model_validate(state['subject_gate'])
+        baseline = (
+            BaselineEvidenceProjection.model_validate(
+                state['baseline_projection']
+            )
+            if state.get('baseline_projection') else None
+        )
+        selection = BaselineSelection.model_validate(state['selection'])
+        result = comparison_engine.compare(
+            pack,
+            subject_gate,
+            baseline=baseline,
+            selection=selection,
+        )
+        if result.comparability_status == 'not_comparable':
+            raise AppError(
+                409,
+                'comparison_evidence_changed',
+                '比较证据在冻结时不再满足硬可比条件。',
+            )
+        if not state.get('evidence_frozen'):
+            comparable = with_comparison(pack, result, baseline)
+            comparable = repository.freeze_evidence(
+                job_id,
+                comparable,
+                owner=owner,
+                fencing_token=fencing_token,
+            )
+            return {
+                'subject_pack': comparable.model_dump(mode='json'),
+                'evidence_frozen': True,
+                'evidence_digest': comparable.canonical_digest or '',
+                'baseline_evidence_digest': (
+                    baseline.canonical_digest if baseline is not None else None
+                ),
+                'comparison': result.model_dump(mode='json'),
+            }
+        return {
+            'comparison': result.model_dump(mode='json'),
         }
 
     def generate(state: DiagnosisState) -> DiagnosisState:
-        pack = repository.load_evidence(job_id)
-        result = GateResult.model_validate(state['gate_snapshot'])
-        context = build_context(pack, result)
+        pack = parse_evidence_pack(state['subject_pack'])
+        gate = GateResult.model_validate(state['subject_gate'])
+        baseline_gate = (
+            GateResult.model_validate(state['baseline_gate'])
+            if state.get('baseline_gate') else None
+        )
+        comparison = (
+            ComparisonResult.model_validate(state['comparison'])
+            if state.get('comparison') else None
+        )
+        context = build_context(
+            pack,
+            gate,
+            comparison=comparison,
+            baseline_gate=baseline_gate,
+        )
         candidate = generator.generate(context)
         return {
             'candidate_report': candidate.model_dump(mode='json'),
@@ -132,15 +308,37 @@ def build_diagnosis_graph(
         }
 
     def validate(state: DiagnosisState) -> DiagnosisState:
-        pack = repository.load_evidence(job_id)
-        result = GateResult.model_validate(state['gate_snapshot'])
+        pack = parse_evidence_pack(state['subject_pack'])
+        gate = GateResult.model_validate(state['subject_gate'])
+        baseline_gate = (
+            GateResult.model_validate(state['baseline_gate'])
+            if state.get('baseline_gate') else None
+        )
+        comparison = (
+            ComparisonResult.model_validate(state['comparison'])
+            if state.get('comparison') else None
+        )
         candidate = CandidateReport.model_validate(state['candidate_report'])
-        issues = validator.validate(candidate, pack, result)
+        issues = validator.validate(
+            candidate,
+            pack,
+            gate,
+            comparison=comparison,
+            baseline_gate=baseline_gate,
+        )
         return {'validation_issues': _issue_state(issues)}
 
     def repair(state: DiagnosisState) -> DiagnosisState:
-        pack = repository.load_evidence(job_id)
-        result = GateResult.model_validate(state['gate_snapshot'])
+        pack = parse_evidence_pack(state['subject_pack'])
+        gate = GateResult.model_validate(state['subject_gate'])
+        baseline_gate = (
+            GateResult.model_validate(state['baseline_gate'])
+            if state.get('baseline_gate') else None
+        )
+        comparison = (
+            ComparisonResult.model_validate(state['comparison'])
+            if state.get('comparison') else None
+        )
         candidate = CandidateReport.model_validate(state['candidate_report'])
         issues = [
             ValidationIssue.model_validate(item)
@@ -148,9 +346,11 @@ def build_diagnosis_graph(
         ]
         context = build_context(
             pack,
-            result,
+            gate,
             repair_issues=issues,
             previous_candidate=candidate.model_dump(mode='json'),
+            comparison=comparison,
+            baseline_gate=baseline_gate,
         )
         repaired = generator.repair(context, candidate, issues)
         return {
@@ -166,8 +366,13 @@ def build_diagnosis_graph(
         return 'fail'
 
     def publish(state: DiagnosisState) -> DiagnosisState:
-        pack = repository.load_evidence(job_id)
-        gate_result = GateResult.model_validate(state['gate_snapshot'])
+        pack = parse_evidence_pack(state['subject_pack'])
+        gate_result = GateResult.model_validate(state['subject_gate'])
+        baseline_gate = (
+            GateResult.model_validate(state['baseline_gate'])
+            if state.get('baseline_gate') else None
+        )
+        comparison = ComparisonResult.model_validate(state['comparison'])
         candidate = CandidateReport.model_validate(state['candidate_report'])
         health_reasons = [
             item.model_dump(mode='json') for item in gate_result.health_reasons
@@ -184,7 +389,24 @@ def build_diagnosis_graph(
                 fencing_token,
                 usage,
             )
-        report = AdvisoryReport(
+        baseline = (
+            BaselineEvidenceProjection.model_validate(
+                state['baseline_projection']
+            )
+            if state.get('baseline_projection') else None
+        )
+        input_digest = digest({
+            'subject_evidence': pack.canonical_digest,
+            'baseline_evidence': (
+                baseline.canonical_digest if baseline is not None else None
+            ),
+            'subject_gate': gate_result.gate_digest,
+            'baseline_gate': (
+                baseline_gate.gate_digest if baseline_gate is not None else None
+            ),
+            'comparison': comparison.comparison_digest,
+        })
+        report = AdvisoryReportV2(
             id=uuid.uuid4(),
             job_id=job_id,
             attempt_id=attempt_id,
@@ -193,7 +415,16 @@ def build_diagnosis_graph(
             freshness='current',
             integrity=(
                 'conflict'
-                if any(item.blocking for item in pack.conflicts)
+                if (
+                    any(item.blocking for item in pack.conflicts)
+                    or (
+                        baseline_gate is not None
+                        and any(
+                            item.blocking
+                            for item in baseline_gate.conflicts
+                        )
+                    )
+                )
                 else 'consistent'
             ),
             health=_axis(
@@ -217,9 +448,11 @@ def build_diagnosis_graph(
             prompt_version=PROMPT_VERSION,
             generator_version=GENERATOR_VERSION,
             model_name=generator.model_name,
-            input_digest=pack.canonical_digest or '',
+            input_digest=input_digest,
             generated_at=generated_at,
             published_at=generated_at,
+            baseline_attempt_id=comparison.selection.resolved_attempt_id,
+            comparison=comparison,
         )
         published = repository.publish(
             report,
@@ -251,16 +484,22 @@ def build_diagnosis_graph(
         return {'error_code': error_code}
 
     builder = StateGraph(DiagnosisState)
-    builder.add_node('collect', collect)
-    builder.add_node('gate', gate)
+    builder.add_node('collect_subject', collect_subject)
+    builder.add_node('collect_baseline', collect_baseline)
+    builder.add_node('gate_subject', gate_subject)
+    builder.add_node('gate_baseline', gate_baseline)
+    builder.add_node('compare', compare)
     builder.add_node('generate', generate)
     builder.add_node('validate', validate)
     builder.add_node('repair', repair)
     builder.add_node('publish', publish)
     builder.add_node('fail', fail)
-    builder.add_edge(START, 'collect')
-    builder.add_edge('collect', 'gate')
-    builder.add_edge('gate', 'generate')
+    builder.add_edge(START, 'collect_subject')
+    builder.add_edge('collect_subject', 'collect_baseline')
+    builder.add_edge('collect_baseline', 'gate_subject')
+    builder.add_edge('gate_subject', 'gate_baseline')
+    builder.add_edge('gate_baseline', 'compare')
+    builder.add_edge('compare', 'generate')
     builder.add_edge('generate', 'validate')
     builder.add_conditional_edges(
         'validate',
@@ -291,5 +530,5 @@ def graph_config(job_id: uuid.UUID) -> dict[str, Any]:
             'thread_id': f'diagnosis:{job_id}',
             'checkpoint_ns': GRAPH_VERSION,
         },
-        'recursion_limit': 8,
+        'recursion_limit': 12,
     }

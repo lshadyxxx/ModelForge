@@ -23,6 +23,28 @@
 - 安全与运维手册：`SECURITY_OPERATIONS_RUNBOOK.md`
 - 实施任务种子：`IMPLEMENTATION_BACKLOG.md`
 
+## 下一阶段规划包
+
+历史训练对比已完成本地实现并通过真实页面验收：
+
+- 规划入口：`historical-comparison-2026-11-08/README.md`
+- 架构设计：`historical-comparison-2026-11-08/ARCHITECTURE.md`
+- 数据与 API 契约：`historical-comparison-2026-11-08/DATA_CONTRACT.md`
+- 比较策略与 AI 评估：`historical-comparison-2026-11-08/COMPARISON_POLICY_AND_AI_EVAL.md`
+- UI/UX 规范：`historical-comparison-2026-11-08/UI_UX_SPEC.md`
+- 实施执行计划：`historical-comparison-2026-11-08/EXECUTION_PLAN.md`
+- 测试与验收：`historical-comparison-2026-11-08/TEST_ACCEPTANCE.md`
+
+该能力只比较 `当前成功 Attempt vs 一次同基座、同数据集、同 split 的成功历史 Attempt`。
+真实模型效果在没有同评测集分数时固定为 `unverified`，不得把 Eval Loss 改善写成业务效果。
+本地实现已完成，未提交、未推送、未部署，未创建云资源。
+
+历史对比验收证据：
+
+- [IMPLEMENTATION_STATUS_2026-11-08.md](historical-comparison-2026-11-08/IMPLEMENTATION_STATUS_2026-11-08.md)
+- [TEST_ACCEPTANCE.md](historical-comparison-2026-11-08/TEST_ACCEPTANCE.md)
+- `historical-comparison-2026-11-08/evidence/`
+
 ## 先看什么
 
 - 对比入口：`index.html`
@@ -127,7 +149,18 @@ PostgreSQL job/evidence/report 和租约/fencing。产品名称仍为“AI 智�
 - 复制摘要与复制配置草稿：均显示“已复制”
 - 前端：96/96 测试通过，生产构建 108 modules 通过
 - 诊断 + 独立验收测试：23 passed, 1 skipped
-- Alembic：`0020_diagnosis_usage (head)`；独立推理验收表 0 行
+- Alembic（历史片段）：`0020_diagnosis_usage`；独立推理验收表 0 行；当前 head 见下方
+
+### 历史训练对比增量 · 2026-11-08
+
+- 后端组合测试：65 passed, 1 skipped
+- 前端测试：100 passed, 0 failed
+- 生产构建：110 modules 通过；主 JS chunk 726.51 kB，体积警告不是失败
+- Alembic：`0021_diagnosis_comparison (head)`
+- 真实对比报告：`f24452d8-d364-4c1c-9dee-cc4ec87721c2`，`flat / low / same / unverified`
+- 真实失败无基线报告：`3fd8c4de-8495-4752-8b42-fbed82e0108f`，`limited / no_baseline`
+- 1440 与 390：文档级无横向溢出；console/runtime/window errors 均为 0
+- 真实模型 smoke 只覆盖本轮成功对比与失败/无基线复盘，不等于 18 场景稳定性
 
 ## 未验证
 

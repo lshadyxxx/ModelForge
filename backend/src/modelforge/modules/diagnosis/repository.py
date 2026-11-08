@@ -9,7 +9,15 @@ from psycopg.types.json import Jsonb
 
 from modelforge.errors import AppError
 
-from .contracts import AdvisoryReport, EvidencePack, GateResult
+from .contracts import (
+    AdvisoryReport,
+    AdvisoryReportV2,
+    EvidencePack,
+    EvidencePackV2,
+    GateResult,
+    parse_advisory_report,
+    parse_evidence_pack,
+)
 
 
 class DiagnosisRepository:
@@ -26,6 +34,9 @@ class DiagnosisRepository:
         graph_version: str,
         prompt_version: str,
         generator_version: str,
+        comparison_mode: str = 'none',
+        baseline_attempt_id: uuid.UUID | None = None,
+        comparison_policy_version: str | None = None,
     ) -> tuple[dict[str, Any], bool]:
         job_id = uuid.uuid4()
         with self.pool.connection() as connection:
@@ -33,9 +44,10 @@ class DiagnosisRepository:
                 '''
                 INSERT INTO training_diagnosis_jobs(
                     id, attempt_id, request_key, policy_version, graph_version,
-                    prompt_version, generator_version
+                    prompt_version, generator_version, comparison_mode,
+                    baseline_attempt_id, comparison_policy_version
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (attempt_id, request_key) DO NOTHING
                 RETURNING *
                 ''',
@@ -47,6 +59,9 @@ class DiagnosisRepository:
                     graph_version,
                     prompt_version,
                     generator_version,
+                    comparison_mode,
+                    baseline_attempt_id,
+                    comparison_policy_version,
                 ),
             ).fetchone()
             if inserted is not None:
@@ -86,9 +101,10 @@ class DiagnosisRepository:
                 '''
                 INSERT INTO training_diagnosis_jobs(
                     id, attempt_id, request_key, policy_version, graph_version,
-                    prompt_version, generator_version
+                    prompt_version, generator_version, comparison_mode,
+                    baseline_attempt_id, comparison_policy_version
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING *
                 ''',
                 (
@@ -99,6 +115,9 @@ class DiagnosisRepository:
                     source['graph_version'],
                     source['prompt_version'],
                     source['generator_version'],
+                    source['comparison_mode'],
+                    source['baseline_attempt_id'],
+                    source['comparison_policy_version'],
                 ),
             ).fetchone()
         return row
@@ -141,6 +160,9 @@ class DiagnosisRepository:
             'started_at': row['started_at'],
             'finished_at': row['finished_at'],
             'usage': row.get('usage'),
+            'comparison_mode': row.get('comparison_mode', 'none'),
+            'baseline_attempt_id': row.get('baseline_attempt_id'),
+            'comparison_policy_version': row.get('comparison_policy_version'),
             'latest_report_id': report['id'] if report else None,
             'report_version': report['version'] if report else None,
         }
@@ -278,16 +300,30 @@ class DiagnosisRepository:
         if row is None:
             raise AppError(409, 'diagnosis_lease_lost', '诊断任务租约已失效，不能继续写入。')
 
-    def freeze_evidence(self, job_id: uuid.UUID, pack: EvidencePack) -> EvidencePack:
+    def freeze_evidence(
+        self,
+        job_id: uuid.UUID,
+        pack: EvidencePack | EvidencePackV2,
+        *,
+        owner: str | None = None,
+        fencing_token: int | None = None,
+    ) -> EvidencePack | EvidencePackV2:
         payload = pack.model_dump(mode='json')
+        comparison = getattr(pack, 'comparison', None)
+        baseline = comparison.baseline if comparison is not None else None
+        baseline_attempt_id = baseline.attempt_id if baseline is not None else None
+        baseline_digest = (
+            baseline.canonical_digest if baseline is not None else None
+        )
         with self.pool.connection() as connection:
             row = connection.execute(
                 '''
                 INSERT INTO training_diagnosis_evidence(
                     job_id, attempt_id, schema_version, evidence_pack,
-                    evidence_digest, redaction_version
+                    evidence_digest, redaction_version, baseline_attempt_id,
+                    baseline_evidence_digest
                 )
-                VALUES (%s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (job_id) DO NOTHING
                 RETURNING evidence_pack
                 ''',
@@ -298,6 +334,8 @@ class DiagnosisRepository:
                     Jsonb(payload),
                     pack.canonical_digest,
                     pack.redaction_version,
+                    baseline_attempt_id,
+                    baseline_digest,
                 ),
             ).fetchone()
             if row is None:
@@ -307,16 +345,47 @@ class DiagnosisRepository:
                 ).fetchone()
         if row is None:
             raise AppError(503, 'diagnosis_evidence_unavailable', '诊断证据冻结失败。')
-        frozen = EvidencePack.model_validate(row['evidence_pack'])
+        frozen = parse_evidence_pack(row['evidence_pack'])
         if frozen.canonical_digest != pack.canonical_digest:
             raise AppError(
                 409,
                 'diagnosis_evidence_changed',
                 '同一诊断任务的证据内容发生变化，必须创建新的诊断任务。',
             )
+        if baseline_attempt_id is not None:
+            if owner is not None and fencing_token is not None:
+                with self.pool.connection() as connection:
+                    updated = connection.execute(
+                        '''
+                        UPDATE training_diagnosis_jobs
+                        SET baseline_attempt_id = %s,
+                            baseline_evidence_digest = %s,
+                            comparison_policy_version = %s
+                        WHERE id = %s
+                          AND state = 'running'
+                          AND lease_owner = %s
+                          AND fencing_token = %s
+                          AND lease_expires_at > now()
+                        RETURNING id
+                        ''',
+                        (
+                            baseline_attempt_id,
+                            baseline_digest,
+                            comparison.comparison_result.policy_version,
+                            job_id,
+                            owner,
+                            fencing_token,
+                        ),
+                    ).fetchone()
+                if updated is None:
+                    raise AppError(
+                        409,
+                        'diagnosis_lease_lost',
+                        '诊断任务租约已失效，不能记录比较基线。',
+                    )
         return frozen
 
-    def load_evidence(self, job_id: uuid.UUID) -> EvidencePack:
+    def load_evidence(self, job_id: uuid.UUID) -> EvidencePack | EvidencePackV2:
         with self.pool.connection() as connection:
             row = connection.execute(
                 'SELECT evidence_pack FROM training_diagnosis_evidence WHERE job_id = %s',
@@ -324,15 +393,15 @@ class DiagnosisRepository:
             ).fetchone()
         if row is None:
             raise AppError(404, 'diagnosis_evidence_not_found', 'Diagnosis evidence is missing')
-        return EvidencePack.model_validate(row['evidence_pack'])
+        return parse_evidence_pack(row['evidence_pack'])
 
     def publish(
         self,
-        report: AdvisoryReport,
+        report: AdvisoryReport | AdvisoryReportV2,
         *,
         owner: str,
         fencing_token: int,
-    ) -> AdvisoryReport:
+    ) -> AdvisoryReport | AdvisoryReportV2:
         report = report.with_digest()
         evidence = self.load_evidence(report.job_id)
         payload = report.model_dump(mode='json')
@@ -364,7 +433,7 @@ class DiagnosisRepository:
                     (report.job_id,),
                 ).fetchone()
                 if existing is not None:
-                    return AdvisoryReport.model_validate(existing['report'])
+                    return parse_advisory_report(existing['report'])
                 version = connection.execute(
                     '''
                     SELECT COALESCE(max(version), 0) + 1 AS version
@@ -379,6 +448,7 @@ class DiagnosisRepository:
                     'published_at': published_at,
                 }).with_digest()
                 payload = report.model_dump(mode='json')
+                comparison = getattr(report, 'comparison', None)
                 connection.execute(
                     '''
                     INSERT INTO training_diagnosis_reports(
@@ -386,11 +456,15 @@ class DiagnosisRepository:
                         report_mode, health_status, delivery_status, report,
                         report_digest, evidence_digest, policy_version,
                         graph_version, prompt_version, generator_version,
-                        model_name, created_at, published_at
+                        model_name, created_at, published_at,
+                        baseline_attempt_id, comparison_status,
+                        comparison_confidence, training_signal, delivery_signal,
+                        model_effect_status
                     )
                     VALUES (
                         %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                        %s, %s, %s, %s, %s, %s, %s
+                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                        %s, %s, %s
                     )
                     ''',
                     (
@@ -412,6 +486,27 @@ class DiagnosisRepository:
                         report.model_name,
                         published_at,
                         published_at,
+                        getattr(report, 'baseline_attempt_id', None),
+                        (
+                            comparison.comparability_status
+                            if comparison is not None else None
+                        ),
+                        (
+                            comparison.confidence
+                            if comparison is not None else None
+                        ),
+                        (
+                            comparison.training_signal
+                            if comparison is not None else None
+                        ),
+                        (
+                            comparison.delivery_signal
+                            if comparison is not None else None
+                        ),
+                        (
+                            comparison.model_effect.status
+                            if comparison is not None else None
+                        ),
                     ),
                 )
                 connection.execute(
@@ -538,7 +633,7 @@ class DiagnosisRepository:
         return [self._report_response(row) for row in rows]
 
     def _report_response(self, row: dict[str, Any]) -> dict[str, Any]:
-        report = AdvisoryReport.model_validate(row['report'])
+        report = parse_advisory_report(row['report'])
         with self.pool.connection() as connection:
             evidence_row = connection.execute(
                 '''
@@ -551,17 +646,36 @@ class DiagnosisRepository:
         try:
             from .evidence import EvidenceCollector
 
-            current_revision = EvidenceCollector(
-                self.resources
-            ).current_source_revision(report.attempt_id)
+            collector = EvidenceCollector(self.resources)
+            current_revision = collector.current_source_revision(report.attempt_id)
             stale = current_revision != report.source_revision
+            if isinstance(report, AdvisoryReportV2) and report.baseline_attempt_id:
+                evidence_pack = (
+                    parse_evidence_pack(evidence_row['evidence_pack'])
+                    if evidence_row else None
+                )
+                baseline = (
+                    evidence_pack.comparison.baseline
+                    if isinstance(evidence_pack, EvidencePackV2)
+                    and evidence_pack.comparison is not None
+                    else None
+                )
+                if baseline is None:
+                    stale = True
+                else:
+                    baseline_revision = collector.current_source_revision(
+                        report.baseline_attempt_id
+                    )
+                    stale = stale or (
+                        baseline_revision != baseline.source_revision
+                    )
         except Exception:
             # A report cannot be presented as current when its source
             # revision cannot be re-read and compared.
             stale = True
         report = report.model_copy(update={'freshness': 'stale' if stale else 'current'})
         evidence_pack = (
-            EvidencePack.model_validate(evidence_row['evidence_pack'])
+            parse_evidence_pack(evidence_row['evidence_pack'])
             if evidence_row
             else None
         )

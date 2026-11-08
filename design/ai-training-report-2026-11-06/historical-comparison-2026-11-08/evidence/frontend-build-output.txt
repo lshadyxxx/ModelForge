@@ -1,0 +1,13 @@
+Command:
+npm run build
+
+Result:
+tsc --noEmit passed
+vite build passed
+110 modules transformed
+dist/index.html 0.41 kB
+dist/assets/index-BWaufh5D.css 362.37 kB
+dist/assets/index-DeMTnAVF.js 726.51 kB
+
+Warning:
+Main JS chunk exceeds 500 kB; this is a bundle-size warning, not a build failure.

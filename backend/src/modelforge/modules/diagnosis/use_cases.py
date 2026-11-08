@@ -9,7 +9,13 @@ from typing import Any
 from modelforge.errors import AppError
 from modelforge.modules.training import Training
 
-from .contracts import digest
+from .comparison import POLICY_VERSION as COMPARISON_POLICY_VERSION
+from .comparison_repository import ComparisonRepository
+from .contracts import (
+    BaselineSelection,
+    ComparisonMode,
+    digest,
+)
 from .drafts import build_training_draft
 from .gates import POLICY_VERSION
 from .generator import GENERATOR_VERSION
@@ -56,7 +62,14 @@ class DiagnosisUseCases:
             )
         return attempt
 
-    def _request_key(self, attempt: dict[str, Any]) -> str:
+    def _request_key(
+        self,
+        attempt: dict[str, Any],
+        *,
+        comparison_mode: ComparisonMode,
+        selection: BaselineSelection,
+        baseline_snapshot_sha256: str | None,
+    ) -> str:
         body = {
             'scope': 'initial',
             'policy': POLICY_VERSION,
@@ -64,21 +77,72 @@ class DiagnosisUseCases:
             'prompt': PROMPT_VERSION,
             'generator': GENERATOR_VERSION,
             'snapshot': attempt.get('snapshot_sha256'),
+            'comparison_mode': comparison_mode,
+            'selection_rule': selection.selection_rule,
+            'baseline': (
+                str(selection.resolved_attempt_id)
+                if selection.resolved_attempt_id else None
+            ),
+            'baseline_snapshot': baseline_snapshot_sha256,
+            'comparison_policy': COMPARISON_POLICY_VERSION,
         }
         return hashlib.sha256(
             json.dumps(body, sort_keys=True).encode('utf-8')
         ).hexdigest()
 
-    def create(self, attempt_id: uuid.UUID) -> dict[str, Any]:
+    def create(
+        self,
+        attempt_id: uuid.UUID,
+        *,
+        comparison_mode: ComparisonMode = 'auto',
+        baseline_attempt_id: uuid.UUID | None = None,
+    ) -> dict[str, Any]:
         self._require_enabled()
         attempt = self._attempt(attempt_id)
+        comparison = ComparisonRepository(self.resources)
+        selection: BaselineSelection
+        baseline: dict[str, Any] | None = None
+        if comparison_mode == 'explicit':
+            selection, baseline = comparison.resolve(
+                attempt_id,
+                mode='explicit',
+                requested_attempt_id=baseline_attempt_id,
+            )
+        elif comparison_mode == 'none':
+            selection = BaselineSelection(
+                mode='none',
+                selection_rule='none',
+            )
+        elif attempt['state'] == 'succeeded':
+            selection, baseline = comparison.resolve(
+                attempt_id,
+                mode='auto',
+                requested_attempt_id=None,
+            )
+        else:
+            selection = BaselineSelection(
+                mode='auto',
+                selection_rule='not_available',
+                reason_code='subject_not_succeeded_for_comparison',
+            )
         job, created = self.repository.create_job(
             attempt_id,
-            request_key=self._request_key(attempt),
+            request_key=self._request_key(
+                attempt,
+                comparison_mode=comparison_mode,
+                selection=selection,
+                baseline_snapshot_sha256=(
+                    baseline.get('snapshot_sha256')
+                    if baseline is not None else None
+                ),
+            ),
             policy_version=POLICY_VERSION,
             graph_version=GRAPH_VERSION,
             prompt_version=PROMPT_VERSION,
             generator_version=GENERATOR_VERSION,
+            comparison_mode=comparison_mode,
+            baseline_attempt_id=selection.resolved_attempt_id,
+            comparison_policy_version=COMPARISON_POLICY_VERSION,
         )
         view = self.repository.get_job(job['id'])
         view['created'] = created
@@ -93,6 +157,12 @@ class DiagnosisUseCases:
             'source_job': str(job_id),
             'nonce': uuid.uuid4().hex,
             'snapshot': attempt.get('snapshot_sha256'),
+            'comparison_mode': source.get('comparison_mode', 'none'),
+            'baseline': (
+                str(source['baseline_attempt_id'])
+                if source.get('baseline_attempt_id') else None
+            ),
+            'comparison_policy': COMPARISON_POLICY_VERSION,
         })
         job = self.repository.create_regeneration(
             job_id,
@@ -101,6 +171,17 @@ class DiagnosisUseCases:
         view = self.repository.get_job(job['id'])
         view['created'] = True
         return view
+
+    def comparison_candidates(
+        self,
+        attempt_id: uuid.UUID,
+        *,
+        limit: int = 20,
+    ) -> dict[str, Any]:
+        return ComparisonRepository(self.resources).candidates(
+            attempt_id,
+            limit=limit,
+        ).model_dump(mode='json')
 
     def latest(self, attempt_id: uuid.UUID) -> dict[str, Any] | None:
         self.training.get(attempt_id)

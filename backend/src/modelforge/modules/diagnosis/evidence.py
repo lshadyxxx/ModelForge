@@ -12,9 +12,13 @@ from modelforge.modules.models import Adapters
 from modelforge.modules.training import Training
 
 from .contracts import (
+    BaselineEvidenceProjection,
+    ComparisonEvidence,
+    ComparisonResult,
     EvidenceConflict,
     EvidenceCoverage,
     EvidencePack,
+    EvidencePackV2,
     EvidenceRef,
     SourceRevision,
     digest,
@@ -92,7 +96,7 @@ class EvidenceCollector:
         self.resources = resources
         self.pool = resources.pool
 
-    def collect(self, attempt_id: uuid.UUID) -> EvidencePack:
+    def collect(self, attempt_id: uuid.UUID) -> EvidencePackV2:
         attempt = _jsonable(Training(self.resources).get(attempt_id))
         state = attempt.get('state')
         if state not in ('succeeded', 'failed', 'cancelled'):
@@ -374,7 +378,7 @@ class EvidenceCollector:
             trials=trials,
             acceptance=acceptance,
         )
-        pack = EvidencePack(
+        pack = EvidencePackV2(
             attempt_id=attempt_id,
             evidence_cutoff_at=datetime.now(timezone.utc),
             attempt_state=state,
@@ -385,6 +389,74 @@ class EvidenceCollector:
             conflicts=conflicts,
         )
         return pack.with_digest()
+
+    def collect_baseline(
+        self,
+        attempt_id: uuid.UUID,
+    ) -> BaselineEvidenceProjection:
+        """Freeze a redacted historical projection with E-BASE-* evidence IDs."""
+        pack = self.collect(attempt_id)
+        if pack.attempt_state != 'succeeded':
+            raise AppError(
+                422,
+                'baseline_not_succeeded',
+                '历史基线不是成功 Attempt，不能做效果比较。',
+            )
+        mapping = {
+            item.id: 'E-BASE-' + item.id.removeprefix('E-')
+            for item in pack.evidence
+        }
+        facts = _jsonable(pack.facts)
+        logs = facts.get('logs') if isinstance(facts.get('logs'), dict) else {}
+        facts['logs'] = {
+            'chunks_received': logs.get('chunks_received', 0),
+            'gap': bool(logs.get('gap')),
+            'excerpt': None,
+        }
+        evidence = [
+            item.model_copy(update={'id': mapping.get(item.id, item.id)})
+            for item in pack.evidence
+        ]
+        coverage = [
+            item.model_copy(update={
+                'evidence_ids': [
+                    mapping.get(identifier, identifier)
+                    for identifier in item.evidence_ids
+                ],
+            })
+            for item in pack.coverage
+        ]
+        conflicts = [
+            item.model_copy(update={
+                'left_ref': mapping.get(item.left_ref, item.left_ref),
+                'right_ref': mapping.get(item.right_ref, item.right_ref),
+            })
+            for item in pack.conflicts
+        ]
+        baseline_pack = EvidencePackV2(
+            attempt_id=attempt_id,
+            evidence_cutoff_at=pack.evidence_cutoff_at,
+            attempt_state='succeeded',
+            source_revision=pack.source_revision,
+            coverage=coverage,
+            evidence=evidence,
+            facts=facts,
+            conflicts=conflicts,
+            redaction_version=pack.redaction_version,
+        ).with_digest()
+        from .gates import GateEngine
+
+        projection = BaselineEvidenceProjection(
+            attempt_id=attempt_id,
+            snapshot_sha256=pack.source_revision.snapshot_sha256,
+            attempt_state='succeeded',
+            facts=facts,
+            coverage=coverage,
+            evidence=evidence,
+            gate=GateEngine().evaluate(baseline_pack),
+            source_revision=pack.source_revision,
+        )
+        return projection.with_digest()
 
     def current_source_revision(self, attempt_id: uuid.UUID) -> SourceRevision:
         """Re-read source markers without freezing or mutating evidence."""
@@ -536,3 +608,89 @@ class EvidenceCollector:
             return _redact(_jsonable(rows)), None
         except Exception:
             return None, 'inference_acceptance_read_unavailable'
+
+
+def with_comparison(
+    pack: EvidencePack | EvidencePackV2,
+    comparison: ComparisonResult,
+    baseline: BaselineEvidenceProjection | None,
+) -> EvidencePackV2:
+    """Add deterministic comparison facts to a frozen subject evidence pack."""
+    observed_at = datetime.now(timezone.utc)
+    subject_id = str(pack.attempt_id)
+    baseline_id = str(baseline.attempt_id) if baseline is not None else 'none'
+    comparison_body = comparison.model_dump(mode='json')
+    definitions = (
+        (
+            'E-COMPARE-METRIC-BEST-EVAL',
+            'comparison.metric_deltas.best_eval_loss',
+            {'deltas': comparison_body['metric_deltas']},
+        ),
+        (
+            'E-COMPARE-METRIC-FINAL-EVAL',
+            'comparison.metric_deltas.final_eval_loss',
+            {'deltas': comparison_body['metric_deltas']},
+        ),
+        (
+            'E-COMPARE-PARAMETERS',
+            'comparison.parameter_changes',
+            comparison_body['parameter_changes'],
+        ),
+        (
+            'E-COMPARE-CONFOUNDERS',
+            'comparison.confounders',
+            comparison_body['confounders'],
+        ),
+        (
+            'E-COMPARE-CONCLUSION',
+            'comparison.conclusion',
+            {
+                'comparability_status': comparison_body['comparability_status'],
+                'confidence': comparison_body['confidence'],
+                'training_signal': comparison_body['training_signal'],
+                'delivery_signal': comparison_body['delivery_signal'],
+                'model_effect': comparison_body['model_effect'],
+                'reason_codes': comparison_body['reason_codes'],
+            },
+        ),
+    )
+    comparison_evidence = [
+        EvidenceRef(
+            id=identifier,
+            kind='comparison',
+            source_locator=(
+                f'diagnosis/comparison/{subject_id}/{baseline_id}'
+            ),
+            field_path=field_path,
+            observed_at=observed_at,
+            source_version=pack.source_revision.snapshot_sha256,
+            source_digest=digest(value),
+            coverage='available',
+        )
+        for identifier, field_path, value in definitions
+    ]
+    comparison_coverage = [
+        EvidenceCoverage(
+            category='comparison',
+            status='available',
+            evidence_ids=[item.id for item in comparison_evidence],
+        )
+    ]
+    evidence = list(pack.evidence) + comparison_evidence
+    coverage = list(pack.coverage) + comparison_coverage
+    result = EvidencePackV2(
+        attempt_id=pack.attempt_id,
+        evidence_cutoff_at=pack.evidence_cutoff_at,
+        attempt_state=pack.attempt_state,
+        source_revision=pack.source_revision,
+        coverage=coverage,
+        evidence=evidence,
+        facts=pack.facts,
+        conflicts=pack.conflicts,
+        redaction_version=pack.redaction_version,
+        comparison=ComparisonEvidence(
+            comparison_result=comparison,
+            baseline=baseline,
+        ),
+    )
+    return result.with_digest()

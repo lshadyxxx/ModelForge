@@ -3,16 +3,20 @@ import {
   createDiagnosis,
   createDiagnosisDraft,
   getDiagnosisConfig,
+  getDiagnosisComparisonCandidates,
   getDiagnosisJob,
   getLatestDiagnosis,
   regenerateDiagnosis,
 } from './api';
 import type {
   DiagnosisConfig,
+  DiagnosisComparisonCandidates,
+  DiagnosisComparisonChoice,
   DiagnosisDraft,
   DiagnosisJob,
   DiagnosisLatest,
 } from '../types';
+import {baselineSelectionChanged} from './diagnosis-model';
 
 function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
@@ -27,7 +31,14 @@ export function useDiagnosis(attemptId: string) {
   const [draft, setDraft] = useState<DiagnosisDraft | null>(null);
   const [draftError, setDraftError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [comparisonCandidates, setComparisonCandidates] =
+    useState<DiagnosisComparisonCandidates | null>(null);
+  const [candidatesLoading, setCandidatesLoading] = useState(false);
+  const [candidatesError, setCandidatesError] = useState('');
+  const [baselineChoice, setBaselineChoiceState] =
+    useState<DiagnosisComparisonChoice>({mode: 'auto'});
   const mounted = useRef(true);
+  const attemptRef = useRef(attemptId);
 
   useEffect(() => {
     mounted.current = true;
@@ -35,6 +46,19 @@ export function useDiagnosis(attemptId: string) {
       mounted.current = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (attemptRef.current === attemptId) return;
+    attemptRef.current = attemptId;
+    setLatest(null);
+    setJob(null);
+    setDraft(null);
+    setDraftError('');
+    setError('');
+    setComparisonCandidates(null);
+    setCandidatesError('');
+    setBaselineChoiceState({mode: 'auto'});
+  }, [attemptId]);
 
   const load = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
@@ -89,6 +113,23 @@ export function useDiagnosis(attemptId: string) {
     };
   }, [attemptId, job?.job_id, job?.state]);
 
+  const loadCandidates = useCallback(async (signal?: AbortSignal) => {
+    setCandidatesLoading(true);
+    setCandidatesError('');
+    try {
+      const next = await getDiagnosisComparisonCandidates(attemptId, signal);
+      if (signal?.aborted || !mounted.current) return null;
+      setComparisonCandidates(next);
+      return next;
+    } catch (failure) {
+      if (signal?.aborted || !mounted.current) return null;
+      setCandidatesError(errorMessage(failure));
+      return null;
+    } finally {
+      if (!signal?.aborted && mounted.current) setCandidatesLoading(false);
+    }
+  }, [attemptId]);
+
   const startJob = useCallback(async (request: () => Promise<DiagnosisJob>) => {
     setSubmitting(true);
     setError('');
@@ -106,12 +147,30 @@ export function useDiagnosis(attemptId: string) {
   }, []);
 
   const generate = useCallback(
-    () => startJob(() => (
-      job?.state === 'failed'
-        ? regenerateDiagnosis(job.job_id)
-        : createDiagnosis(attemptId)
-    )),
-    [attemptId, job?.job_id, job?.state, startJob],
+    () => startJob(() => {
+      const report = latest?.report;
+      const pendingChange = baselineSelectionChanged(
+        baselineChoice,
+        report,
+        comparisonCandidates,
+      );
+      if (report && !pendingChange) {
+        return regenerateDiagnosis(report.job_id);
+      }
+      if (!report && job?.state === 'failed' && !pendingChange) {
+        return regenerateDiagnosis(job.job_id);
+      }
+      return createDiagnosis(attemptId, baselineChoice);
+    }),
+    [
+      attemptId,
+      baselineChoice,
+      comparisonCandidates,
+      job?.job_id,
+      job?.state,
+      latest?.report,
+      startJob,
+    ],
   );
   const regenerate = useCallback(
     () => startJob(() => {
@@ -119,6 +178,16 @@ export function useDiagnosis(attemptId: string) {
       return regenerateDiagnosis(latest.report.job_id);
     }),
     [latest?.report, startJob],
+  );
+
+  const setBaselineChoice = useCallback((choice: DiagnosisComparisonChoice) => {
+    setBaselineChoiceState(choice);
+  }, []);
+
+  const baselineChanged = baselineSelectionChanged(
+    baselineChoice,
+    latest?.report,
+    comparisonCandidates,
   );
 
   const applyExperiment = useCallback(async (experimentId: string) => {
@@ -144,6 +213,13 @@ export function useDiagnosis(attemptId: string) {
     draft,
     draftError,
     reload: () => load(),
+    comparisonCandidates,
+    candidatesLoading,
+    candidatesError,
+    loadCandidates,
+    baselineChoice,
+    setBaselineChoice,
+    baselineChanged,
     generate,
     regenerate,
     applyExperiment,

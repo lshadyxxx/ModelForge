@@ -177,3 +177,127 @@ def test_ai_diagnosis_availability_defaults_to_disabled(monkeypatch):
         "trigger": "manual",
         "ai_role": "advisory_diagnosis_not_gate",
     }
+
+
+def _diagnosis_route_stub(monkeypatch, **methods):
+    from modelforge.modules.diagnosis import routes as diagnosis_routes
+
+    class Stub:
+        pass
+
+    for name, value in methods.items():
+        setattr(Stub, name, value)
+    monkeypatch.setattr(
+        diagnosis_routes,
+        "use_cases",
+        lambda request: Stub(),
+    )
+
+
+def test_diagnosis_create_without_body_defaults_to_auto(monkeypatch):
+    attempt_id = "11111111-1111-1111-1111-111111111111"
+    captured = {}
+
+    def create(self, value, *, comparison_mode, baseline_attempt_id):
+        captured.update(
+            attempt_id=value,
+            comparison_mode=comparison_mode,
+            baseline_attempt_id=baseline_attempt_id,
+        )
+        return {
+            "job_id": "22222222-2222-2222-2222-222222222222",
+            "attempt_id": str(value),
+            "state": "queued",
+        }
+
+    _diagnosis_route_stub(monkeypatch, create=create)
+    response = TestClient(app).post(
+        f"/api/v1/training/attempts/{attempt_id}/diagnosis-reports"
+    )
+    assert response.status_code == 202
+    assert captured["comparison_mode"] == "auto"
+    assert captured["baseline_attempt_id"] is None
+
+
+def test_diagnosis_create_explicit_passes_baseline(monkeypatch):
+    attempt_id = "11111111-1111-1111-1111-111111111111"
+    baseline_id = "33333333-3333-3333-3333-333333333333"
+    captured = {}
+
+    def create(self, value, *, comparison_mode, baseline_attempt_id):
+        captured.update(
+            attempt_id=value,
+            comparison_mode=comparison_mode,
+            baseline_attempt_id=baseline_attempt_id,
+        )
+        return {"state": "queued"}
+
+    _diagnosis_route_stub(monkeypatch, create=create)
+    response = TestClient(app).post(
+        f"/api/v1/training/attempts/{attempt_id}/diagnosis-reports",
+        json={
+            "comparison_mode": "explicit",
+            "baseline_attempt_id": baseline_id,
+        },
+    )
+    assert response.status_code == 202
+    assert str(captured["attempt_id"]) == attempt_id
+    assert captured["comparison_mode"] == "explicit"
+    assert str(captured["baseline_attempt_id"]) == baseline_id
+
+
+def test_diagnosis_create_rejects_invalid_baseline_combinations(monkeypatch):
+    attempt_id = "11111111-1111-1111-1111-111111111111"
+    baseline_id = "33333333-3333-3333-3333-333333333333"
+    _diagnosis_route_stub(
+        monkeypatch,
+        create=lambda *args, **kwargs: {"state": "queued"},
+    )
+    client = TestClient(app)
+
+    missing = client.post(
+        f"/api/v1/training/attempts/{attempt_id}/diagnosis-reports",
+        json={"comparison_mode": "explicit"},
+    )
+    assert missing.status_code == 422
+    assert missing.json()["error"]["code"] == "validation_error"
+
+    unexpected = client.post(
+        f"/api/v1/training/attempts/{attempt_id}/diagnosis-reports",
+        json={
+            "comparison_mode": "auto",
+            "baseline_attempt_id": baseline_id,
+        },
+    )
+    assert unexpected.status_code == 422
+    assert unexpected.json()["error"]["code"] == "validation_error"
+
+
+def test_diagnosis_candidates_route_forwards_subject_and_limit(monkeypatch):
+    attempt_id = "11111111-1111-1111-1111-111111111111"
+    captured = {}
+
+    def comparison_candidates(self, value, *, limit):
+        captured.update(attempt_id=value, limit=limit)
+        return {
+            "subject_attempt_id": str(value),
+            "group": {
+                "base_fingerprint": "b" * 64,
+                "dataset_sha256": "d" * 64,
+                "dataset_split_sha256": "s" * 64,
+            },
+            "suggested_baseline_attempt_id": None,
+            "candidates": [],
+        }
+
+    _diagnosis_route_stub(
+        monkeypatch,
+        comparison_candidates=comparison_candidates,
+    )
+    response = TestClient(app).get(
+        f"/api/v1/training/attempts/{attempt_id}"
+        "/diagnosis-comparison-candidates?limit=7"
+    )
+    assert response.status_code == 200
+    assert str(captured["attempt_id"]) == attempt_id
+    assert captured["limit"] == 7

@@ -179,6 +179,6 @@ export function AttemptDetail({
   </div>;
 
   return tab === 'overview' || tab === 'diagnosis'
-    ? <DiagnosisProvider attemptId={attempt.id}>{detailPage}</DiagnosisProvider>
+    ? <DiagnosisProvider key={attempt.id} attemptId={attempt.id}>{detailPage}</DiagnosisProvider>
     : detailPage;
 }

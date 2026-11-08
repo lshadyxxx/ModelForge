@@ -636,7 +636,7 @@ def test_fixed_langgraph_publishes_only_after_gate_and_validation():
         model_name = 'fixture-structured-model'
 
         def generate(self, context):
-            assert 'diagnosis-prompt-context-v1' in context
+            assert 'diagnosis-prompt-context-v2' in context
             assert 'E-METRICS' in context
             return candidate()
 

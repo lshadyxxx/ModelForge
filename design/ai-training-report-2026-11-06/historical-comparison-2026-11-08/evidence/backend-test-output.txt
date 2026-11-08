@@ -1,0 +1,8 @@
+Command:
+docker compose run --rm --no-deps api python -m pytest tests/test_training_diagnosis.py tests/test_inference_acceptance.py tests/test_training_comparison.py tests/test_http_contract.py -q
+
+Result:
+65 passed, 1 skipped, 1 warning in 1.14s
+
+Warning:
+Pytest cache path permission denied inside container; test execution succeeded.

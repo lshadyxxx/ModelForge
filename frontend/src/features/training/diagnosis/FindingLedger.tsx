@@ -22,6 +22,7 @@ const categoryLabels: Record<DiagnosisFinding['category'], string> = {
   artifact: '产物',
   failure: '失败过程',
   coverage: '证据覆盖',
+  comparison: '历史对比',
 };
 
 const layerLabels: Record<DiagnosisClaim['layer'], string> = {

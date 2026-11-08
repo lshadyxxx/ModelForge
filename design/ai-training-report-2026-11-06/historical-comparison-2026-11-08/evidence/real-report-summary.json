@@ -1,0 +1,25 @@
+{
+  "subject_attempt_id": "fbc8a03d-27e3-4ef2-8253-c23ac8a599ac",
+  "baseline_attempt_id": "6b330374-7fff-4ac2-9104-4f3909045e0b",
+  "job_id": "0f6b2943-7486-4a10-81ab-c6f73b6cbf71",
+  "report_id": "f24452d8-d364-4c1c-9dee-cc4ec87721c2",
+  "version": 4,
+  "report_schema": "advisory-report-v2",
+  "evidence_schema": "evidence-pack-v2",
+  "graph": "training-diagnosis-graph-v2",
+  "health": "partial",
+  "delivery": "artifact_deliverable_model_unverified",
+  "comparability": "conditional",
+  "confidence": "low",
+  "training_signal": "flat",
+  "delivery_signal": "same",
+  "model_effect": "unverified",
+  "parameter_changes": 0,
+  "confounders": ["eval_coverage_low"],
+  "usage": {
+    "model_calls": 2,
+    "total_tokens": 69524,
+    "latency_ms": 63180,
+    "cost_estimate": null
+  }
+}

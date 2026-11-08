@@ -1,0 +1,56 @@
+{
+  "date": "2026-11-08",
+  "web": "http://127.0.0.1:8092/",
+  "api": "http://127.0.0.1:8102",
+  "build_script": "/assets/index-DeMTnAVF.js",
+  "desktop": {
+    "viewport": "1440x1000",
+    "document_overflow": false,
+    "subject_attempt": "fbc8a03d-27e3-4ef2-8253-c23ac8a599ac",
+    "baseline_attempt": "6b330374-7fff-4ac2-9104-4f3909045e0b",
+    "comparison": {
+      "comparability": "conditional",
+      "confidence": "low",
+      "training_signal": "flat",
+      "delivery_signal": "same",
+      "model_effect": "unverified"
+    },
+    "baseline_pending": {
+      "selected": "explicit:03c13388-378b-4aa2-a586-7b3061c7ecc5",
+      "notice": "基线选择尚未应用",
+      "action": "用新基线重新生成",
+      "auto_restore_action": "重新生成"
+    },
+    "severity_filter": {
+      "all": 7,
+      "attention": 3,
+      "restored": 7
+    },
+    "evidence_chip": {
+      "opened": true,
+      "hash_after_click": "#training"
+    },
+    "copy_summary": {
+      "button_text": "已复制摘要",
+      "inline_errors": 0
+    }
+  },
+  "mobile": {
+    "viewport": "390x844",
+    "inner_width": 390,
+    "document_width": 390,
+    "document_overflow": false
+  },
+  "states": {
+    "empty": "desktop-empty-state-1440.png",
+    "generating": "desktop-generating-1440.png",
+    "failure_review": "desktop-failure-review-1440.png",
+    "no_baseline": "desktop-no-baseline-1440.png"
+  },
+  "runtime": {
+    "console_errors": 0,
+    "runtime_exceptions": 0,
+    "window_errors": 0,
+    "unhandled_rejections": 0
+  }
+}

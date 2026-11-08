@@ -3,11 +3,12 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Query, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from .contracts import ComparisonMode
 from .use_cases import DiagnosisUseCases
 
 
@@ -17,6 +18,20 @@ router = APIRouter(prefix='/api/v1/training', tags=['training-diagnosis'])
 class DraftRequest(BaseModel):
     model_config = ConfigDict(extra='forbid')
     experiment_id: str = Field(min_length=1, max_length=80)
+
+
+class DiagnosisCreateRequest(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    comparison_mode: ComparisonMode = 'auto'
+    baseline_attempt_id: uuid.UUID | None = None
+
+    @model_validator(mode='after')
+    def comparison_selection(self):
+        if self.comparison_mode == 'explicit' and self.baseline_attempt_id is None:
+            raise ValueError('explicit comparison requires baseline_attempt_id')
+        if self.comparison_mode != 'explicit' and self.baseline_attempt_id is not None:
+            raise ValueError('baseline_attempt_id is only valid for explicit comparison')
+        return self
 
 
 def use_cases(request: Request) -> DiagnosisUseCases:
@@ -32,8 +47,29 @@ def availability(request: Request):
     '/attempts/{attempt_id}/diagnosis-reports',
     status_code=202,
 )
-def create_report(attempt_id: uuid.UUID, request: Request):
-    return use_cases(request).create(attempt_id)
+def create_report(
+    attempt_id: uuid.UUID,
+    request: Request,
+    body: DiagnosisCreateRequest | None = None,
+):
+    body = body or DiagnosisCreateRequest()
+    return use_cases(request).create(
+        attempt_id,
+        comparison_mode=body.comparison_mode,
+        baseline_attempt_id=body.baseline_attempt_id,
+    )
+
+
+@router.get('/attempts/{attempt_id}/diagnosis-comparison-candidates')
+def comparison_candidates(
+    attempt_id: uuid.UUID,
+    request: Request,
+    limit: int = Query(20, ge=1, le=20),
+):
+    return use_cases(request).comparison_candidates(
+        attempt_id,
+        limit=limit,
+    )
 
 
 @router.get('/attempts/{attempt_id}/diagnosis-reports/latest')

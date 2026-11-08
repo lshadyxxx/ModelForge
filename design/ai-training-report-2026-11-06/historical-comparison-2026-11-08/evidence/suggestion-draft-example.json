@@ -1,0 +1,26 @@
+{
+  "source": "real historical report API",
+  "report_id": "5652d20e-ad8c-4f29-8646-862af83c3552",
+  "report_version": 2,
+  "attempt_id": "fbc8a03d-27e3-4ef2-8253-c23ac8a599ac",
+  "experiment_id": "EXP-002",
+  "status": "unsubmitted_draft",
+  "config_patch": {
+    "epochs": 2
+  },
+  "draft_config": {
+    "seed": 42,
+    "epochs": 2,
+    "template": "qwen3_nothink",
+    "lora_rank": 8,
+    "scheduler": "cosine",
+    "batch_size": 1,
+    "cutoff_len": 512,
+    "lora_alpha": 16,
+    "lora_dropout": 0.0,
+    "warmup_ratio": 0.0,
+    "learning_rate": 0.0002,
+    "gradient_accumulation": 1
+  },
+  "notice": "仅生成未提交草稿；不会回写历史 Attempt、创建 GPU 或提交训练。"
+}

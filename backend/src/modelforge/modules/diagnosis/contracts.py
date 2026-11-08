@@ -4,7 +4,7 @@ from __future__ import annotations
 import hashlib
 import json
 from datetime import datetime
-from typing import Any, Literal
+from typing import Annotated, Any, Literal, Self, TypeAlias
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -37,7 +37,38 @@ EvidenceKind = Literal[
     'adapter',
     'inference_trial',
     'inference_acceptance',
+    'comparison',
 ]
+
+ComparisonMode = Literal['none', 'auto', 'explicit']
+ComparabilityStatus = Literal[
+    'strict',
+    'conditional',
+    'not_comparable',
+    'no_baseline',
+]
+TrainingSignal = Literal[
+    'improved',
+    'worsened',
+    'mixed',
+    'flat',
+    'inconclusive',
+]
+DeliverySignal = Literal[
+    'improved',
+    'worsened',
+    'same',
+    'inconclusive',
+]
+ModelEffectStatus = Literal[
+    'verified_better',
+    'verified_worse',
+    'verified_same',
+    'inconclusive',
+    'unverified',
+]
+ComparisonConfidence = Literal['high', 'medium', 'low', 'none']
+AdapterRole = Literal['best', 'final']
 
 
 def canonical(value: Any) -> bytes:
@@ -97,23 +128,139 @@ class SourceRevision(BaseModel):
     inference_revision: str | None = None
 
 
-class EvidencePack(BaseModel):
+class ComparisonGroup(BaseModel):
     model_config = ConfigDict(extra='forbid')
-    schema_version: Literal['evidence-pack-v1'] = 'evidence-pack-v1'
-    attempt_id: UUID
-    evidence_cutoff_at: datetime
-    attempt_state: Literal['succeeded', 'failed', 'cancelled']
-    source_revision: SourceRevision
-    coverage: list[EvidenceCoverage]
-    evidence: list[EvidenceRef]
-    facts: dict[str, Any]
-    conflicts: list[EvidenceConflict] = Field(default_factory=list)
-    redaction_version: str = 'diagnosis-redaction-v1'
-    canonical_digest: str | None = None
+    base_fingerprint: str
+    dataset_sha256: str
+    dataset_split_sha256: str
 
-    def with_digest(self) -> 'EvidencePack':
-        body = self.model_dump(mode='json', exclude={'canonical_digest'})
-        return self.model_copy(update={'canonical_digest': digest(body)})
+
+class BaselineSelection(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    mode: ComparisonMode
+    requested_attempt_id: UUID | None = None
+    resolved_attempt_id: UUID | None = None
+    selection_rule: Literal[
+        'none',
+        'latest_previous_success',
+        'explicit',
+        'not_available',
+    ]
+    reason_code: str | None = None
+
+
+class ComparisonCandidate(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    attempt_id: UUID
+    task_id: UUID
+    task_name: str
+    attempt_number: int
+    state: Literal['succeeded']
+    created_at: datetime
+    snapshot_sha256: str
+    base_fingerprint: str
+    dataset_sha256: str
+    dataset_split_sha256: str
+    best_eval_loss: float | None = None
+    final_eval_loss: float | None = None
+    eval_point_count: int = 0
+    available_adapter_roles: list[AdapterRole] = Field(default_factory=list)
+    comparability_preview: ComparabilityStatus
+    changed_parameter_count: int = 0
+    confounder_preview_codes: list[str] = Field(default_factory=list)
+
+
+class ComparisonCandidates(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    subject_attempt_id: UUID
+    group: ComparisonGroup
+    suggested_baseline_attempt_id: UUID | None = None
+    candidates: list[ComparisonCandidate] = Field(default_factory=list)
+
+
+class ParameterChange(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    field: Literal[
+        'epochs',
+        'learning_rate',
+        'cutoff_len',
+        'batch_size',
+        'gradient_accumulation',
+        'lora_rank',
+        'lora_alpha',
+        'lora_dropout',
+        'scheduler',
+        'warmup_ratio',
+        'template',
+        'seed',
+    ]
+    baseline_value: Any
+    subject_value: Any
+    classification: Literal[
+        'optimization',
+        'budget',
+        'input_processing',
+        'stochasticity',
+    ]
+
+
+ConfounderCode = Literal[
+    'runtime_lock_changed',
+    'training_image_changed',
+    'gpu_changed',
+    'template_changed',
+    'seed_changed',
+    'cutoff_changed',
+    'multiple_parameters_changed',
+    'adapter_role_mismatch',
+    'baseline_metrics_missing',
+    'subject_metrics_missing',
+    'eval_coverage_low',
+    'baseline_source_unavailable',
+    'subject_source_unavailable',
+]
+
+
+class Confounder(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    code: ConfounderCode
+    field: str | None = None
+    baseline_value: Any = None
+    subject_value: Any = None
+    text: str
+    blocking: bool = False
+
+
+class MetricDelta(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    name: Literal[
+        'best_eval_loss',
+        'final_eval_loss',
+        'latest_eval_loss',
+        'lowest_eval_loss',
+        'final_train_loss',
+        'token_overflow_count',
+    ]
+    subject_value: float | int | None = None
+    baseline_value: float | int | None = None
+    absolute_delta: float | int | None = None
+    relative_delta: float | None = None
+    better_direction: Literal['lower', 'higher', 'neutral']
+    evidence_ids: list[str] = Field(default_factory=list)
+
+
+class ModelEffect(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    status: ModelEffectStatus
+    reason: Literal[
+        'no_comparable_downstream_evaluation',
+        'evaluation_missing_on_one_side',
+        'evaluation_spec_mismatch',
+        'score_comparison_available',
+    ]
+    subject_evaluation_id: UUID | None = None
+    baseline_evaluation_id: UUID | None = None
+    note: str
 
 
 class GateReason(BaseModel):
@@ -140,6 +287,87 @@ class GateResult(BaseModel):
         return self.model_copy(update={'gate_digest': digest(body)})
 
 
+class ComparisonResult(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    schema_version: Literal['comparison-result-v1'] = 'comparison-result-v1'
+    policy_version: str
+    group: ComparisonGroup
+    selection: BaselineSelection
+    comparability_status: ComparabilityStatus
+    confidence: ComparisonConfidence
+    training_signal: TrainingSignal
+    delivery_signal: DeliverySignal
+    model_effect: ModelEffect
+    primary_adapter_role: AdapterRole | None = None
+    metric_deltas: list[MetricDelta] = Field(default_factory=list)
+    parameter_changes: list[ParameterChange] = Field(default_factory=list)
+    confounders: list[Confounder] = Field(default_factory=list)
+    regressions: list[dict[str, Any]] = Field(default_factory=list)
+    reason_codes: list[str] = Field(default_factory=list)
+    evidence_ids: list[str] = Field(default_factory=list)
+    comparison_digest: str | None = None
+
+    def with_digest(self) -> 'ComparisonResult':
+        body = self.model_dump(mode='json', exclude={'comparison_digest'})
+        return self.model_copy(update={'comparison_digest': digest(body)})
+
+
+class BaselineEvidenceProjection(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    attempt_id: UUID
+    snapshot_sha256: str
+    attempt_state: Literal['succeeded']
+    facts: dict[str, Any]
+    coverage: list[EvidenceCoverage]
+    evidence: list[EvidenceRef]
+    gate: GateResult
+    source_revision: SourceRevision
+    canonical_digest: str | None = None
+
+    def with_digest(self) -> 'BaselineEvidenceProjection':
+        body = self.model_dump(mode='json', exclude={'canonical_digest'})
+        return self.model_copy(update={'canonical_digest': digest(body)})
+
+
+class ComparisonEvidence(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    comparison_result: ComparisonResult
+    baseline: BaselineEvidenceProjection | None = None
+
+
+class _EvidenceBase(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    attempt_id: UUID
+    evidence_cutoff_at: datetime
+    attempt_state: Literal['succeeded', 'failed', 'cancelled']
+    source_revision: SourceRevision
+    coverage: list[EvidenceCoverage]
+    evidence: list[EvidenceRef]
+    facts: dict[str, Any]
+    conflicts: list[EvidenceConflict] = Field(default_factory=list)
+    redaction_version: str = 'diagnosis-redaction-v1'
+    canonical_digest: str | None = None
+
+    def with_digest(self) -> Self:
+        body = self.model_dump(mode='json', exclude={'canonical_digest'})
+        return self.model_copy(update={'canonical_digest': digest(body)})
+
+
+class EvidencePack(_EvidenceBase):
+    schema_version: Literal['evidence-pack-v1'] = 'evidence-pack-v1'
+
+
+class EvidencePackV2(_EvidenceBase):
+    schema_version: Literal['evidence-pack-v2'] = 'evidence-pack-v2'
+    comparison: ComparisonEvidence | None = None
+
+
+EvidencePackDocument: TypeAlias = Annotated[
+    EvidencePack | EvidencePackV2,
+    Field(discriminator='schema_version'),
+]
+
+
 class Claim(BaseModel):
     model_config = ConfigDict(extra='forbid')
     id: str = Field(min_length=1, max_length=80)
@@ -162,6 +390,7 @@ class Finding(BaseModel):
         'artifact',
         'failure',
         'coverage',
+        'comparison',
     ]
     severity: Literal['blocked', 'attention', 'passed', 'info']
     epistemic_status: Literal['observed', 'inferred', 'unknown']
@@ -218,9 +447,8 @@ class GateAxis(BaseModel):
     evidence_ids: list[str] = Field(default_factory=list)
 
 
-class AdvisoryReport(BaseModel):
+class _AdvisoryBase(BaseModel):
     model_config = ConfigDict(extra='forbid')
-    schema_version: Literal['advisory-report-v1'] = 'advisory-report-v1'
     id: UUID
     job_id: UUID
     attempt_id: UUID
@@ -246,6 +474,36 @@ class AdvisoryReport(BaseModel):
     generated_at: datetime
     published_at: datetime
 
-    def with_digest(self) -> 'AdvisoryReport':
+    def with_digest(self) -> Self:
         body = self.model_dump(mode='json', exclude={'report_digest'})
         return self.model_copy(update={'report_digest': digest(body)})
+
+
+class AdvisoryReport(_AdvisoryBase):
+    schema_version: Literal['advisory-report-v1'] = 'advisory-report-v1'
+
+
+class AdvisoryReportV2(_AdvisoryBase):
+    schema_version: Literal['advisory-report-v2'] = 'advisory-report-v2'
+    baseline_attempt_id: UUID | None = None
+    comparison: ComparisonResult
+
+
+AdvisoryReportDocument: TypeAlias = Annotated[
+    AdvisoryReport | AdvisoryReportV2,
+    Field(discriminator='schema_version'),
+]
+
+
+def parse_evidence_pack(value: Any) -> EvidencePack | EvidencePackV2:
+    """Read a persisted evidence document without discarding v1 history."""
+    if isinstance(value, dict) and value.get('schema_version') == 'evidence-pack-v2':
+        return EvidencePackV2.model_validate(value)
+    return EvidencePack.model_validate(value)
+
+
+def parse_advisory_report(value: Any) -> AdvisoryReport | AdvisoryReportV2:
+    """Read a persisted report document without rewriting old reports."""
+    if isinstance(value, dict) and value.get('schema_version') == 'advisory-report-v2':
+        return AdvisoryReportV2.model_validate(value)
+    return AdvisoryReport.model_validate(value)
